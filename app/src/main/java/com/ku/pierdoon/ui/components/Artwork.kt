@@ -136,7 +136,7 @@ object ArtworkCache {
         }
     }
 
-    /** Theme seed from album art, reusing the 36x36 blurred copy. Cached per album. */
+    /** Theme seed from album art, reusing the 36x36 blurred copy; null without art. Cached per album. */
     suspend fun themeSeed(context: Context, songId: Long, albumId: Long): Int? {
         val source = source(songId, albumId)
         synchronized(seeds) { if (source in seeds) return seeds[source] }

@@ -26,13 +26,20 @@ object SchemeGenerator {
         fun tone(t: Int): Color = Color(Lab.lchToArgb(t.toDouble(), chroma, hue))
     }
 
+    /**
+     * Seed for black, white and grey art: [scheme] turns it into a colourless palette instead
+     * of inventing a hue the picture doesn't have. Pickers never produce a grey seed.
+     */
+    const val MONOCHROME_SEED: Int = 0xFF808080.toInt()
+
     fun scheme(seed: Int, dark: Boolean): ColorScheme {
         val (_, c, h) = Lab.argbToLch(seed)
-        val primary = Palette(h, maxOf(c, 48.0))
-        val secondary = Palette(h, 16.0)
-        val tertiary = Palette((h + 60.0) % 360.0, 28.0)
-        val neutral = Palette(h, 4.0)
-        val neutralVariant = Palette(h, 9.0)
+        val mono = c < MONO_CHROMA
+        val primary = Palette(h, if (mono) 0.0 else maxOf(c, 48.0))
+        val secondary = Palette(h, if (mono) 0.0 else 16.0)
+        val tertiary = Palette((h + 60.0) % 360.0, if (mono) 0.0 else 28.0)
+        val neutral = Palette(h, if (mono) 0.0 else 4.0)
+        val neutralVariant = Palette(h, if (mono) 0.0 else 9.0)
         val error = Palette(30.0, 80.0)
 
         return if (!dark) lightColorScheme(
@@ -81,13 +88,15 @@ object SchemeGenerator {
     /** Seed with the given hue at a lively, always-in-gamut chroma; used by the hue picker. */
     fun seedFromHue(hue: Float): Int = Lab.lchToArgb(50.0, 60.0, hue.toDouble())
 
+    private const val MONO_CHROMA = 4.0
+
     fun hueOf(argb: Int): Float = Lab.argbToLch(argb).third.toFloat()
 
     /**
      * Picks a theme seed from a tiny image: chroma-weighted hue histogram, so a small vivid
-     * accent beats a large grey area. Returns null for (near-)greyscale art.
+     * accent beats a large grey area. (Near-)greyscale art gets [MONOCHROME_SEED].
      */
-    fun seedFromPixels(pixels: IntArray): Int? {
+    fun seedFromPixels(pixels: IntArray): Int {
         val bins = DoubleArray(36)
         val chromaSum = DoubleArray(36)
         for (p in pixels) {
@@ -105,7 +114,7 @@ object SchemeGenerator {
             val score = bins[i] + 0.5 * (bins[(i + 35) % 36] + bins[(i + 1) % 36])
             if (score > bestScore) { bestScore = score; best = i }
         }
-        if (best < 0 || bestScore < pixels.size * 2.0) return null
+        if (best < 0 || bestScore < pixels.size * 2.0) return MONOCHROME_SEED
         val hue = best * 10.0 + 5.0
         return Lab.lchToArgb(50.0, 60.0, hue)
     }
