@@ -185,19 +185,13 @@ class PlaybackService : MediaSessionService() {
     private fun loadSavedQueue(): Restored? {
         val q = queueStore.read() ?: return null
         val byId = MusicRepository(this).loadSongs(q.songIds).associateBy { it.id }
-        val items = ArrayList<MediaItem>(q.songIds.size)
-        var index = 0
-        var current = false
-        q.songIds.forEachIndexed { i, id ->
-            val song = byId[id] ?: return@forEachIndexed
-            if (i < q.index) index++ else if (i == q.index) current = true
-            items += song.toMediaItem()
-        }
-        if (items.isEmpty()) return null
-        // The current track is gone: start the one after it from the top.
-        val position = if (current) q.positionMs else 0L
+        val plan = q.restorePlan { it in byId } ?: return null
         return Restored(
-            MediaSession.MediaItemsWithStartPosition(items, index.coerceAtMost(items.lastIndex), position),
+            MediaSession.MediaItemsWithStartPosition(
+                plan.songIds.map { byId.getValue(it).toMediaItem() },
+                plan.index,
+                plan.positionMs,
+            ),
             q.shuffle,
             q.repeatMode,
         )

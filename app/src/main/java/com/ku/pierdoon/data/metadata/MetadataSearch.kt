@@ -1,6 +1,7 @@
 package com.ku.pierdoon.data.metadata
 
 import androidx.compose.runtime.Immutable
+import com.ku.pierdoon.data.USER_AGENT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -143,5 +144,4 @@ object MetadataSearch {
 
     private const val LIMIT = 12
     private const val UNKNOWN_LENGTH_RANK = Long.MAX_VALUE / 2
-    private const val USER_AGENT = "Pierdoon/1.2.1 (https://github.com/kural3/Pierdoon)"
 }

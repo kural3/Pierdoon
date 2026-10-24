@@ -9,6 +9,8 @@ import android.content.pm.PackageInstaller
 import android.os.Build
 import androidx.compose.runtime.Immutable
 import androidx.core.content.edit
+import com.ku.pierdoon.BuildConfig
+import com.ku.pierdoon.data.USER_AGENT
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -74,9 +76,7 @@ object Updater {
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
-    val currentVersion: String by lazy {
-        runCatching { app.packageManager.getPackageInfo(app.packageName, 0).versionName }.getOrNull().orEmpty()
-    }
+    const val currentVersion: String = BuildConfig.VERSION_NAME
 
     @Synchronized
     fun init(context: Context) {
@@ -102,7 +102,7 @@ object Updater {
         val result = try {
             val release = withContext(Dispatchers.IO) { fetchLatest() }
             prefs.edit { putLong(K_LAST_CHECK, System.currentTimeMillis()) }
-            if (release != null && isNewer(release.version, currentVersion)) {
+            if (release != null && isNewerVersion(release.version, currentVersion)) {
                 UpdateState.Available(release)
             } else {
                 UpdateState.UpToDate
@@ -246,25 +246,33 @@ object Updater {
         conn.readTimeout = 20_000
         conn.instanceFollowRedirects = true
         conn.setRequestProperty("Accept", accept)
-        conn.setRequestProperty("User-Agent", "Pierdoon/$currentVersion")
+        conn.setRequestProperty("User-Agent", USER_AGENT)
         if (conn.responseCode !in 200..299) {
             conn.disconnect()
             throw IOException("HTTP ${conn.responseCode}")
         }
         return conn
     }
+}
 
-    /** "1.10" > "1.9"; missing parts count as 0, so "1.2" == "1.2.0". */
-    internal fun isNewer(candidate: String, current: String): Boolean {
-        val a = candidate.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
-        val b = current.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
-        for (i in 0 until maxOf(a.size, b.size)) {
-            val x = a.getOrElse(i) { 0 }
-            val y = b.getOrElse(i) { 0 }
-            if (x != y) return x > y
-        }
-        return false
+/**
+ * "1.10" > "1.9"; missing parts count as 0, so "1.2" == "1.2.0".
+ * A pre-release comes before its release ("1.3-beta" < "1.3"), so a beta install is still
+ * offered the final version. Two pre-releases of the same version aren't ranked: no offer
+ * beats a guess that could be a downgrade.
+ *
+ * Outside [Updater] so it can be tested without the object's Android-bound state.
+ */
+internal fun isNewerVersion(candidate: String, current: String): Boolean {
+    fun numbers(v: String) = v.substringBefore('-').split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+    val a = numbers(candidate)
+    val b = numbers(current)
+    for (i in 0 until maxOf(a.size, b.size)) {
+        val x = a.getOrElse(i) { 0 }
+        val y = b.getOrElse(i) { 0 }
+        if (x != y) return x > y
     }
+    return '-' in current && '-' !in candidate
 }
 
 class InstallResultReceiver : BroadcastReceiver() {

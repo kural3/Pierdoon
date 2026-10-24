@@ -66,6 +66,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // VERSION_NAME for the User-Agent and the updater.
+        buildConfig = true
     }
 }
 

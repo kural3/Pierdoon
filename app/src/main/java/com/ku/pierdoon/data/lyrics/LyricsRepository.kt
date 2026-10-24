@@ -2,6 +2,7 @@ package com.ku.pierdoon.data.lyrics
 
 import android.content.Context
 import android.util.LruCache
+import com.ku.pierdoon.data.USER_AGENT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -173,7 +174,6 @@ class LyricsRepository(context: Context) {
 
     private companion object {
         const val API = "https://lrclib.net/api"
-        const val USER_AGENT = "Pier.doon/1.0 (Android music player)"
         const val MAX_DURATION_DIFF_SEC = 5.0
         const val UNSYNCED_PENALTY = 3.0
         const val NOT_FOUND_TTL_MS = 3L * 24 * 60 * 60 * 1000
