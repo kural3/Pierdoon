@@ -3,8 +3,12 @@ package com.ku.pierdoon
 import android.app.Application
 import android.content.ComponentName
 import android.content.ContentUris
+import android.database.ContentObserver
 import android.net.ConnectivityManager
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.provider.MediaStore
 import androidx.compose.runtime.Immutable
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
@@ -31,6 +35,11 @@ import com.ku.pierdoon.playback.nextRepeatMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -163,13 +172,46 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }, ContextCompat.getMainExecutor(app))
     }
 
+    private var loadJob: Job? = null
+
     fun loadLibrary(force: Boolean = false) {
         if (!force && _library.value is LibraryState.Ready) return
-        viewModelScope.launch {
+        watchMediaStore()
+        // A newer load supersedes one still running.
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             val songs = runCatching { repository.loadSongs() }.getOrElse { emptyList() }
+            // Unrelated MediaStore changes (another app's ringtone, say) leave the UI alone.
+            if ((_library.value as? LibraryState.Ready)?.songs == songs) return@launch
             songsById = songs.associateBy { it.id }
             _collections.value = withContext(Dispatchers.Default) { MusicCollections.from(songs) }
             _library.value = LibraryState.Ready(songs)
+        }
+    }
+
+    /**
+     * Files added, deleted or retagged show up without a manual rescan. The media scanner
+     * reports a batch as a burst of changes, so they are coalesced into one reload; nothing
+     * is registered once the screen's ViewModel is gone.
+     */
+    private val mediaStoreChanged =
+        MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private val mediaStoreObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            mediaStoreChanged.tryEmit(Unit)
+        }
+    }
+    private var watching = false
+
+    @OptIn(FlowPreview::class)
+    private fun watchMediaStore() {
+        if (watching) return
+        watching = true
+        getApplication<Application>().contentResolver.registerContentObserver(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, true, mediaStoreObserver,
+        )
+        viewModelScope.launch {
+            mediaStoreChanged.debounce(MEDIA_STORE_DEBOUNCE_MS).collect { loadLibrary(force = true) }
         }
     }
 
@@ -268,6 +310,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        if (watching) getApplication<Application>().contentResolver.unregisterContentObserver(mediaStoreObserver)
         controller?.removeListener(listener)
         MediaController.releaseFuture(controllerFuture)
         controller = null
@@ -276,5 +319,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         const val POSITION_TICK_MS = 500L
         const val STOP_TIMEOUT_MS = 1_000L
+        const val MEDIA_STORE_DEBOUNCE_MS = 1_500L
     }
 }
