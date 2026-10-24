@@ -143,4 +143,19 @@
     <string name="playlist_cover_shape">Форма</string>
     <string name="playlist_cover_image">Изображение</string>
     <string name="playlist_cover_from_track">Без изображения на обложке будет первый трек</string>
+    <string name="settings_updates">Обновления</string>
+    <string name="settings_updates_auto">Проверять автоматически</string>
+    <string name="settings_updates_auto_desc">Раз в 12 часов смотреть, вышла ли новая версия на GitHub</string>
+    <string name="settings_check_updates">Проверить обновления</string>
+    <string name="update_current">Установлена версия %1$s</string>
+    <string name="update_checking">Проверка…</string>
+    <string name="update_up_to_date">Установлена последняя версия, %1$s</string>
+    <string name="update_check_failed">Не удалось связаться с GitHub</string>
+    <string name="update_available">Доступна версия %1$s</string>
+    <string name="update_installed_now">Сейчас установлена %1$s</string>
+    <string name="update_install">Обновить</string>
+    <string name="update_later">Позже</string>
+    <string name="update_downloading">Загрузка…</string>
+    <string name="update_confirm">Подтвердите установку в окне Android</string>
+    <string name="update_failed">Не удалось установить обновление</string>
 </resources>

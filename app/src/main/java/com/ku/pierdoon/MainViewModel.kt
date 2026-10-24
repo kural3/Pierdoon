@@ -28,6 +28,9 @@ import com.ku.pierdoon.data.MusicCollections
 import com.ku.pierdoon.data.TagOverride
 import com.ku.pierdoon.data.TagOverrides
 import com.ku.pierdoon.data.metadata.CoverEdit
+import com.ku.pierdoon.data.update.AppRelease
+import com.ku.pierdoon.data.update.UpdateState
+import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.TagWriter
 import com.ku.pierdoon.data.metadata.TrackEdit
@@ -194,6 +197,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             syncQueue(c)
             eventTick.update { it + 1 }
         }, ContextCompat.getMainExecutor(app))
+    }
+
+    val update: StateFlow<UpdateState> = Updater.state
+    private val _updatePrompt = MutableStateFlow(false)
+    /** Whether the "new version" dialog is up. */
+    val updatePrompt: StateFlow<Boolean> = _updatePrompt.asStateFlow()
+
+    init {
+        // Quietly on launch; a release the user put off with "Later" isn't offered again.
+        if (SettingsStore.settings.value.checkUpdates && Updater.isDue()) {
+            viewModelScope.launch {
+                val s = Updater.check()
+                if (s is UpdateState.Available && !Updater.isSkipped(s.release)) _updatePrompt.value = true
+            }
+        }
+    }
+
+    fun checkForUpdates() {
+        viewModelScope.launch {
+            if (Updater.check() is UpdateState.Available) _updatePrompt.value = true
+        }
+    }
+
+    fun showUpdate() { _updatePrompt.value = true }
+    fun installUpdate(release: AppRelease) = Updater.install(release)
+
+    fun dismissUpdate() {
+        when (val s = Updater.state.value) {
+            is UpdateState.Downloading -> Updater.cancel()
+            is UpdateState.Available -> Updater.skip(s.release)
+            else -> Unit
+        }
+        _updatePrompt.value = false
     }
 
     private var loadJob: Job? = null

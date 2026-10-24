@@ -43,6 +43,7 @@ import com.ku.pierdoon.R
 import com.ku.pierdoon.data.AppSettings
 import com.ku.pierdoon.data.ColorSource
 import com.ku.pierdoon.data.ThemeMode
+import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.library.AppScaffold
@@ -68,6 +69,9 @@ fun SettingsScreen(
     lyricsCacheSize: suspend () -> Long,
     onClearLyricsCache: () -> Unit,
     onRescan: () -> Unit,
+    updateState: UpdateState,
+    onCheckUpdates: () -> Unit,
+    onShowUpdate: () -> Unit,
     bottomInset: Dp,
 ) {
     val context = LocalContext.current
@@ -307,6 +311,44 @@ fun SettingsScreen(
                                 onClick = {
                                     onRescan()
                                     Toast.makeText(context, done, Toast.LENGTH_SHORT).show()
+                                },
+                            )
+                        },
+                    )
+                }
+            }
+            item(key = "updates") {
+                Group(stringResource(R.string.settings_updates)) {
+                    listOf<@Composable (Shape) -> Unit>(
+                        { shape ->
+                            SwitchItem(
+                                shape = shape,
+                                title = stringResource(R.string.settings_updates_auto),
+                                subtitle = stringResource(R.string.settings_updates_auto_desc),
+                                checked = settings.checkUpdates,
+                                onChange = { v -> onUpdate { it.copy(checkUpdates = v) } },
+                            )
+                        },
+                        { shape ->
+                            ActionItem(
+                                shape = shape,
+                                title = stringResource(R.string.settings_check_updates),
+                                subtitle = when (updateState) {
+                                    UpdateState.Checking -> stringResource(R.string.update_checking)
+                                    UpdateState.UpToDate -> stringResource(R.string.update_up_to_date, version)
+                                    UpdateState.CheckFailed -> stringResource(R.string.update_check_failed)
+                                    is UpdateState.Available -> stringResource(R.string.update_available, updateState.release.version)
+                                    is UpdateState.Downloading -> stringResource(R.string.update_downloading)
+                                    is UpdateState.Installing -> stringResource(R.string.update_confirm)
+                                    is UpdateState.InstallFailed -> stringResource(R.string.update_failed)
+                                    UpdateState.Idle -> stringResource(R.string.update_current, version)
+                                },
+                                onClick = {
+                                    when (updateState) {
+                                        UpdateState.Idle, UpdateState.UpToDate, UpdateState.CheckFailed -> onCheckUpdates()
+                                        UpdateState.Checking -> Unit
+                                        else -> onShowUpdate()
+                                    }
                                 },
                             )
                         },

@@ -37,6 +37,8 @@ data class AppSettings(
     val audioOffload: Boolean = true,
     /** Last choice on the track editor: the app's records or the file itself. */
     val editTarget: SaveTarget = SaveTarget.App,
+    /** Look for a new release on GitHub now and then (at most twice a day). */
+    val checkUpdates: Boolean = true,
 )
 
 /**
@@ -72,6 +74,7 @@ object SettingsStore {
             audioOffload = p.getBoolean(K_OFFLOAD, d.audioOffload),
             editTarget = runCatching { SaveTarget.valueOf(p.getString(K_EDIT_TARGET, d.editTarget.name)!!) }
                 .getOrDefault(d.editTarget),
+            checkUpdates = p.getBoolean(K_UPDATES, d.checkUpdates),
         )
     }
 
@@ -93,6 +96,7 @@ object SettingsStore {
             putBoolean(K_SILENCE, s.skipSilence)
             putBoolean(K_OFFLOAD, s.audioOffload)
             putString(K_EDIT_TARGET, s.editTarget.name)
+            putBoolean(K_UPDATES, s.checkUpdates)
         }
     }
 
@@ -110,4 +114,5 @@ object SettingsStore {
     private const val K_SILENCE = "skip_silence"
     private const val K_OFFLOAD = "audio_offload"
     private const val K_EDIT_TARGET = "edit_target"
+    private const val K_UPDATES = "check_updates"
 }

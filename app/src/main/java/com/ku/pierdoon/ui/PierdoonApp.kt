@@ -116,6 +116,7 @@ import com.ku.pierdoon.ui.library.PlaylistActionsSheet
 import com.ku.pierdoon.ui.library.PlaylistCover
 import com.ku.pierdoon.ui.library.PlaylistCoverSheet
 import com.ku.pierdoon.ui.edit.EditSongScreen
+import com.ku.pierdoon.ui.update.UpdateDialog
 import com.ku.pierdoon.ui.library.PlaylistNameDialog
 import com.ku.pierdoon.ui.library.PlaylistsScreen
 import com.ku.pierdoon.ui.library.SongActionTarget
@@ -164,6 +165,8 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     val lyrics by vm.lyrics.collectAsStateWithLifecycle()
     val userData by vm.userData.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
+    val update by vm.update.collectAsStateWithLifecycle()
+    val updatePrompt by vm.updatePrompt.collectAsStateWithLifecycle()
     val nowPlaying = rememberLastNonNull(player.nowPlaying)
     val backdrop = rememberBackdrop()
     val nav = rememberNavigator()
@@ -367,6 +370,9 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             onRemoveImage = { vm.removePlaylistCover(p.id) },
         )
     }
+    if (updatePrompt) {
+        UpdateDialog(state = update, onInstall = vm::installUpdate, onDismiss = vm::dismissUpdate)
+    }
     when (val d = dialog) {
         is PlaylistDialog.Create -> PlaylistNameDialog(
             title = stringResource(R.string.new_playlist),
@@ -466,6 +472,9 @@ private fun Screens(
                         lyricsCacheSize = vm::lyricsCacheSize,
                         onClearLyricsCache = vm::clearLyricsCache,
                         onRescan = vm::rescanLibrary,
+                        updateState = vm.update.collectAsStateWithLifecycle().value,
+                        onCheckUpdates = vm::checkForUpdates,
+                        onShowUpdate = vm::showUpdate,
                         bottomInset = bottomInset,
                     )
                 }
