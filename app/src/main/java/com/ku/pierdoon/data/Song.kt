@@ -5,6 +5,8 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.net.toUri
 import androidx.compose.runtime.Immutable
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 
 @Immutable
 data class Song(
@@ -22,6 +24,21 @@ data class Song(
 
     val artworkUri: Uri
         get() = ContentUris.withAppendedId(ALBUM_ART_URI, albumId)
+
+    fun toMediaItem(): MediaItem = MediaItem.Builder()
+        .setMediaId(id.toString())
+        .setUri(uri)
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle(title)
+                .setArtist(artist)
+                .setAlbumTitle(album)
+                .setArtworkUri(artworkUri)
+                .setIsPlayable(true)
+                .setIsBrowsable(false)
+                .build()
+        )
+        .build()
 
     companion object {
         val ALBUM_ART_URI: Uri = "content://media/external/audio/albumart".toUri()

@@ -9,6 +9,21 @@ import kotlinx.coroutines.withContext
 class MusicRepository(private val context: Context) {
 
     suspend fun loadSongs(): List<Song> = withContext(Dispatchers.IO) {
+        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= ?"
+        val songs = query(selection, arrayOf(MIN_DURATION_MS.toString()))
+        val collator = Collator.getInstance().apply { strength = Collator.PRIMARY }
+        songs.sortWith { a, b -> collator.compare(a.title, b.title) }
+        songs
+    }
+
+    /** Songs that still exist among [ids], in no particular order. Call off the main thread. */
+    fun loadSongs(ids: Collection<Long>): List<Song> {
+        if (ids.isEmpty()) return emptyList()
+        // Inlined numbers, not "?" args: queues can outgrow SQLite's bound-parameter limit.
+        return query("${MediaStore.Audio.Media._ID} IN (${ids.distinct().joinToString(",")})", null)
+    }
+
+    private fun query(selection: String, args: Array<String>?): ArrayList<Song> {
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
@@ -18,9 +33,7 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATE_ADDED,
         )
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= ?"
-        val args = arrayOf(MIN_DURATION_MS.toString())
-        // MediaProvider rejects "COLLATE LOCALIZED", so locale-aware sorting happens below.
+        // MediaProvider rejects "COLLATE LOCALIZED", so loadSongs() sorts by locale itself.
         val order = "${MediaStore.Audio.Media.TITLE} ASC"
 
         val songs = ArrayList<Song>()
@@ -47,9 +60,7 @@ class MusicRepository(private val context: Context) {
                 )
             }
         }
-        val collator = Collator.getInstance().apply { strength = Collator.PRIMARY }
-        songs.sortWith { a, b -> collator.compare(a.title, b.title) }
-        songs
+        return songs
     }
 
     private companion object {

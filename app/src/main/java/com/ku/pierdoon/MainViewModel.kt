@@ -10,8 +10,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -283,18 +281,3 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         const val STOP_TIMEOUT_MS = 1_000L
     }
 }
-
-private fun Song.toMediaItem(): MediaItem = MediaItem.Builder()
-    .setMediaId(id.toString())
-    .setUri(uri)
-    .setMediaMetadata(
-        MediaMetadata.Builder()
-            .setTitle(title)
-            .setArtist(artist)
-            .setAlbumTitle(album)
-            .setArtworkUri(artworkUri)
-            .setIsPlayable(true)
-            .setIsBrowsable(false)
-            .build()
-    )
-    .build()
