@@ -21,3 +21,11 @@ data class PlayerState(
     val shuffle: Boolean = false,
     @param:Player.RepeatMode val repeatMode: Int = Player.REPEAT_MODE_OFF,
 )
+
+/** Off → all → one → off, the order of the player's repeat button. */
+@Player.RepeatMode
+fun nextRepeatMode(@Player.RepeatMode mode: Int): Int = when (mode) {
+    Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+    Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+    else -> Player.REPEAT_MODE_OFF
+}

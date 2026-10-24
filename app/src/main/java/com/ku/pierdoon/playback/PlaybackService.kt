@@ -2,6 +2,7 @@ package com.ku.pierdoon.playback
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -13,13 +14,18 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.RenderersFactory
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.session.CommandButton
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.google.common.util.concurrent.SettableFuture
 import com.ku.pierdoon.MainActivity
+import com.ku.pierdoon.R
 import com.ku.pierdoon.data.MusicRepository
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
@@ -51,6 +57,9 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         SettingsStore.init(this)
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_notification) }
+        )
 
         // Audio-only renderers: no video/text/metadata pipelines are created,
         // which keeps memory low and lets R8 drop the unused code.
@@ -81,6 +90,9 @@ class PlaybackService : MediaSessionService() {
 
             override fun onEvents(player: Player, events: Player.Events) {
                 if (events.containsAny(*QUEUE_EVENTS)) scheduleSave(player)
+                if (events.containsAny(Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED, Player.EVENT_REPEAT_MODE_CHANGED)) {
+                    session?.setMediaButtonPreferences(modeButtons(player))
+                }
             }
         })
 
@@ -120,6 +132,7 @@ class PlaybackService : MediaSessionService() {
         session = MediaSession.Builder(this, player)
             .setSessionActivity(openApp)
             .setCallback(SessionCallback())
+            .setMediaButtonPreferences(modeButtons(player))
             .build()
     }
 
@@ -207,8 +220,55 @@ class PlaybackService : MediaSessionService() {
         repeatMode = player.repeatMode,
     )
 
+    /** Shuffle and repeat for the notification / lock screen, showing the current mode. */
+    private fun modeButtons(player: Player) = listOf(
+        CommandButton.Builder(if (player.shuffleModeEnabled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF)
+            .setDisplayName(getString(R.string.shuffle))
+            .setSessionCommand(TOGGLE_SHUFFLE)
+            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .build(),
+        CommandButton.Builder(
+            when (player.repeatMode) {
+                Player.REPEAT_MODE_ONE -> CommandButton.ICON_REPEAT_ONE
+                Player.REPEAT_MODE_ALL -> CommandButton.ICON_REPEAT_ALL
+                else -> CommandButton.ICON_REPEAT_OFF
+            }
+        )
+            .setDisplayName(getString(R.string.repeat))
+            .setSessionCommand(CYCLE_REPEAT)
+            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .build(),
+    )
+
     /** Controllers send only ids + metadata; the playable URI is resolved here. */
     private inner class SessionCallback : MediaSession.Callback {
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): MediaSession.ConnectionResult = MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+            .setAvailableSessionCommands(
+                MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                    .add(TOGGLE_SHUFFLE)
+                    .add(CYCLE_REPEAT)
+                    .build()
+            )
+            .build()
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            val player = session.player
+            when (customCommand.customAction) {
+                TOGGLE_SHUFFLE.customAction -> player.shuffleModeEnabled = !player.shuffleModeEnabled
+                CYCLE_REPEAT.customAction -> player.repeatMode = nextRepeatMode(player.repeatMode)
+                else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+
         override fun onAddMediaItems(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
@@ -234,6 +294,8 @@ class PlaybackService : MediaSessionService() {
 
     private companion object {
         const val SAVE_DELAY_MS = 1_000L
+        val TOGGLE_SHUFFLE = SessionCommand("com.ku.pierdoon.TOGGLE_SHUFFLE", Bundle.EMPTY)
+        val CYCLE_REPEAT = SessionCommand("com.ku.pierdoon.CYCLE_REPEAT", Bundle.EMPTY)
         val QUEUE_EVENTS = intArrayOf(
             Player.EVENT_TIMELINE_CHANGED,
             Player.EVENT_MEDIA_ITEM_TRANSITION,

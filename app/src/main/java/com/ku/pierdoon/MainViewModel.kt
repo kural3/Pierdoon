@@ -27,6 +27,7 @@ import com.ku.pierdoon.data.lyrics.NetworkNotAllowedException
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlaybackService
 import com.ku.pierdoon.playback.PlayerState
+import com.ku.pierdoon.playback.nextRepeatMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -240,11 +241,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cycleRepeat() {
         val c = controller ?: return
-        c.repeatMode = when (c.repeatMode) {
-            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-            else -> Player.REPEAT_MODE_OFF
-        }
+        c.repeatMode = nextRepeatMode(c.repeatMode)
     }
 
     private fun syncState(p: Player) {
