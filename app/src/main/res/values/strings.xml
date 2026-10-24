@@ -7,6 +7,10 @@
     <string name="permission_grant">Разрешить</string>
     <string name="empty_library">На устройстве не найдено музыки</string>
     <string name="unknown_artist">Неизвестный исполнитель</string>
+    <string name="seek_seconds">%d с</string>
+    <string name="seek_back">Назад на 10 секунд</string>
+    <string name="seek_forward">Вперёд на 10 секунд</string>
+    <string name="open_artist">Открыть исполнителя</string>
     <string name="now_playing">Сейчас играет</string>
     <string name="play">Играть</string>
     <string name="pause">Пауза</string>

@@ -298,6 +298,10 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                         onSeek = vm::seekTo,
                         onToggleShuffle = vm::toggleShuffle,
                         onCycleRepeat = vm::cycleRepeat,
+                        onOpenArtist = { name ->
+                            expanded = false
+                            nav.push(Route.ArtistDetail(name))
+                        },
                         onCollapse = { expanded = false },
                         modifier = contentModifier,
                         dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },

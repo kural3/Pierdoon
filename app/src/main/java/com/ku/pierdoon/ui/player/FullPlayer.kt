@@ -12,6 +12,18 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.material3.Icon
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -117,6 +129,7 @@ fun FullPlayer(
     onSeek: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
+    onOpenArtist: (String) -> Unit,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
     /** The expanding sheet owns the vertical drag (swipe down shrinks the player back). */
@@ -238,7 +251,10 @@ fun FullPlayer(
                         PlayerArtwork(
                             nowPlaying = nowPlaying,
                             isPlaying = state.isPlaying,
+                            position = position,
+                            durationMs = state.durationMs,
                             onTap = onTogglePlay,
+                            onSeek = onSeek,
                             modifier = Modifier
                                 .widthIn(max = minOf(maxWidth, maxHeight))
                                 .fillMaxWidth()
@@ -283,12 +299,22 @@ fun FullPlayer(
                                 modifier = Modifier.basicMarquee(iterations = 2),
                             )
                         }
+                        val artist = nowPlaying.artist
                         Text(
-                            text = nowPlaying.artist.ifEmpty { stringResource(R.string.unknown_artist) },
+                            text = artist.ifEmpty { stringResource(R.string.unknown_artist) },
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                // Pulled back by its own padding so the text still lines up with the title.
+                                .offset(x = (-6).dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(
+                                    enabled = artist.isNotEmpty(),
+                                    onClickLabel = stringResource(R.string.open_artist),
+                                ) { onOpenArtist(artist) }
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
 
@@ -470,12 +496,19 @@ private fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, containerCo
 /**
  * Album art that relaxes into a rounded square while playing and curls into a scalloped
  * cookie (and shrinks a little) when paused. One-shot springs, no idle animation.
+ *
+ * Tap toggles playback. Double-tap the left or right third to skip 10 s back or forward,
+ * YouTube Music style: further taps on that side while the hint is up add 10 s each.
+ * The middle third never waits for a second tap, so play/pause there stays instant.
  */
 @Composable
 private fun PlayerArtwork(
     nowPlaying: NowPlaying,
     isPlaying: Boolean,
+    position: () -> PositionSnapshot,
+    durationMs: Long,
     onTap: () -> Unit,
+    onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -486,19 +519,134 @@ private fun PlayerArtwork(
     val restScale = animateFloatAsState(if (isPlaying) 1f else 0.86f, slowSpatial, label = "artScale")
     val scale = remember { derivedStateOf { press.value * restScale.value } }
 
-    Artwork(
-        songId = nowPlaying.songId,
-        albumId = nowPlaying.albumId,
-        large = true,
-        placeholderIconSize = 96.dp,
-        modifier = modifier
-            .scaleBy(scale)
-            .morphClip(ArtworkMorph, morph)
-            .clickable(interactionSource = source, indication = null) {
-                haptics.performHapticFeedback(
-                    if (isPlaying) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn
-                )
-                onTap()
-            },
-    )
+    // Current skip streak: side (-1 back, 1 forward, 0 none), seconds so far, and where it got to.
+    // The target is tracked here because the player's reported position lags rapid taps.
+    var seekSide by remember { mutableIntStateOf(0) }
+    var seekSeconds by remember { mutableIntStateOf(0) }
+    var seekTarget by remember { mutableLongStateOf(0L) }
+    var seekTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(seekTick) {
+        if (seekTick == 0) return@LaunchedEffect
+        delay(SEEK_STREAK_MS)
+        seekSide = 0
+        seekSeconds = 0
+    }
+    LaunchedEffect(nowPlaying.songId) { seekSide = 0; seekSeconds = 0 }
+
+    val currentIsPlaying by rememberUpdatedState(isPlaying)
+    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnSeek by rememberUpdatedState(onSeek)
+    val currentPosition by rememberUpdatedState(position)
+    val currentDuration by rememberUpdatedState(durationMs)
+
+    fun toggle() {
+        haptics.performHapticFeedback(
+            if (currentIsPlaying) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn
+        )
+        currentOnTap()
+    }
+
+    fun skip(side: Int) {
+        val base = if (seekSide == side) seekTarget else currentPosition().estimate()
+        val end = currentDuration.takeIf { it > 0 } ?: Long.MAX_VALUE
+        seekTarget = (base + side * SEEK_STEP_MS).coerceIn(0L, end)
+        seekSeconds = if (seekSide == side) seekSeconds + SEEK_STEP_S else SEEK_STEP_S
+        seekSide = side
+        seekTick++
+        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        currentOnSeek(seekTarget)
+    }
+
+    val backLabel = stringResource(R.string.seek_back)
+    val forwardLabel = stringResource(R.string.seek_forward)
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Artwork(
+            songId = nowPlaying.songId,
+            albumId = nowPlaying.albumId,
+            large = true,
+            placeholderIconSize = 96.dp,
+            modifier = Modifier
+                .fillMaxSize()
+                .scaleBy(scale)
+                .morphClip(ArtworkMorph, morph)
+                .semantics {
+                    role = Role.Button
+                    onClick { toggle(); true }
+                    customActions = listOf(
+                        CustomAccessibilityAction(backLabel) { skip(-1); true },
+                        CustomAccessibilityAction(forwardLabel) { skip(1); true },
+                    )
+                }
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        val pressed = PressInteraction.Press(down.position)
+                        source.tryEmit(pressed)
+                        val up = waitForUpOrCancellation()
+                        source.tryEmit(if (up != null) PressInteraction.Release(pressed) else PressInteraction.Cancel(pressed))
+                        if (up == null) return@awaitEachGesture
+
+                        val third = size.width / 3f
+                        val side = when {
+                            down.position.x < third -> -1
+                            down.position.x > size.width - third -> 1
+                            else -> 0
+                        }
+                        when {
+                            side == 0 -> toggle()
+                            // Mid-streak: every tap on a side counts at once.
+                            seekSide != 0 -> skip(side)
+                            else -> {
+                                val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                                    awaitFirstDown()
+                                }
+                                if (second == null) toggle() else {
+                                    skip(side)
+                                    waitForUpOrCancellation()
+                                }
+                            }
+                        }
+                    }
+                },
+        )
+        SeekHint(side = -1, activeSide = seekSide, seconds = seekSeconds, Modifier.align(Alignment.CenterStart))
+        SeekHint(side = 1, activeSide = seekSide, seconds = seekSeconds, Modifier.align(Alignment.CenterEnd))
+    }
 }
+
+/** "« 20 с" pill over one side of the art while a skip streak on that side is running. */
+@Composable
+private fun SeekHint(side: Int, activeSide: Int, seconds: Int, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val spatial = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+    val effects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    AnimatedVisibility(
+        visible = activeSide == side,
+        enter = fadeIn(effects) + scaleIn(spatial, initialScale = 0.7f),
+        exit = fadeOut(effects) + scaleOut(spatial, targetScale = 0.85f),
+        modifier = modifier.padding(horizontal = 16.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(colors.surfaceContainerHighest.copy(alpha = 0.85f))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        ) {
+            val icon = if (side < 0) PlayerIcons.FastRewind else PlayerIcons.FastForward
+            if (side < 0) Icon(icon, null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
+            Text(
+                text = stringResource(R.string.seek_seconds, seconds),
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.onSurface,
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+            if (side > 0) Icon(icon, null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+private const val SEEK_STEP_S = 10
+private const val SEEK_STEP_MS = SEEK_STEP_S * 1000L
+/** How long after the last skip further single taps keep adding to it. */
+private const val SEEK_STREAK_MS = 800L

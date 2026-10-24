@@ -12,6 +12,8 @@ object PlayerIcons {
     val Pause by lazy { icon("Pause", "M6,19h4V5H6v14zM14,5v14h4V5h-4z") }
     val Next by lazy { icon("Next", "M6,18l8.5,-6L6,6v12zM16,6v12h2V6h-2z") }
     val Previous by lazy { icon("Previous", "M6,6h2v12H6zM9.5,12l8.5,6V6z") }
+    val FastRewind by lazy { icon("FastRewind", "M11,18V6l-8.5,6 8.5,6zM11.5,12l8.5,6V6l-8.5,6z") }
+    val FastForward by lazy { icon("FastForward", "M4,18l8.5,-6L4,6v12zM13,6v12l8.5,-6L13,6z") }
     val Shuffle by lazy {
         icon(
             "Shuffle",
