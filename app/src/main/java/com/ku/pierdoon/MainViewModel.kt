@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -31,6 +32,8 @@ import com.ku.pierdoon.data.lyrics.NetworkNotAllowedException
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlaybackService
 import com.ku.pierdoon.playback.PlayerState
+import com.ku.pierdoon.playback.QueueEntry
+import com.ku.pierdoon.playback.QueueState
 import com.ku.pierdoon.playback.nextRepeatMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -92,6 +95,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _player = MutableStateFlow(PlayerState())
     val player: StateFlow<PlayerState> = _player.asStateFlow()
+
+    /** Rebuilt only when the queue itself changes, not on every play/pause or seek. */
+    private val _queue = MutableStateFlow(QueueState())
+    val queue: StateFlow<QueueState> = _queue.asStateFlow()
 
     private var controller: MediaController? = null
     private val controllerFuture: ListenableFuture<MediaController> =
@@ -158,6 +165,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             syncState(player)
+            if (events.containsAny(*QUEUE_EVENTS)) syncQueue(player)
             eventTick.update { it + 1 }
         }
     }
@@ -168,6 +176,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             controller = c
             c.addListener(listener)
             syncState(c)
+            syncQueue(c)
             eventTick.update { it + 1 }
         }, ContextCompat.getMainExecutor(app))
     }
@@ -186,6 +195,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             songsById = songs.associateBy { it.id }
             _collections.value = withContext(Dispatchers.Default) { MusicCollections.from(songs) }
             _library.value = LibraryState.Ready(songs)
+            controller?.let(::syncQueue)
         }
     }
 
@@ -260,6 +270,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun addToPlaylist(id: Long, songId: Long) = userLibrary.addToPlaylist(id, songId)
     fun removeFromPlaylist(id: Long, songId: Long) = userLibrary.removeFromPlaylist(id, songId)
 
+    fun playQueueEntry(key: String) {
+        val c = controller ?: return
+        val index = c.indexOfQueueKey(key) ?: return
+        c.seekToDefaultPosition(index)
+        c.play()
+    }
+
+    fun removeQueueEntry(key: String) {
+        val c = controller ?: return
+        c.indexOfQueueKey(key)?.let(c::removeMediaItem)
+    }
+
+    /** Moves an upcoming entry to [position] among the upcoming ones (0 = right after the current). */
+    fun moveQueueEntry(key: String, position: Int) {
+        val c = controller ?: return
+        val from = c.indexOfQueueKey(key) ?: return
+        val to = (c.currentMediaItemIndex + 1 + position).coerceIn(0, c.mediaItemCount - 1)
+        if (from != to) c.moveMediaItem(from, to)
+    }
+
     fun next() { controller?.seekToNext() }
     fun previous() { controller?.seekToPrevious() }
     fun seekTo(positionMs: Long) { controller?.seekTo(positionMs) }
@@ -309,6 +339,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun syncQueue(p: Player) {
+        val timeline = p.currentTimeline
+        if (timeline.isEmpty) {
+            _queue.value = QueueState()
+            return
+        }
+        // Walk the play order (shuffle included) from the current track. A shuffled queue on
+        // "repeat all" goes round, so it lists every other track; in list order it stops at the
+        // end, which keeps drag positions meaning "right after the current track".
+        val wrap = p.shuffleModeEnabled && p.repeatMode == Player.REPEAT_MODE_ALL
+        val order = ArrayList<Int>()
+        var i = p.currentMediaItemIndex
+        while (i != C.INDEX_UNSET && order.size < timeline.windowCount) {
+            order += i
+            i = timeline.getNextWindowIndex(
+                i, if (wrap) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF, p.shuffleModeEnabled,
+            )
+        }
+        val seen = HashSet<String>()
+        val entries = order.map { index ->
+            val item = p.getMediaItemAt(index)
+            // LazyColumn needs unique keys; an item without one (or a clash) falls back to its slot.
+            val key = queueKeyOf(item, index).let { if (seen.add(it)) it else "slot:$index" }
+            QueueEntry(key, songsById[item.mediaId.toLongOrNull()] ?: item.toSong())
+        }
+        _queue.value = QueueState(entries.first(), entries.drop(1), canReorder = !p.shuffleModeEnabled)
+    }
+
     override fun onCleared() {
         if (watching) getApplication<Application>().contentResolver.unregisterContentObserver(mediaStoreObserver)
         controller?.removeListener(listener)
@@ -320,5 +378,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         const val POSITION_TICK_MS = 500L
         const val STOP_TIMEOUT_MS = 1_000L
         const val MEDIA_STORE_DEBOUNCE_MS = 1_500L
+        val QUEUE_EVENTS = intArrayOf(
+            Player.EVENT_TIMELINE_CHANGED,
+            Player.EVENT_MEDIA_ITEM_TRANSITION,
+            Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED,
+            Player.EVENT_REPEAT_MODE_CHANGED,
+        )
     }
+}
+
+private fun queueKeyOf(item: MediaItem, index: Int): String =
+    item.mediaMetadata.extras?.getLong(Song.QUEUE_KEY, 0L)?.takeIf { it != 0L }?.let { "q:$it" } ?: "slot:$index"
+
+private fun Player.indexOfQueueKey(key: String): Int? =
+    (0 until mediaItemCount).firstOrNull { queueKeyOf(getMediaItemAt(it), it) == key }
+
+/** A queued file that has left the library still shows with what its metadata knows. */
+private fun MediaItem.toSong(): Song {
+    val md = mediaMetadata
+    return Song(
+        id = mediaId.toLongOrNull() ?: -1L,
+        title = md.title?.toString().orEmpty(),
+        artist = md.artist?.toString().orEmpty(),
+        album = md.albumTitle?.toString().orEmpty(),
+        albumId = md.artworkUri?.let { runCatching { ContentUris.parseId(it) }.getOrNull() } ?: -1L,
+        durationMs = 0L,
+    )
 }

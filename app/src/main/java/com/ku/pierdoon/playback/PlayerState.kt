@@ -2,6 +2,7 @@ package com.ku.pierdoon.playback
 
 import androidx.compose.runtime.Immutable
 import androidx.media3.common.Player
+import com.ku.pierdoon.data.Song
 
 @Immutable
 data class NowPlaying(
@@ -9,6 +10,19 @@ data class NowPlaying(
     val albumId: Long,
     val title: String,
     val artist: String,
+)
+
+/** One entry of the play queue; [key] stays the same while the entry moves. */
+@Immutable
+data class QueueEntry(val key: String, val song: Song)
+
+/** The queue in play order (shuffle-aware) from the current track on. */
+@Immutable
+data class QueueState(
+    val current: QueueEntry? = null,
+    val upcoming: List<QueueEntry> = emptyList(),
+    /** Under shuffle the play order isn't the list order, so dragging would land somewhere else. */
+    val canReorder: Boolean = true,
 )
 
 @Immutable

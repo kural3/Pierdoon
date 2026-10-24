@@ -99,6 +99,8 @@ import com.ku.pierdoon.PositionSnapshot
 import com.ku.pierdoon.R
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlayerState
+import com.ku.pierdoon.playback.QueueState
+import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.BlurredArtwork
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
@@ -110,6 +112,9 @@ import com.ku.pierdoon.ui.components.scaleBy
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/** What fills the space above the controls. */
+private enum class PlayerPanel { Art, Lyrics, Queue }
+
 private val ArtworkMorph by lazy { Morph(MaterialShapes.Square, MaterialShapes.Cookie12Sided) }
 
 @Composable
@@ -119,9 +124,16 @@ fun FullPlayer(
     position: () -> PositionSnapshot,
     lyrics: LyricsState,
     showLyrics: Boolean,
+    queue: QueueState,
+    showQueue: Boolean,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onToggleLyrics: () -> Unit,
+    onToggleQueue: () -> Unit,
+    onPlayQueueEntry: (String) -> Unit,
+    onRemoveQueueEntry: (String) -> Unit,
+    onMoveQueueEntry: (String, Int) -> Unit,
+    onSongLongPress: (Song) -> Unit,
     onRetryLyrics: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrevious: () -> Unit,
@@ -211,7 +223,13 @@ fun FullPlayer(
                     modifier = Modifier.size(48.dp),
                 )
                 Text(
-                    text = stringResource(if (showLyrics) R.string.lyrics else R.string.now_playing),
+                    text = stringResource(
+                        when {
+                            showQueue -> R.string.queue
+                            showLyrics -> R.string.lyrics
+                            else -> R.string.now_playing
+                        }
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                     color = colors.onSurface,
                     textAlign = TextAlign.Center,
@@ -228,7 +246,11 @@ fun FullPlayer(
             val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
             val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
             AnimatedContent(
-                targetState = showLyrics,
+                targetState = when {
+                    showQueue -> PlayerPanel.Queue
+                    showLyrics -> PlayerPanel.Lyrics
+                    else -> PlayerPanel.Art
+                },
                 transitionSpec = {
                     (fadeIn(effects) + scaleIn(spatialF, initialScale = 0.92f))
                         .togetherWith(fadeOut(effects) + scaleOut(spatialF, targetScale = 0.92f))
@@ -237,8 +259,9 @@ fun FullPlayer(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-            ) { lyricsShown ->
-                if (lyricsShown) {
+            ) { panel ->
+                when (panel) {
+                PlayerPanel.Lyrics -> {
                     LyricsPanel(
                         state = lyrics,
                         position = position,
@@ -246,7 +269,19 @@ fun FullPlayer(
                         onRetry = onRetryLyrics,
                         modifier = Modifier.fillMaxSize(),
                     )
-                } else {
+                }
+                PlayerPanel.Queue -> {
+                    QueuePanel(
+                        queue = queue,
+                        onPlay = onPlayQueueEntry,
+                        onRemove = onRemoveQueueEntry,
+                        onMove = onMoveQueueEntry,
+                        onLongPress = onSongLongPress,
+                        // The column's side padding is for the art; rows bring their own inset.
+                        modifier = Modifier.horizontalBleed(12.dp),
+                    )
+                }
+                PlayerPanel.Art -> {
                     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         PlayerArtwork(
                             nowPlaying = nowPlaying,
@@ -261,6 +296,7 @@ fun FullPlayer(
                                 .aspectRatio(1f),
                         )
                     }
+                }
                 }
             }
 
@@ -354,6 +390,14 @@ fun FullPlayer(
                             onClick = onToggleLyrics,
                             icon = PlayerIcons.Lyrics,
                             contentDescription = stringResource(R.string.lyrics),
+                            uncheckedColor = glassButton,
+                            modifier = toggleSize,
+                        )
+                        ExpressiveToggleButton(
+                            checked = showQueue,
+                            onClick = onToggleQueue,
+                            icon = PlayerIcons.Queue,
+                            contentDescription = stringResource(R.string.queue),
                             uncheckedColor = glassButton,
                             modifier = toggleSize,
                         )

@@ -11,6 +11,12 @@
     <string name="seek_back">Назад на 10 секунд</string>
     <string name="seek_forward">Вперёд на 10 секунд</string>
     <string name="open_artist">Открыть исполнителя</string>
+    <string name="queue">Очередь</string>
+    <string name="up_next">Далее</string>
+    <string name="queue_end">Дальше ничего нет</string>
+    <string name="queue_shuffled_hint">Порядок перемешан, перетаскивать можно без перемешивания</string>
+    <string name="remove_from_queue">Убрать из очереди</string>
+    <string name="reorder">Перетащить</string>
     <string name="now_playing">Сейчас играет</string>
     <string name="play">Играть</string>
     <string name="pause">Пауза</string>

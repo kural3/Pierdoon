@@ -66,6 +66,7 @@ fun SongRow(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val colors = MaterialTheme.colorScheme
@@ -128,6 +129,10 @@ fun SongRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            trailing()
         }
     }
 }

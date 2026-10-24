@@ -277,7 +277,7 @@ private fun Message(text: String) {
 }
 
 /** Soft fade at top and bottom. Offscreen compositing only costs while the list moves. */
-private fun Modifier.fadingEdges(): Modifier = this
+internal fun Modifier.fadingEdges(): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()

@@ -160,6 +160,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     val position = vm.position.collectAsStateWithLifecycle()
     val lyrics by vm.lyrics.collectAsStateWithLifecycle()
     val userData by vm.userData.collectAsStateWithLifecycle()
+    val queue by vm.queue.collectAsStateWithLifecycle()
     val nowPlaying = rememberLastNonNull(player.nowPlaying)
     val backdrop = rememberBackdrop()
     val nav = rememberNavigator()
@@ -178,13 +179,14 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
 
     var expanded by rememberSaveable { mutableStateOf(false) }
     var showLyrics by rememberSaveable { mutableStateOf(false) }
+    var showQueue by rememberSaveable { mutableStateOf(false) }
     // Lyrics are fetched only while actually on screen.
     LaunchedEffect(expanded, showLyrics) { vm.setLyricsVisible(expanded && showLyrics) }
 
     val sheet = rememberExpandingPlayerState()
     ExpandingPlayerEffect(sheet, expanded && nowPlaying != null)
     // Predictive back on the open player: it shrinks under the finger, then folds into the mini player.
-    PredictiveBackHandler(enabled = expanded && !showLyrics) { events ->
+    PredictiveBackHandler(enabled = expanded && !showLyrics && !showQueue) { events ->
         try {
             events.collect { e -> sheet.seekBack(e.progress) }
             expanded = false
@@ -193,6 +195,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
         }
     }
     BackHandler(enabled = expanded && showLyrics) { showLyrics = false }
+    BackHandler(enabled = expanded && showQueue) { showQueue = false }
     // Once the full player fully covers the screen, stop drawing everything underneath it.
     val covered by remember { derivedStateOf { sheet.progress.value >= 1f && !sheet.isMoving } }
     // The open player's wave animates endlessly: leave those frames at the system default rate.
@@ -288,9 +291,17 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                         position = { position.value },
                         lyrics = lyrics,
                         showLyrics = showLyrics,
+                        queue = queue,
+                        showQueue = showQueue,
                         isFavorite = np.songId in userData.favorites,
                         onToggleFavorite = { vm.toggleFavorite(np.songId) },
-                        onToggleLyrics = { showLyrics = !showLyrics },
+                        // Lyrics and queue share the space above the controls: one at a time.
+                        onToggleLyrics = { showLyrics = !showLyrics; showQueue = false },
+                        onToggleQueue = { showQueue = !showQueue; showLyrics = false },
+                        onPlayQueueEntry = vm::playQueueEntry,
+                        onRemoveQueueEntry = vm::removeQueueEntry,
+                        onMoveQueueEntry = vm::moveQueueEntry,
+                        onSongLongPress = { songAction = SongActionTarget(it) },
                         onRetryLyrics = vm::retryLyrics,
                         onTogglePlay = vm::togglePlay,
                         onPrevious = vm::previous,
