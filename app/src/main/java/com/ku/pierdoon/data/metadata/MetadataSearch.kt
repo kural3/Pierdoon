@@ -143,5 +143,5 @@ object MetadataSearch {
 
     private const val LIMIT = 12
     private const val UNKNOWN_LENGTH_RANK = Long.MAX_VALUE / 2
-    private const val USER_AGENT = "Pierdoon/1.1 (https://github.com/kural3/Pierdoon)"
+    private const val USER_AGENT = "Pierdoon/1.2 (https://github.com/kural3/Pierdoon)"
 }
