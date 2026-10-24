@@ -33,6 +33,8 @@ data class AppSettings(
     val floatingNav: Boolean = false,
     val wavyProgress: Boolean = true,
     val lyricsWifiOnly: Boolean = false,
+    /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
+    val lyricsSyncControls: Boolean = false,
     val skipSilence: Boolean = false,
     val audioOffload: Boolean = true,
     /** Last choice on the track editor: the app's records or the file itself. */
@@ -70,6 +72,7 @@ object SettingsStore {
             floatingNav = p.getBoolean(K_FLOATING_NAV, d.floatingNav),
             wavyProgress = p.getBoolean(K_WAVY, d.wavyProgress),
             lyricsWifiOnly = p.getBoolean(K_WIFI, d.lyricsWifiOnly),
+            lyricsSyncControls = p.getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
             skipSilence = p.getBoolean(K_SILENCE, d.skipSilence),
             audioOffload = p.getBoolean(K_OFFLOAD, d.audioOffload),
             editTarget = runCatching { SaveTarget.valueOf(p.getString(K_EDIT_TARGET, d.editTarget.name)!!) }
@@ -93,6 +96,7 @@ object SettingsStore {
             putBoolean(K_FLOATING_NAV, s.floatingNav)
             putBoolean(K_WAVY, s.wavyProgress)
             putBoolean(K_WIFI, s.lyricsWifiOnly)
+            putBoolean(K_SYNC_CONTROLS, s.lyricsSyncControls)
             putBoolean(K_SILENCE, s.skipSilence)
             putBoolean(K_OFFLOAD, s.audioOffload)
             putString(K_EDIT_TARGET, s.editTarget.name)
@@ -111,6 +115,7 @@ object SettingsStore {
     private const val K_FLOATING_NAV = "floating_nav"
     private const val K_WAVY = "wavy_progress"
     private const val K_WIFI = "lyrics_wifi_only"
+    private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
     private const val K_SILENCE = "skip_silence"
     private const val K_OFFLOAD = "audio_offload"
     private const val K_EDIT_TARGET = "edit_target"

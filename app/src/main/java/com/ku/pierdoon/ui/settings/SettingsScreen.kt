@@ -281,6 +281,15 @@ fun SettingsScreen(
                             )
                         },
                         { shape ->
+                            SwitchItem(
+                                shape = shape,
+                                title = stringResource(R.string.settings_sync_controls),
+                                subtitle = stringResource(R.string.settings_sync_controls_desc),
+                                checked = settings.lyricsSyncControls,
+                                onChange = { v -> onUpdate { it.copy(lyricsSyncControls = v) } },
+                            )
+                        },
+                        { shape ->
                             ActionItem(
                                 shape = shape,
                                 title = stringResource(R.string.settings_clear_cache),

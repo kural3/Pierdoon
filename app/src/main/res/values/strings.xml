@@ -70,6 +70,8 @@
     <string name="settings_lyrics">Тексты песен</string>
     <string name="settings_wifi_only">Только по Wi‑Fi</string>
     <string name="settings_wifi_only_desc">Не загружать тексты через мобильную сеть</string>
+    <string name="settings_sync_controls">Подстройка синхронизации</string>
+    <string name="settings_sync_controls_desc">Кнопки в тексте песни, чтобы сдвинуть его раньше или позже, если он не совпадает с музыкой</string>
     <string name="settings_clear_cache">Очистить кэш текстов</string>
     <string name="settings_cache_size">Занято: %1$s</string>
     <string name="settings_cache_cleared">Кэш текстов очищен</string>

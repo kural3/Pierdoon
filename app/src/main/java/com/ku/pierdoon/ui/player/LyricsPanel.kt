@@ -66,6 +66,7 @@ import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsOffsets
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.PlayerIcons
+import com.ku.pierdoon.ui.theme.LocalUiPrefs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.widthIn
@@ -215,55 +216,62 @@ private fun SyncedLyrics(
             }
             item(key = "source") { SourceLabel() }
         }
-        // Stays in immersive mode too: that's when a drift is noticed. Over the lines already
-        // sung, never over the ones coming up.
-        SyncControls(offsetMs, onShift, onResetOffset, Modifier.align(Alignment.TopCenter).padding(top = 4.dp))
+        // Off by default (Settings). When on, it stays in immersive mode too: that's when a drift
+        // is noticed. In the top corner, over the lines already sung.
+        if (LocalUiPrefs.current.lyricsSyncControls) {
+            SyncControls(offsetMs, onShift, onResetOffset, Modifier.align(Alignment.TopEnd).padding(top = 4.dp))
+        }
     }
 }
 
-/** "−  +0,25 с  +": nudges the lyrics a step earlier or later; tapping the value resets it. */
+/** "− +0,25 с +": nudges the lyrics a step earlier or later; tapping the value resets it. */
 @Composable
 private fun SyncControls(offsetMs: Long, onShift: (Long) -> Unit, onReset: () -> Unit, modifier: Modifier) {
     val haptics = LocalHapticFeedback.current
     val colors = MaterialTheme.colorScheme
-    val glass = colors.surfaceContainerHighest.copy(alpha = 0.6f)
-    fun shift(delta: Long) {
-        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-        onShift(delta)
-    }
+    // Same matte glass as the player's own round buttons.
+    val glass = colors.surfaceContainerHighest.copy(alpha = 0.45f)
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.clip(RoundedCornerShape(50)).background(glass).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier,
     ) {
         ExpressiveIconButton(
-            onClick = { shift(-LyricsOffsets.STEP_MS) },
+            onClick = { onShift(-LyricsOffsets.STEP_MS) },
             icon = PlayerIcons.Remove,
             contentDescription = stringResource(R.string.lyrics_earlier),
-            containerColor = Color.Transparent,
+            containerColor = glass,
             contentColor = colors.onSurface,
-            modifier = Modifier.size(40.dp),
+            iconSize = 18.dp,
+            haptic = HapticFeedbackType.SegmentTick,
+            modifier = Modifier.size(36.dp),
         )
         Text(
             text = stringResource(R.string.lyrics_offset, formatOffset(offsetMs)),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = if (offsetMs == 0L) colors.onSurfaceVariant else colors.primary,
             textAlign = TextAlign.Center,
+            maxLines = 1,
+            // On glass too: the lines scrolling underneath would otherwise run into it.
             modifier = Modifier
-                .widthIn(min = 72.dp)
+                .widthIn(min = 52.dp)
                 .clip(RoundedCornerShape(50))
+                .background(glass)
                 .clickable(enabled = offsetMs != 0L, onClickLabel = stringResource(R.string.lyrics_offset_reset)) {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     onReset()
                 }
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
         )
         ExpressiveIconButton(
-            onClick = { shift(LyricsOffsets.STEP_MS) },
+            onClick = { onShift(LyricsOffsets.STEP_MS) },
             icon = PlayerIcons.Add,
             contentDescription = stringResource(R.string.lyrics_later),
-            containerColor = Color.Transparent,
+            containerColor = glass,
             contentColor = colors.onSurface,
-            modifier = Modifier.size(40.dp),
+            iconSize = 18.dp,
+            haptic = HapticFeedbackType.SegmentTick,
+            modifier = Modifier.size(36.dp),
         )
     }
 }

@@ -34,7 +34,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /** UI switches that components read without threading them through every call. */
 @Immutable
-data class UiPrefs(val glass: Boolean = true, val wavyProgress: Boolean = true)
+data class UiPrefs(
+    val glass: Boolean = true,
+    val wavyProgress: Boolean = true,
+    val lyricsSyncControls: Boolean = false,
+)
 
 val LocalUiPrefs = staticCompositionLocalOf { UiPrefs() }
 
@@ -87,7 +91,11 @@ fun PierdoonTheme(
         typography = Typography,
     ) {
         CompositionLocalProvider(
-            LocalUiPrefs provides UiPrefs(glass = settings.glass, wavyProgress = settings.wavyProgress),
+            LocalUiPrefs provides UiPrefs(
+                glass = settings.glass,
+                wavyProgress = settings.wavyProgress,
+                lyricsSyncControls = settings.lyricsSyncControls,
+            ),
             LocalHapticFeedback provides haptics,
             // Text outside a Surface (or on a transparent one) would otherwise default to black.
             LocalContentColor provides MaterialTheme.colorScheme.onSurface,
