@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.Immutable
 import androidx.core.content.edit
+import com.ku.pierdoon.data.metadata.SaveTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +35,8 @@ data class AppSettings(
     val lyricsWifiOnly: Boolean = false,
     val skipSilence: Boolean = false,
     val audioOffload: Boolean = true,
+    /** Last choice on the track editor: the app's records or the file itself. */
+    val editTarget: SaveTarget = SaveTarget.App,
 )
 
 /**
@@ -67,6 +70,8 @@ object SettingsStore {
             lyricsWifiOnly = p.getBoolean(K_WIFI, d.lyricsWifiOnly),
             skipSilence = p.getBoolean(K_SILENCE, d.skipSilence),
             audioOffload = p.getBoolean(K_OFFLOAD, d.audioOffload),
+            editTarget = runCatching { SaveTarget.valueOf(p.getString(K_EDIT_TARGET, d.editTarget.name)!!) }
+                .getOrDefault(d.editTarget),
         )
     }
 
@@ -87,6 +92,7 @@ object SettingsStore {
             putBoolean(K_WIFI, s.lyricsWifiOnly)
             putBoolean(K_SILENCE, s.skipSilence)
             putBoolean(K_OFFLOAD, s.audioOffload)
+            putString(K_EDIT_TARGET, s.editTarget.name)
         }
     }
 
@@ -103,4 +109,5 @@ object SettingsStore {
     private const val K_WIFI = "lyrics_wifi_only"
     private const val K_SILENCE = "skip_silence"
     private const val K_OFFLOAD = "audio_offload"
+    private const val K_EDIT_TARGET = "edit_target"
 }

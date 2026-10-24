@@ -19,6 +19,7 @@ sealed interface Route {
     data class ArtistDetail(val name: String) : Route { override val key = "artist:$name" }
     data class PlaylistDetail(val playlistId: Long) : Route { override val key = "playlist:$playlistId" }
     data object Favorites : Route { override val key = "favorites" }
+    data class EditSong(val songId: Long) : Route { override val key = "edit:$songId" }
 
     companion object {
         val tabs = listOf(Home, Library, Playlists, Settings)
@@ -27,6 +28,7 @@ sealed interface Route {
             key.startsWith("album:") -> AlbumDetail(key.removePrefix("album:").toLong())
             key.startsWith("artist:") -> ArtistDetail(key.removePrefix("artist:"))
             key.startsWith("playlist:") -> PlaylistDetail(key.removePrefix("playlist:").toLong())
+            key.startsWith("edit:") -> EditSong(key.removePrefix("edit:").toLong())
             key == Favorites.key -> Favorites
             else -> tabs.firstOrNull { it.key == key } ?: Home
         }

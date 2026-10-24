@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -47,9 +48,13 @@ import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.R
 import com.ku.pierdoon.data.Album
 import com.ku.pierdoon.data.Artist
+import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.Song
+import androidx.graphics.shapes.RoundedPolygon
 import com.ku.pierdoon.ui.components.Artwork
+import com.ku.pierdoon.ui.components.FileArtwork
+import com.ku.pierdoon.ui.components.animatedShapeClip
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.components.animatePressAsState
 import com.ku.pierdoon.ui.components.scaleBy
@@ -174,7 +179,7 @@ fun PlaylistsScreen(
                 CollectionRow(
                     title = p.name,
                     subtitle = stringResource(R.string.songs_count, p.songIds.size),
-                    cover = { PlaylistCover(resolveCover(p), Modifier.size(56.dp)) },
+                    cover = { PlaylistCover(p, resolveCover(p), Modifier.size(56.dp)) },
                     onClick = { onOpen(Route.PlaylistDetail(p.id)) },
                     onLongClick = { onPlaylistLongPress(p) },
                 )
@@ -221,13 +226,49 @@ fun CollectionRow(
     }
 }
 
-/** Playlist cover: first track's art cut into an expressive shape, or an icon when empty. */
+/** Silhouettes a playlist cover can take, stored by name. The first one is the default. */
+object PlaylistShapes {
+    val all: List<Pair<String, RoundedPolygon>> by lazy {
+        listOf(
+            "clover" to MaterialShapes.Clover4Leaf,
+            "cookie" to MaterialShapes.Cookie9Sided,
+            "sunny" to MaterialShapes.Sunny,
+            "flower" to MaterialShapes.Flower,
+            "heart" to MaterialShapes.Heart,
+            "arch" to MaterialShapes.Arch,
+            "circle" to MaterialShapes.Circle,
+            "square" to MaterialShapes.Square,
+        )
+    }
+
+    fun polygon(name: String?): RoundedPolygon = all.firstOrNull { it.first == name }?.second ?: all.first().second
+}
+
+/**
+ * Playlist cover in the playlist's shape: the picture picked for it, else the first track's art,
+ * else an icon. Changing the shape morphs it.
+ */
 @Composable
-fun PlaylistCover(cover: Song?, modifier: Modifier = Modifier, shape: Shape = MaterialShapes.Clover4Leaf.toShape()) {
-    if (cover != null) {
-        Artwork(cover.id, cover.albumId, modifier.clip(shape))
-    } else {
-        IconCover(PlayerIcons.Playlist, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, shape, modifier)
+fun PlaylistCover(
+    playlist: Playlist?,
+    firstSong: Song?,
+    modifier: Modifier = Modifier,
+    large: Boolean = false,
+    placeholderIconSize: Dp = 24.dp,
+) {
+    val clipped = modifier.animatedShapeClip(PlaylistShapes.polygon(playlist?.shape))
+    val version = playlist?.let { CoverStore.playlistVersion(it.id) }
+    val file = playlist?.let { CoverStore.playlistFile(it.id) }
+    when {
+        version != null && file != null -> FileArtwork(file, version, clipped, large, placeholderIconSize)
+        firstSong != null -> Artwork(firstSong.id, firstSong.albumId, clipped, large, placeholderIconSize)
+        else -> IconCover(
+            PlayerIcons.Playlist,
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.onSecondaryContainer,
+            RectangleShape,
+            clipped,
+        )
     }
 }
 

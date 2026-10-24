@@ -49,7 +49,7 @@ import com.ku.pierdoon.ui.library.AppScaffold
 import com.ku.pierdoon.ui.library.listBottomPadding
 
 /** Shapes for grouped items: large outer corners, tight inner ones (Android 16 style). */
-private fun groupShape(index: Int, count: Int): Shape {
+internal fun groupShape(index: Int, count: Int): Shape {
     val outer = 24.dp
     val inner = 6.dp
     return RoundedCornerShape(
@@ -342,7 +342,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun Group(title: String, items: () -> List<@Composable (Shape) -> Unit>) {
+internal fun Group(title: String, items: () -> List<@Composable (Shape) -> Unit>) {
     val list = items()
     Column(Modifier.fillMaxWidth()) {
         Text(
@@ -358,7 +358,7 @@ private fun Group(title: String, items: () -> List<@Composable (Shape) -> Unit>)
 }
 
 @Composable
-private fun ItemContainer(shape: Shape, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun ItemContainer(shape: Shape, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
         modifier
             .fillMaxWidth()

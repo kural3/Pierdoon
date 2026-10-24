@@ -11,6 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -23,6 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.graphics.shapes.Morph
+import androidx.graphics.shapes.RoundedPolygon
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -101,3 +105,24 @@ fun Modifier.morphClip(morph: Morph, progress: State<Float>, startAngle: Int = 0
         shape = MorphShape(morph, progress.value, startAngle)
         clip = true
     }
+
+/**
+ * Clips to [target], morphing from the previous shape whenever it changes. A change mid-way
+ * starts from the shape being morphed to, so quick taps never jump.
+ */
+@Composable
+fun Modifier.animatedShapeClip(target: RoundedPolygon): Modifier {
+    var from by remember { mutableStateOf(target) }
+    var to by remember { mutableStateOf(target) }
+    val progress = remember { Animatable(1f) }
+    val spec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    LaunchedEffect(target) {
+        if (target == to) return@LaunchedEffect
+        from = to
+        to = target
+        progress.snapTo(0f)
+        progress.animateTo(1f, spec)
+    }
+    val morph = remember(from, to) { Morph(from, to) }
+    return morphClip(morph, progress.asState())
+}

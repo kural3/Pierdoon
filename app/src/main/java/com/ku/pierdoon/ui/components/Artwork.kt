@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,16 +32,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.theme.SchemeGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
+import java.io.File
 
 /**
  * Tiny album-art loader: an LRU of downsampled bitmaps keyed by album and size bucket,
  * plus a negative cache so albums without art never hit the disk twice.
+ *
+ * A track with a cover picked in the app ([CoverStore]) is keyed by that cover instead of its
+ * album; the cover's version is part of the key, so changing it never shows a stale image.
  */
 object ArtworkCache {
     private const val SMALL_PX = 192
@@ -54,24 +60,58 @@ object ArtworkCache {
     private val missing = HashSet<String>()
     private val io = Dispatchers.IO.limitedParallelism(3)
 
-    private fun key(albumId: Long, large: Boolean) = if (large) "L$albumId" else "S$albumId"
+    private fun source(songId: Long, albumId: Long): String =
+        CoverStore.songVersion(songId)?.let { "c$songId.$it" } ?: "a$albumId"
 
-    fun peek(albumId: Long, large: Boolean): ImageBitmap? =
-        cache.get(key(albumId, large)) ?: if (large) null else cache.get(key(albumId, true))
+    private fun key(source: String, large: Boolean) = if (large) "L$source" else "S$source"
 
-    fun peekBlurred(albumId: Long): ImageBitmap? = cache.get("B$albumId")
+    fun peek(songId: Long, albumId: Long, large: Boolean): ImageBitmap? {
+        val source = source(songId, albumId)
+        return cache.get(key(source, large)) ?: if (large) null else cache.get(key(source, true))
+    }
+
+    fun peekBlurred(songId: Long, albumId: Long): ImageBitmap? = cache.get("B" + source(songId, albumId))
 
     suspend fun load(context: Context, songId: Long, albumId: Long, large: Boolean): ImageBitmap? {
-        val key = key(albumId, large)
-        peek(albumId, large)?.let { return it }
+        val custom = CoverStore.songFile(songId)
+        val key = key(source(songId, albumId), large)
+        peek(songId, albumId, large)?.let { return it }
         synchronized(missing) { if (key in missing) return null }
         return withContext(io) {
             coroutineContext.ensureActive()
             val px = if (large) LARGE_PX else SMALL_PX
-            val bitmap = decode(context, songId, albumId, px)?.asImageBitmap()
+            val bitmap = (if (custom != null) decodeFile(custom, px) else decode(context, songId, albumId, px))
+                ?.asImageBitmap()
             if (bitmap != null) cache.put(key, bitmap) else synchronized(missing) { missing += key }
             bitmap
         }
+    }
+
+    /** A picture file of our own (a playlist cover); [version] busts the cache when it changes. */
+    suspend fun loadFile(file: File, version: Long, large: Boolean): ImageBitmap? {
+        val key = key("f${file.name}.$version", large)
+        cache.get(key)?.let { return it }
+        return withContext(io) {
+            decodeFile(file, if (large) LARGE_PX else SMALL_PX)?.asImageBitmap()?.also { cache.put(key, it) }
+        }
+    }
+
+    fun peekFile(file: File, version: Long, large: Boolean): ImageBitmap? = cache.get(key("f${file.name}.$version", large))
+
+    /** Bumped by [invalidateAlbum]; artwork on screen reads it to reload. */
+    private val albumRevisions = mutableStateMapOf<Long, Int>()
+    fun albumRevision(albumId: Long): Int = albumRevisions[albumId] ?: 0
+
+    /**
+     * Forgets an album's art after its file changed (tags written by the app). MediaStore
+     * regenerates its thumbnails on rescan; this drops our copies so they're loaded again.
+     */
+    fun invalidateAlbum(albumId: Long) {
+        albumRevisions[albumId] = albumRevision(albumId) + 1
+        val source = "a$albumId"
+        cache.snapshot().keys.filter { it.endsWith(source) && it.length == source.length + 1 }.forEach(cache::remove)
+        synchronized(missing) { missing.removeAll { it.endsWith(source) && it.length == source.length + 1 } }
+        synchronized(seeds) { seeds.remove(source) }
     }
 
     /**
@@ -80,7 +120,7 @@ object ArtworkCache {
      * bilinear filtering it looks the same.
      */
     suspend fun loadBlurred(context: Context, songId: Long, albumId: Long): ImageBitmap? {
-        val key = "B$albumId"
+        val key = "B" + source(songId, albumId)
         cache.get(key)?.let { return it }
         val small = load(context, songId, albumId, large = false) ?: return null
         return withContext(io) {
@@ -98,7 +138,8 @@ object ArtworkCache {
 
     /** Theme seed from album art, reusing the 36x36 blurred copy. Cached per album. */
     suspend fun themeSeed(context: Context, songId: Long, albumId: Long): Int? {
-        synchronized(seeds) { if (albumId in seeds) return seeds[albumId] }
+        val source = source(songId, albumId)
+        synchronized(seeds) { if (source in seeds) return seeds[source] }
         val blurred = loadBlurred(context, songId, albumId)
         val seed = blurred?.let {
             withContext(io) {
@@ -108,11 +149,11 @@ object ArtworkCache {
                 SchemeGenerator.seedFromPixels(px)
             }
         }
-        synchronized(seeds) { seeds[albumId] = seed }
+        synchronized(seeds) { seeds[source] = seed }
         return seed
     }
 
-    private val seeds = HashMap<Long, Int?>()
+    private val seeds = HashMap<String, Int?>()
 
     /** Separable box blur, in place. Three passes approximate a gaussian. */
     private fun boxBlur(px: IntArray, w: Int, h: Int, radius: Int) {
@@ -144,6 +185,14 @@ object ArtworkCache {
             }
         }
     }
+
+    private fun decodeFile(file: File, px: Int): Bitmap? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= px && bounds.outHeight / (sample * 2) >= px) sample *= 2
+        BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+    }.getOrNull()
 
     private fun decode(context: Context, songId: Long, albumId: Long, px: Int): Bitmap? {
         val resolver = context.contentResolver
@@ -180,9 +229,31 @@ fun Artwork(
     placeholderIconSize: Dp = 24.dp,
 ) {
     val context = LocalContext.current.applicationContext
-    val bitmap by produceState(ArtworkCache.peek(albumId, large), songId, albumId, large) {
+    val cover = CoverStore.songVersion(songId)
+    val revision = ArtworkCache.albumRevision(albumId)
+    val bitmap by produceState(ArtworkCache.peek(songId, albumId, large), songId, albumId, large, cover, revision) {
         value = ArtworkCache.load(context, songId, albumId, large)
     }
+    ArtworkImage(bitmap, modifier, placeholderIconSize)
+}
+
+/** A cover file of the app's own (picked for a playlist, or about to be saved for a track). */
+@Composable
+fun FileArtwork(
+    file: File,
+    version: Long,
+    modifier: Modifier = Modifier,
+    large: Boolean = false,
+    placeholderIconSize: Dp = 24.dp,
+) {
+    val bitmap by produceState(ArtworkCache.peekFile(file, version, large), file, version, large) {
+        value = ArtworkCache.loadFile(file, version, large)
+    }
+    ArtworkImage(bitmap, modifier, placeholderIconSize)
+}
+
+@Composable
+private fun ArtworkImage(bitmap: ImageBitmap?, modifier: Modifier, placeholderIconSize: Dp) {
     Box(modifier.background(MaterialTheme.colorScheme.secondaryContainer)) {
         Crossfade(
             targetState = bitmap,
@@ -216,7 +287,9 @@ private val Vibrant = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturat
 @Composable
 fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
     val context = LocalContext.current.applicationContext
-    val bitmap by produceState(ArtworkCache.peekBlurred(albumId), songId, albumId) {
+    val cover = CoverStore.songVersion(songId)
+    val revision = ArtworkCache.albumRevision(albumId)
+    val bitmap by produceState(ArtworkCache.peekBlurred(songId, albumId), songId, albumId, cover, revision) {
         value = ArtworkCache.loadBlurred(context, songId, albumId)
     }
     Crossfade(

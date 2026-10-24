@@ -22,6 +22,8 @@ data class Playlist(
     val id: Long,
     val name: String,
     val songIds: List<Long>,
+    /** Cover silhouette by name ([com.ku.pierdoon.ui.library.PlaylistShapes]); null = default. */
+    val shape: String? = null,
 )
 
 @Immutable
@@ -88,6 +90,10 @@ class UserLibrary private constructor(context: Context) {
         d.copy(playlists = d.playlists.map { if (it.id == id) it.copy(name = name.trim()) else it })
     }
 
+    fun setPlaylistShape(id: Long, shape: String?) = mutate { d ->
+        d.copy(playlists = d.playlists.map { if (it.id == id) it.copy(shape = shape) else it })
+    }
+
     fun deletePlaylist(id: Long) = mutate { d -> d.copy(playlists = d.playlists.filterNot { it.id == id }) }
 
     fun addToPlaylist(id: Long, songId: Long) = mutate { d ->
@@ -140,7 +146,12 @@ class UserLibrary private constructor(context: Context) {
             val playlists = o.optJSONArray("playlists")?.let { arr ->
                 List(arr.length()) { i ->
                     val p = arr.getJSONObject(i)
-                    Playlist(p.getLong("id"), p.getString("name"), p.getJSONArray("songs").toLongList())
+                    Playlist(
+                        id = p.getLong("id"),
+                        name = p.getString("name"),
+                        songIds = p.getJSONArray("songs").toLongList(),
+                        shape = p.optString("shape").takeIf { it.isNotEmpty() },
+                    )
                 }
             }.orEmpty()
             UserData(
@@ -157,7 +168,10 @@ class UserLibrary private constructor(context: Context) {
             .put("version", 1)
             .put("playlists", JSONArray().apply {
                 d.playlists.forEach { p ->
-                    put(JSONObject().put("id", p.id).put("name", p.name).put("songs", JSONArray(p.songIds)))
+                    put(
+                        JSONObject().put("id", p.id).put("name", p.name).put("songs", JSONArray(p.songIds))
+                            .apply { p.shape?.let { put("shape", it) } }
+                    )
                 }
             })
             .put("favorites", JSONArray(d.favorites.toList()))

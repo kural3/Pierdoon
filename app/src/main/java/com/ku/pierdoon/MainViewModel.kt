@@ -4,7 +4,10 @@ import android.app.Application
 import android.content.ComponentName
 import android.content.ContentUris
 import android.database.ContentObserver
+import android.content.IntentSender
 import android.net.ConnectivityManager
+import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -15,11 +18,22 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.MusicCollections
+import com.ku.pierdoon.data.TagOverride
+import com.ku.pierdoon.data.TagOverrides
+import com.ku.pierdoon.data.metadata.CoverEdit
+import com.ku.pierdoon.data.metadata.MetadataSearch
+import com.ku.pierdoon.data.metadata.TagWriter
+import com.ku.pierdoon.data.metadata.TrackEdit
+import com.ku.pierdoon.data.writeScaledJpeg
+import com.ku.pierdoon.ui.components.ArtworkCache
+import java.io.File
 import com.ku.pierdoon.data.MusicRepository
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.UserData
@@ -91,6 +105,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val collections: StateFlow<MusicCollections> = _collections.asStateFlow()
 
     private val userLibrary = UserLibrary.get(app)
+    private val tagOverrides = TagOverrides.get(app)
     val userData: StateFlow<UserData> = userLibrary.data
 
     private val _player = MutableStateFlow(PlayerState())
@@ -195,7 +210,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             songsById = songs.associateBy { it.id }
             _collections.value = withContext(Dispatchers.Default) { MusicCollections.from(songs) }
             _library.value = LibraryState.Ready(songs)
-            controller?.let(::syncQueue)
+            controller?.let {
+                refreshQueueItems(it)
+                syncQueue(it)
+            }
         }
     }
 
@@ -266,7 +284,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun createPlaylist(name: String, initialSongs: List<Long> = emptyList()) =
         userLibrary.createPlaylist(name, initialSongs)
     fun renamePlaylist(id: Long, name: String) = userLibrary.renamePlaylist(id, name)
-    fun deletePlaylist(id: Long) = userLibrary.deletePlaylist(id)
+    fun deletePlaylist(id: Long) {
+        userLibrary.deletePlaylist(id)
+        CoverStore.removePlaylistCover(id)
+    }
+    fun setPlaylistShape(id: Long, shape: String?) = userLibrary.setPlaylistShape(id, shape)
+    fun setPlaylistCover(id: Long, image: Uri) {
+        viewModelScope.launch {
+            val file = importCover(image) ?: return@launch
+            withContext(Dispatchers.IO) { CoverStore.setPlaylistCover(id, file) }
+            file.delete()
+        }
+    }
+    fun removePlaylistCover(id: Long) = CoverStore.removePlaylistCover(id)
     fun addToPlaylist(id: Long, songId: Long) = userLibrary.addToPlaylist(id, songId)
     fun removeFromPlaylist(id: Long, songId: Long) = userLibrary.removeFromPlaylist(id, songId)
 
@@ -316,6 +346,155 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         c.repeatMode = nextRepeatMode(c.repeatMode)
     }
 
+    // Track editing ------------------------------------------------------------------------
+
+    fun song(id: Long): Song? = songsById[id]
+
+    /** The track as its file has it, to tell in-app edits apart from what's really there. */
+    suspend fun fileTags(id: Long): Song? = repository.fileTags(id)
+
+    fun hasInAppEdits(songId: Long): Boolean = tagOverrides.has(songId) || CoverStore.songVersion(songId) != null
+
+    fun searchMetadata(query: String, durationMs: Long) = MetadataSearch.search(query, durationMs)
+
+    /** A picture from the gallery as a cover-sized JPEG; null if it couldn't be read as an image. */
+    suspend fun importCover(uri: Uri): File? = withContext(Dispatchers.IO) {
+        val raw = coverPickFile("img")
+        runCatching {
+            getApplication<Application>().contentResolver.openInputStream(uri)
+                ?.use { input -> raw.outputStream().use { input.copyTo(it) } }
+        }
+        toCoverJpeg(raw)
+    }
+
+    suspend fun downloadCover(url: String): File? {
+        val bytes = MetadataSearch.download(url) ?: return null
+        return withContext(Dispatchers.IO) {
+            val raw = coverPickFile("img")
+            raw.writeBytes(bytes)
+            toCoverJpeg(raw)
+        }
+    }
+
+    private fun toCoverJpeg(raw: File): File? {
+        val out = coverPickFile("jpg")
+        val ok = writeScaledJpeg(raw, out)
+        raw.delete()
+        return out.takeIf { ok }
+    }
+
+    private fun coverPickFile(ext: String): File {
+        val dir = File(getApplication<Application>().cacheDir, COVER_PICKS).apply { mkdirs() }
+        return File(dir, "pick_${SystemClock.elapsedRealtimeNanos()}.$ext")
+    }
+
+    /** Saves [edit] as app records: the file stays untouched. Empty fields fall back to the file's tags. */
+    suspend fun saveInApp(song: Song, edit: TrackEdit) {
+        val file = repository.fileTags(song.id)
+        withContext(Dispatchers.IO) {
+            tagOverrides.set(
+                song.id,
+                TagOverride(
+                    title = edit.title.trim().takeIf { it.isNotEmpty() && it != file?.title },
+                    artist = edit.artist.trim().takeIf { it.isNotEmpty() && it != file?.artist },
+                    album = edit.album.trim().takeIf { it.isNotEmpty() && it != file?.album },
+                ),
+            )
+            when (val cover = edit.cover) {
+                CoverEdit.Keep -> Unit
+                CoverEdit.Remove -> CoverStore.removeSongCover(song.id)
+                is CoverEdit.Replace -> CoverStore.setSongCover(song.id, cover.file)
+            }
+        }
+        refreshAfterEdit()
+    }
+
+    /** Android 11+ asks the user before an app may change someone else's file; null below that. */
+    fun fileWriteRequest(song: Song): IntentSender? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            MediaStore.createWriteRequest(getApplication<Application>().contentResolver, listOf(song.uri)).intentSender
+        } else {
+            null
+        }
+
+    /** Whether the file's format takes tags at all (raw AAC, for one, doesn't). */
+    suspend fun canWriteTags(song: Song): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            TagWriter.canWrite(TagWriter.displayName(getApplication(), song))
+
+    /**
+     * Writes [edit] into the file's tags; call once the user granted [fileWriteRequest].
+     * The app's own edits of this track are folded in and then dropped: the file is the truth now.
+     */
+    suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean {
+        val app = getApplication<Application>()
+        val name = TagWriter.displayName(app, song) ?: return false
+        val cover = withContext(Dispatchers.IO) {
+            when (val c = edit.cover) {
+                // A cover picked "in the app" earlier goes into the file rather than being lost.
+                CoverEdit.Keep -> CoverStore.songFile(song.id)?.let { runCatching { it.readBytes() }.getOrNull() }
+                CoverEdit.Remove -> null
+                is CoverEdit.Replace -> runCatching { c.file.readBytes() }.getOrNull()
+            }
+        }
+        // The player holds the file open while it plays; rewriting it underneath breaks playback.
+        val c = controller?.takeIf { it.currentMediaItem?.mediaId == song.id.toString() }
+        val resume = c?.let { Triple(it.currentMediaItemIndex, it.currentPosition, it.playWhenReady) }
+        c?.stop()
+        val ok = TagWriter.write(
+            app, song, name,
+            title = edit.title.trim(),
+            artist = edit.artist.trim(),
+            album = edit.album.trim(),
+            cover = cover,
+            removeCover = edit.cover == CoverEdit.Remove,
+        )
+        if (ok) {
+            tagOverrides.set(song.id, null)
+            CoverStore.removeSongCover(song.id)
+            ArtworkCache.invalidateAlbum(song.albumId)
+        }
+        if (c != null && resume != null) {
+            val (index, positionMs, playWhenReady) = resume
+            c.seekTo(index, positionMs)
+            c.prepare()
+            c.playWhenReady = playWhenReady
+        }
+        if (ok) refreshAfterEdit()
+        return ok
+    }
+
+    /** Drops the app's edits of a track: tags and cover come from the file again. */
+    suspend fun resetEdits(song: Song) {
+        withContext(Dispatchers.IO) {
+            tagOverrides.set(song.id, null)
+            CoverStore.removeSongCover(song.id)
+        }
+        refreshAfterEdit()
+    }
+
+    private suspend fun refreshAfterEdit() {
+        loadLibrary(force = true)
+        loadJob?.join()
+        // A cover-only change leaves the song list equal, so the load above may skip the queue.
+        controller?.let(::refreshQueueItems)
+    }
+
+    /** Queued entries carry the tags they were queued with; edited tracks get their new ones. */
+    private fun refreshQueueItems(p: Player) {
+        for (i in 0 until p.mediaItemCount) {
+            val item = p.getMediaItemAt(i)
+            val song = songsById[item.mediaId.toLongOrNull()] ?: continue
+            val md = item.mediaMetadata
+            if (md.title?.toString() == song.title && md.artist?.toString() == song.artist &&
+                md.albumTitle?.toString() == song.album && md.artworkUri == song.artworkUri
+            ) continue
+            val key = md.extras?.getLong(Song.QUEUE_KEY, 0L)?.takeIf { it != 0L }
+            // Same file, new metadata: Media3 swaps it in without interrupting playback.
+            p.replaceMediaItem(i, if (key != null) song.toMediaItem(key) else song.toMediaItem())
+        }
+    }
+
     private fun syncState(p: Player) {
         val item = p.currentMediaItem
         _player.update {
@@ -325,7 +504,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     val md = mi.mediaMetadata
                     NowPlaying(
                         songId = mi.mediaId.toLongOrNull() ?: -1L,
-                        albumId = md.artworkUri?.let { runCatching { ContentUris.parseId(it) }.getOrNull() } ?: -1L,
+                        albumId = md.albumId(),
                         title = md.title?.toString().orEmpty(),
                         artist = md.artist?.toString().orEmpty(),
                     )
@@ -368,6 +547,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        File(getApplication<Application>().cacheDir, COVER_PICKS).listFiles()?.forEach { it.delete() }
         if (watching) getApplication<Application>().contentResolver.unregisterContentObserver(mediaStoreObserver)
         controller?.removeListener(listener)
         MediaController.releaseFuture(controllerFuture)
@@ -378,6 +558,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         const val POSITION_TICK_MS = 500L
         const val STOP_TIMEOUT_MS = 1_000L
         const val MEDIA_STORE_DEBOUNCE_MS = 1_500L
+        const val COVER_PICKS = "cover-picks"
         val QUEUE_EVENTS = intArrayOf(
             Player.EVENT_TIMELINE_CHANGED,
             Player.EVENT_MEDIA_ITEM_TRANSITION,
@@ -401,7 +582,12 @@ private fun MediaItem.toSong(): Song {
         title = md.title?.toString().orEmpty(),
         artist = md.artist?.toString().orEmpty(),
         album = md.albumTitle?.toString().orEmpty(),
-        albumId = md.artworkUri?.let { runCatching { ContentUris.parseId(it) }.getOrNull() } ?: -1L,
+        albumId = md.albumId(),
         durationMs = 0L,
     )
 }
+
+/** Album of a queued item: from the extra, or (items queued before it existed) the art URI. */
+private fun MediaMetadata.albumId(): Long =
+    extras?.getLong(Song.ALBUM_ID, -1L)?.takeIf { it != -1L }
+        ?: artworkUri?.let { runCatching { ContentUris.parseId(it) }.getOrNull() } ?: -1L

@@ -10,3 +10,11 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# jaudiotagger builds ID3 frame bodies and other parts by class name (Class.forName).
+-keep class org.jaudiotagger.** { *; }
+# Desktop-only APIs it references for artwork images; never called on Android.
+-dontwarn java.awt.**
+-dontwarn javax.imageio.**
+-dontwarn javax.swing.**
+-dontwarn java.beans.**

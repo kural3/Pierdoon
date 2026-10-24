@@ -93,6 +93,7 @@ import com.ku.pierdoon.MainViewModel
 import com.ku.pierdoon.R
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.ColorSource
+import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.playback.NowPlaying
@@ -113,6 +114,8 @@ import com.ku.pierdoon.ui.library.HomeScreen
 import com.ku.pierdoon.ui.library.LibraryScreen
 import com.ku.pierdoon.ui.library.PlaylistActionsSheet
 import com.ku.pierdoon.ui.library.PlaylistCover
+import com.ku.pierdoon.ui.library.PlaylistCoverSheet
+import com.ku.pierdoon.ui.edit.EditSongScreen
 import com.ku.pierdoon.ui.library.PlaylistNameDialog
 import com.ku.pierdoon.ui.library.PlaylistsScreen
 import com.ku.pierdoon.ui.library.SongActionTarget
@@ -167,7 +170,8 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     val settings by SettingsStore.settings.collectAsStateWithLifecycle()
 
     // "Album art" palette: extract a seed once per album, only while that mode is on.
-    LaunchedEffect(nowPlaying?.albumId, settings.colorSource) {
+    val nowPlayingCover = nowPlaying?.let { CoverStore.songVersion(it.songId) }
+    LaunchedEffect(nowPlaying?.albumId, nowPlayingCover, settings.colorSource) {
         val np = nowPlaying
         AlbumThemeSeed.seed.value =
             if (settings.colorSource == ColorSource.AlbumArt && np != null) {
@@ -204,6 +208,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
 
     var songAction by remember { mutableStateOf<SongActionTarget?>(null) }
     var playlistAction by remember { mutableStateOf<Playlist?>(null) }
+    var coverSheetFor by remember { mutableStateOf<Long?>(null) }
     var dialog by remember { mutableStateOf<PlaylistDialog?>(null) }
 
     // Lists reserve exactly the height of the floating chrome below them.
@@ -241,6 +246,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                     onCreatePlaylist = { dialog = PlaylistDialog.Create(null) },
                     onRenamePlaylist = { dialog = PlaylistDialog.Rename(it) },
                     onDeletePlaylist = { dialog = PlaylistDialog.Delete(it) },
+                    onPlaylistCover = { coverSheetFor = it.id },
                 )
             }
         }
@@ -333,6 +339,10 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             onAddToPlaylist = { id -> vm.addToPlaylist(id, target.song.id) },
             onCreatePlaylist = { dialog = PlaylistDialog.Create(target.song.id) },
             onRemoveFromPlaylist = { target.playlistId?.let { vm.removeFromPlaylist(it, target.song.id) } },
+            onEdit = {
+                expanded = false
+                nav.push(Route.EditSong(target.song.id))
+            },
         )
     }
     playlistAction?.let { p ->
@@ -340,7 +350,19 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             playlist = p,
             onDismiss = { playlistAction = null },
             onRename = { dialog = PlaylistDialog.Rename(p) },
+            onCover = { coverSheetFor = p.id },
             onDelete = { dialog = PlaylistDialog.Delete(p) },
+        )
+    }
+    // Read from the live list, so the sheet shows each change as it's made.
+    coverSheetFor?.let { id -> userData.playlists.firstOrNull { it.id == id } }?.let { p ->
+        PlaylistCoverSheet(
+            playlist = p,
+            firstSong = vm.resolve(p.songIds.take(1)).firstOrNull(),
+            onDismiss = { coverSheetFor = null },
+            onShape = { vm.setPlaylistShape(p.id, it) },
+            onPickImage = { vm.setPlaylistCover(p.id, it) },
+            onRemoveImage = { vm.removePlaylistCover(p.id) },
         )
     }
     when (val d = dialog) {
@@ -390,6 +412,7 @@ private fun Screens(
     onCreatePlaylist: () -> Unit,
     onRenamePlaylist: (Playlist) -> Unit,
     onDeletePlaylist: (Playlist) -> Unit,
+    onPlaylistCover: (Playlist) -> Unit,
 ) {
     val collections by vm.collections.collectAsStateWithLifecycle()
     val stateHolder = rememberSaveableStateHolder()
@@ -499,7 +522,9 @@ private fun Screens(
                         subtitle = "",
                         songs = tracks,
                         currentSongId = currentSongId,
-                        cover = { m -> PlaylistCover(tracks.firstOrNull(), m) },
+                        cover = { m ->
+                            PlaylistCover(playlist, tracks.firstOrNull(), m, large = true, placeholderIconSize = 64.dp)
+                        },
                         onBack = { nav.pop() },
                         onPlay = onPlay,
                         onShuffle = onShuffle,
@@ -508,6 +533,14 @@ private fun Screens(
                         emptyText = stringResource(R.string.empty_playlist),
                         actions = {
                             if (playlist != null) {
+                                ExpressiveIconButton(
+                                    onClick = { onPlaylistCover(playlist) },
+                                    icon = PlayerIcons.Image,
+                                    contentDescription = stringResource(R.string.cover),
+                                    containerColor = Color.Transparent,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(48.dp),
+                                )
                                 ExpressiveIconButton(
                                     onClick = { onRenamePlaylist(playlist) },
                                     icon = PlayerIcons.Edit,
@@ -527,6 +560,15 @@ private fun Screens(
                             }
                         },
                     )
+                }
+                is Route.EditSong -> {
+                    val song = remember(songs, route.songId) { vm.song(route.songId) }
+                    if (song != null) {
+                        EditSongScreen(song = song, vm = vm, onBack = { nav.pop() }, bottomInset = bottomInset)
+                    } else {
+                        // The file is gone (deleted elsewhere): nothing left to edit.
+                        LaunchedEffect(Unit) { nav.pop() }
+                    }
                 }
                 Route.Favorites -> {
                     val tracks = remember(userData.favorites, songs) { vm.resolve(userData.favorites) }

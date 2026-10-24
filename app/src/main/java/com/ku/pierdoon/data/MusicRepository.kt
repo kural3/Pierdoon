@@ -8,6 +8,8 @@ import kotlinx.coroutines.withContext
 
 class MusicRepository(private val context: Context) {
 
+    private val overrides = TagOverrides.get(context)
+
     suspend fun loadSongs(): List<Song> = withContext(Dispatchers.IO) {
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= ?"
         val songs = query(selection, arrayOf(MIN_DURATION_MS.toString()))
@@ -23,7 +25,12 @@ class MusicRepository(private val context: Context) {
         return query("${MediaStore.Audio.Media._ID} IN (${ids.distinct().joinToString(",")})", null)
     }
 
-    private fun query(selection: String, args: Array<String>?): ArrayList<Song> {
+    /** The track as its file tags it, without the user's in-app edits. */
+    suspend fun fileTags(id: Long): Song? = withContext(Dispatchers.IO) {
+        query("${MediaStore.Audio.Media._ID} = $id", null, withOverrides = false).firstOrNull()
+    }
+
+    private fun query(selection: String, args: Array<String>?, withOverrides: Boolean = true): ArrayList<Song> {
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
@@ -49,7 +56,7 @@ class MusicRepository(private val context: Context) {
             val addedCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
             songs.ensureCapacity(c.count)
             while (c.moveToNext()) {
-                songs += Song(
+                val song = Song(
                     id = c.getLong(idCol),
                     title = c.getString(titleCol).orEmpty(),
                     artist = c.getString(artistCol)?.takeUnless { it == UNKNOWN }.orEmpty(),
@@ -58,6 +65,7 @@ class MusicRepository(private val context: Context) {
                     durationMs = c.getLong(durationCol),
                     dateAdded = c.getLong(addedCol),
                 )
+                songs += if (withOverrides) overrides.apply(song) else song
             }
         }
         return songs

@@ -26,6 +26,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.google.common.util.concurrent.SettableFuture
 import com.ku.pierdoon.MainActivity
 import com.ku.pierdoon.R
+import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.MusicRepository
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
@@ -57,6 +58,7 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         SettingsStore.init(this)
+        CoverStore.init(this)
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_notification) }
         )

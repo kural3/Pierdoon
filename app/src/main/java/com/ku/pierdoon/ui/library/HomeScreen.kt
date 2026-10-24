@@ -162,6 +162,7 @@ fun HomeScreen(
                             songId = cover?.id ?: -1L,
                             albumId = cover?.albumId ?: -1L,
                             onClick = { onOpen(Route.PlaylistDetail(p.id)) },
+                            art = { m -> PlaylistCover(p, cover, m, placeholderIconSize = 40.dp) },
                         )
                     }
                 }
@@ -292,6 +293,8 @@ fun CoverCard(
     width: Dp = 148.dp,
     shape: Shape = RoundedCornerShape(28.dp),
     onLongClick: (() -> Unit)? = null,
+    /** Draws the picture instead of the track's art; gets the square, unclipped bounds. */
+    art: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val source = remember { MutableInteractionSource() }
@@ -304,15 +307,19 @@ fun CoverCard(
             .combinedClickableCompat(source, onClick, onLongClick, haptics)
             .padding(4.dp),
     ) {
-        Artwork(
-            songId = songId,
-            albumId = albumId,
-            placeholderIconSize = 40.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(shape),
-        )
+        if (art != null) {
+            art(Modifier.fillMaxWidth().aspectRatio(1f))
+        } else {
+            Artwork(
+                songId = songId,
+                albumId = albumId,
+                placeholderIconSize = 40.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(shape),
+            )
+        }
         Spacer(Modifier.height(8.dp))
         Text(
             text = title,
