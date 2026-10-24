@@ -79,7 +79,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _collections = MutableStateFlow(MusicCollections())
     val collections: StateFlow<MusicCollections> = _collections.asStateFlow()
 
-    private val userLibrary = UserLibrary(app, viewModelScope)
+    private val userLibrary = UserLibrary.get(app)
     val userData: StateFlow<UserData> = userLibrary.data
 
     private val _player = MutableStateFlow(PlayerState())
@@ -150,9 +150,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             syncState(player)
-            if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
-                player.currentMediaItem?.mediaId?.toLongOrNull()?.let(userLibrary::recordPlayed)
-            }
             eventTick.update { it + 1 }
         }
     }

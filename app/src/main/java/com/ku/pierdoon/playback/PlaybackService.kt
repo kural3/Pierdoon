@@ -6,6 +6,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -19,6 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.ku.pierdoon.MainActivity
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
+import com.ku.pierdoon.data.UserLibrary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,6 +58,14 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
+
+        // History lives here, not in the UI: tracks that play with the app closed count too.
+        val library = UserLibrary.get(this)
+        player.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                mediaItem?.mediaId?.toLongOrNull()?.let(library::recordPlayed)
+            }
+        })
 
         // Settings apply live; distinctUntilChanged keeps the player untouched by unrelated toggles.
         scope.launch {
@@ -103,6 +113,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        UserLibrary.get(this).flush()
         scope.cancel()
         session?.run {
             player.release()

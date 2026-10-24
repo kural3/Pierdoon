@@ -1,10 +1,12 @@
 package com.ku.pierdoon.data
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,17 +39,43 @@ data class UserData(
  * Deliberately not a database: a few kilobytes read once at start-up, then kept in memory.
  * Writes are coalesced (one write per burst of changes) and atomic (temp file + rename),
  * so skipping through ten tracks costs one tiny write, not ten.
+ *
+ * One instance per process, shared by the UI and the playback service. It owns its scope,
+ * so a pending write outlives the screen that made the change.
  */
-class UserLibrary(context: Context, private val scope: CoroutineScope) {
+class UserLibrary private constructor(context: Context) {
 
     private val file = File(context.filesDir, "library.json")
+    private val scope = CoroutineScope(SupervisorJob())
     private val io = Dispatchers.IO.limitedParallelism(1)
     private val _data = MutableStateFlow(UserData())
     val data: StateFlow<UserData> = _data.asStateFlow()
+
+    private val lock = Any()
     private var pendingWrite: Job? = null
+    private var writeAtMs = 0L
+    /** Changes made before the file was read; replayed on top of it. Null once loaded. */
+    private var beforeLoad: MutableList<(UserData) -> UserData>? = ArrayList()
 
     init {
-        scope.launch(io) { _data.value = read() }
+        scope.launch(io) {
+            val disk = read()
+            synchronized(lock) {
+                val ops = beforeLoad.orEmpty()
+                beforeLoad = null
+                _data.value = ops.fold(disk) { d, op -> op(d) }
+                if (ops.isNotEmpty()) scheduleWrite(WRITE_DELAY_MS)
+            }
+        }
+    }
+
+    /** Writes pending changes now instead of after the coalescing delay. */
+    fun flush() {
+        synchronized(lock) {
+            if (pendingWrite?.isActive != true) return
+            pendingWrite?.cancel()
+            pendingWrite = scope.launch(io) { write(_data.value) }
+        }
     }
 
     fun createPlaylist(name: String, initialSongs: List<Long> = emptyList()): Long {
@@ -84,10 +112,21 @@ class UserLibrary(context: Context, private val scope: CoroutineScope) {
     }
 
     private fun mutate(delayMs: Long = WRITE_DELAY_MS, transform: (UserData) -> UserData) {
-        val before = _data.value
-        _data.update(transform)
-        if (_data.value == before) return
+        synchronized(lock) {
+            val before = _data.value
+            _data.update(transform)
+            // Not loaded yet: show the change now, but never write until it is merged with the file.
+            beforeLoad?.let { it += transform; return }
+            if (_data.value != before) scheduleWrite(delayMs)
+        }
+    }
+
+    /** A slower change (history) never postpones a write that is already due sooner. */
+    private fun scheduleWrite(delayMs: Long) {
+        val at = SystemClock.uptimeMillis() + delayMs
+        if (pendingWrite?.isActive == true && writeAtMs <= at) return
         pendingWrite?.cancel()
+        writeAtMs = at
         pendingWrite = scope.launch(io) {
             delay(delayMs)
             write(_data.value)
@@ -135,9 +174,15 @@ class UserLibrary(context: Context, private val scope: CoroutineScope) {
 
     private fun JSONArray.toLongList(): List<Long> = List(length()) { getLong(it) }
 
-    private companion object {
-        const val MAX_RECENT = 30
-        const val WRITE_DELAY_MS = 300L
-        const val HISTORY_WRITE_DELAY_MS = 3_000L
+    companion object {
+        @Volatile private var instance: UserLibrary? = null
+
+        fun get(context: Context): UserLibrary = instance ?: synchronized(this) {
+            instance ?: UserLibrary(context.applicationContext).also { instance = it }
+        }
+
+        private const val MAX_RECENT = 30
+        private const val WRITE_DELAY_MS = 300L
+        private const val HISTORY_WRITE_DELAY_MS = 3_000L
     }
 }

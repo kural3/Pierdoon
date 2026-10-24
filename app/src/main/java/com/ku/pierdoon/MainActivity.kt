@@ -10,6 +10,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ku.pierdoon.data.SettingsStore
+import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.ui.PierdoonApp
 import com.ku.pierdoon.ui.components.installFrameRateBooster
 import com.ku.pierdoon.ui.theme.PierdoonTheme
@@ -36,5 +37,11 @@ class MainActivity : ComponentActivity() {
             }
         }
         installFrameRateBooster(findViewById(android.R.id.content))
+    }
+
+    // Backgrounded apps can be killed at any time: don't leave edits waiting on a timer.
+    override fun onStop() {
+        super.onStop()
+        UserLibrary.get(this).flush()
     }
 }
