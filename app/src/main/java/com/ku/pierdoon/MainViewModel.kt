@@ -43,6 +43,7 @@ import com.ku.pierdoon.data.UserData
 import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.lyrics.Lyrics
+import com.ku.pierdoon.data.lyrics.LyricsOffsets
 import com.ku.pierdoon.data.lyrics.LyricsQuery
 import com.ku.pierdoon.data.lyrics.LyricsRepository
 import com.ku.pierdoon.data.lyrics.NetworkNotAllowedException
@@ -179,6 +180,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LyricsState.Idle)
+
+    private val lyricsOffsets = LyricsOffsets(app)
+
+    /** Hand-set sync correction of the current track's lyrics; positive = lines show later. */
+    val lyricsOffset: StateFlow<Long> = combine(
+        _player.map { it.nowPlaying?.songId }.distinctUntilChanged(),
+        lyricsOffsets.version,
+    ) { id, _ -> id?.let(lyricsOffsets::get) ?: 0L }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0L)
+
+    fun shiftLyrics(deltaMs: Long) {
+        _player.value.nowPlaying?.let { lyricsOffsets.shift(it.songId, deltaMs) }
+    }
+
+    fun resetLyricsOffset() {
+        _player.value.nowPlaying?.let { lyricsOffsets.set(it.songId, 0L) }
+    }
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -498,6 +516,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (ok) refreshAfterEdit()
         return ok
+    }
+
+    /**
+     * Android 11+ asks the user before an app may delete someone else's file (the system dialog
+     * is the confirmation); null below that, where deleting would need write access to storage.
+     */
+    fun deleteRequest(song: Song): IntentSender? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            MediaStore.createDeleteRequest(getApplication<Application>().contentResolver, listOf(song.uri)).intentSender
+        } else {
+            null
+        }
+
+    /** The user agreed and the system deleted the file: forget everything the app kept about it. */
+    fun onSongDeleted(songId: Long) {
+        controller?.let { c ->
+            val mediaId = songId.toString()
+            for (i in c.mediaItemCount - 1 downTo 0) {
+                if (c.getMediaItemAt(i).mediaId == mediaId) c.removeMediaItem(i)
+            }
+        }
+        userLibrary.forgetSong(songId)
+        lyricsOffsets.set(songId, 0L)
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                tagOverrides.set(songId, null)
+                CoverStore.removeSongCover(songId)
+            }
+            lyricsRepository.forget(songId)
+        }
+        loadLibrary(force = true)
     }
 
     /** Drops the app's edits of a track: tags and cover come from the file again. */

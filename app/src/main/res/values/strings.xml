@@ -114,6 +114,12 @@
     <string name="lyrics_error">Не удалось загрузить текст. Проверьте подключение к сети.</string>
     <string name="retry">Повторить</string>
     <string name="lyrics_source">Тексты: LRCLIB</string>
+    <string name="lyrics_offset">%1$s с</string>
+    <string name="lyrics_offset_reset">Сбросить сдвиг текста</string>
+    <string name="lyrics_earlier">Текст раньше</string>
+    <string name="lyrics_later">Текст позже</string>
+    <string name="delete_from_device">Удалить с устройства</string>
+    <string name="deleted">Трек удалён</string>
     <string name="edit_track">Изменить</string>
     <string name="edit_track_title">Изменить трек</string>
     <string name="tags">Теги</string>

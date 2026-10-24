@@ -84,6 +84,8 @@ fun SongActionsSheet(
     onCreatePlaylist: () -> Unit,
     onRemoveFromPlaylist: () -> Unit,
     onEdit: () -> Unit,
+    /** Null where the system can't ask for consent to delete (below Android 11). */
+    onDelete: (() -> Unit)?,
 ) {
     val haptics = LocalHapticFeedback.current
     var pickingPlaylist by remember { mutableStateOf(false) }
@@ -145,6 +147,13 @@ fun SongActionsSheet(
                         if (target.playlistId != null) {
                             ActionItem(PlayerIcons.Remove, stringResource(R.string.remove_from_playlist)) {
                                 act(onRemoveFromPlaylist)
+                            }
+                        }
+                        if (onDelete != null) {
+                            ActionItem(PlayerIcons.Delete, stringResource(R.string.delete_from_device)) {
+                                haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                                onDismiss()
+                                onDelete()
                             }
                         }
                     } else {

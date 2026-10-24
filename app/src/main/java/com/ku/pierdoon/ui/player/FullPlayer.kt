@@ -135,6 +135,9 @@ fun FullPlayer(
     onMoveQueueEntry: (String, Int) -> Unit,
     onSongLongPress: (Song) -> Unit,
     onRetryLyrics: () -> Unit,
+    lyricsOffsetMs: Long,
+    onShiftLyrics: (Long) -> Unit,
+    onResetLyricsOffset: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
@@ -267,6 +270,9 @@ fun FullPlayer(
                         position = position,
                         onSeek = onSeek,
                         onRetry = onRetryLyrics,
+                        offsetMs = lyricsOffsetMs,
+                        onShift = onShiftLyrics,
+                        onResetOffset = onResetLyricsOffset,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

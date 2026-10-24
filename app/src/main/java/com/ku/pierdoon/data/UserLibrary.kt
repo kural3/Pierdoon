@@ -112,6 +112,15 @@ class UserLibrary private constructor(context: Context) {
         d.copy(favorites = if (songId in d.favorites) d.favorites - songId else d.favorites + songId)
     }
 
+    /** The file was deleted: drop it from playlists, favourites and history. */
+    fun forgetSong(songId: Long) = mutate { d ->
+        d.copy(
+            playlists = d.playlists.map { if (songId in it.songIds) it.copy(songIds = it.songIds - songId) else it },
+            favorites = d.favorites - songId,
+            recent = d.recent - songId,
+        )
+    }
+
     fun recordPlayed(songId: Long) = mutate(delayMs = HISTORY_WRITE_DELAY_MS) { d ->
         if (d.recent.firstOrNull() == songId) d
         else d.copy(recent = (listOf(songId) + (d.recent - songId)).take(MAX_RECENT))

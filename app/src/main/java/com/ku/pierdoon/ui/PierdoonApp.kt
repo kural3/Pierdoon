@@ -18,7 +18,10 @@ import androidx.compose.ui.unit.IntSize
 import com.ku.pierdoon.ui.components.animatePressAsState
 import com.ku.pierdoon.ui.components.scaleBy
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.widget.Toast
+import androidx.activity.result.IntentSenderRequest
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.BackHandler
@@ -163,6 +166,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     val player by vm.player.collectAsStateWithLifecycle()
     val position = vm.position.collectAsStateWithLifecycle()
     val lyrics by vm.lyrics.collectAsStateWithLifecycle()
+    val lyricsOffset by vm.lyricsOffset.collectAsStateWithLifecycle()
     val userData by vm.userData.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
@@ -215,6 +219,18 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     var playlistAction by remember { mutableStateOf<Playlist?>(null) }
     var coverSheetFor by remember { mutableStateOf<Long?>(null) }
     var dialog by remember { mutableStateOf<PlaylistDialog?>(null) }
+
+    // The system asks before the file goes; saved, so a recreated activity still cleans up after it.
+    var deletingSongId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val deletedText = stringResource(R.string.deleted)
+    val deleteConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
+        val id = deletingSongId
+        deletingSongId = null
+        if (r.resultCode == Activity.RESULT_OK && id != null) {
+            vm.onSongDeleted(id)
+            Toast.makeText(context, deletedText, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // Lists reserve exactly the height of the floating chrome below them.
     var chromeHeightPx by remember { mutableIntStateOf(0) }
@@ -314,6 +330,9 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                         onMoveQueueEntry = vm::moveQueueEntry,
                         onSongLongPress = { songAction = SongActionTarget(it) },
                         onRetryLyrics = vm::retryLyrics,
+                        lyricsOffsetMs = lyricsOffset,
+                        onShiftLyrics = vm::shiftLyrics,
+                        onResetLyricsOffset = vm::resetLyricsOffset,
                         onTogglePlay = vm::togglePlay,
                         onPrevious = vm::previous,
                         onNext = vm::next,
@@ -347,6 +366,16 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             onEdit = {
                 expanded = false
                 nav.push(Route.EditSong(target.song.id))
+            },
+            onDelete = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                {
+                    vm.deleteRequest(target.song)?.let { request ->
+                        deletingSongId = target.song.id
+                        deleteConsent.launch(IntentSenderRequest.Builder(request).build())
+                    }
+                }
+            } else {
+                null
             },
         )
     }

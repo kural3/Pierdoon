@@ -50,6 +50,12 @@ class LyricsRepository(context: Context) {
         }
     }
 
+    /** The track's file is gone: its lyrics won't be asked for again. */
+    suspend fun forget(songId: Long) = withContext(Dispatchers.IO) {
+        memory.remove(songId)
+        file(songId).delete()
+    }
+
     suspend fun cacheSizeBytes(): Long = withContext(Dispatchers.IO) {
         dir.listFiles()?.sumOf { it.length() } ?: 0L
     }

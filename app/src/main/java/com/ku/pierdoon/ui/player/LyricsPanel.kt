@@ -63,6 +63,14 @@ import com.ku.pierdoon.LyricsState
 import com.ku.pierdoon.PositionSnapshot
 import com.ku.pierdoon.R
 import com.ku.pierdoon.data.lyrics.Lyrics
+import com.ku.pierdoon.data.lyrics.LyricsOffsets
+import com.ku.pierdoon.ui.components.ExpressiveIconButton
+import com.ku.pierdoon.ui.components.PlayerIcons
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
+import java.util.Locale
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
@@ -90,6 +98,10 @@ fun LyricsPanel(
     position: () -> PositionSnapshot,
     onSeek: (Long) -> Unit,
     onRetry: () -> Unit,
+    /** Hand-set sync correction; positive = lines show later. */
+    offsetMs: Long,
+    onShift: (Long) -> Unit,
+    onResetOffset: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -108,7 +120,7 @@ fun LyricsPanel(
                 FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
             }
             is LyricsState.Ready -> when (val l = s.lyrics) {
-                is Lyrics.Synced -> SyncedLyrics(l, position, onSeek)
+                is Lyrics.Synced -> SyncedLyrics(l, position, onSeek, offsetMs, onShift, onResetOffset)
                 is Lyrics.Plain -> PlainLyrics(l)
                 Lyrics.Instrumental -> Centered { Message(stringResource(R.string.lyrics_instrumental)) }
                 Lyrics.NotFound -> Centered { Message(stringResource(R.string.lyrics_not_found)) }
@@ -123,6 +135,9 @@ private fun SyncedLyrics(
     lyrics: Lyrics.Synced,
     position: () -> PositionSnapshot,
     onSeek: (Long) -> Unit,
+    offsetMs: Long,
+    onShift: (Long) -> Unit,
+    onResetOffset: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     val listState = rememberLazyListState()
@@ -131,10 +146,12 @@ private fun SyncedLyrics(
 
     // Event-driven sync: after each position sample, sleep exactly until the next line is due.
     // No per-frame work and no fast polling — one wakeup per lyric line.
-    LaunchedEffect(lyrics) {
+    // A changed offset restarts it, so the active line moves at once.
+    LaunchedEffect(lyrics, offsetMs) {
         snapshotFlow { currentPosition() }.collectLatest { snap ->
             while (true) {
-                val now = snap.estimate(SystemClock.elapsedRealtime()) + LEAD_MS
+                // Timeline of the lyrics: shifting them later = reading an earlier moment.
+                val now = snap.estimate(SystemClock.elapsedRealtime()) + LEAD_MS - offsetMs
                 val idx = lyrics.indexAt(now)
                 current = idx
                 if (!snap.playing) break
@@ -192,13 +209,70 @@ private fun SyncedLyrics(
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                         userScrolledAt = 0L
-                        onSeek(line.timeMs)
+                        onSeek((line.timeMs + offsetMs).coerceAtLeast(0L))
                     },
                 )
             }
             item(key = "source") { SourceLabel() }
         }
+        // Stays in immersive mode too: that's when a drift is noticed. Over the lines already
+        // sung, never over the ones coming up.
+        SyncControls(offsetMs, onShift, onResetOffset, Modifier.align(Alignment.TopCenter).padding(top = 4.dp))
     }
+}
+
+/** "−  +0,25 с  +": nudges the lyrics a step earlier or later; tapping the value resets it. */
+@Composable
+private fun SyncControls(offsetMs: Long, onShift: (Long) -> Unit, onReset: () -> Unit, modifier: Modifier) {
+    val haptics = LocalHapticFeedback.current
+    val colors = MaterialTheme.colorScheme
+    val glass = colors.surfaceContainerHighest.copy(alpha = 0.6f)
+    fun shift(delta: Long) {
+        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        onShift(delta)
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.clip(RoundedCornerShape(50)).background(glass).padding(4.dp),
+    ) {
+        ExpressiveIconButton(
+            onClick = { shift(-LyricsOffsets.STEP_MS) },
+            icon = PlayerIcons.Remove,
+            contentDescription = stringResource(R.string.lyrics_earlier),
+            containerColor = Color.Transparent,
+            contentColor = colors.onSurface,
+            modifier = Modifier.size(40.dp),
+        )
+        Text(
+            text = stringResource(R.string.lyrics_offset, formatOffset(offsetMs)),
+            style = MaterialTheme.typography.labelLarge,
+            color = if (offsetMs == 0L) colors.onSurfaceVariant else colors.primary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .widthIn(min = 72.dp)
+                .clip(RoundedCornerShape(50))
+                .clickable(enabled = offsetMs != 0L, onClickLabel = stringResource(R.string.lyrics_offset_reset)) {
+                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                    onReset()
+                }
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+        )
+        ExpressiveIconButton(
+            onClick = { shift(LyricsOffsets.STEP_MS) },
+            icon = PlayerIcons.Add,
+            contentDescription = stringResource(R.string.lyrics_later),
+            containerColor = Color.Transparent,
+            contentColor = colors.onSurface,
+            modifier = Modifier.size(40.dp),
+        )
+    }
+}
+
+/** "0", "+0,25", "−1,5": signed seconds, decimal separator of the user's locale. */
+private fun formatOffset(ms: Long): String {
+    if (ms == 0L) return "0"
+    val seconds = String.format(Locale.getDefault(), "%.2f", abs(ms) / 1000.0).trimEnd('0').trimEnd(',', '.')
+    return (if (ms > 0) "+" else "−") + seconds
 }
 
 @Composable
