@@ -171,7 +171,9 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
 
     // "Album art" palette: extract a seed once per album, only while that mode is on.
     val nowPlayingCover = nowPlaying?.let { CoverStore.songVersion(it.songId) }
-    LaunchedEffect(nowPlaying?.albumId, nowPlayingCover, settings.colorSource) {
+    // A cover written into the file keeps the album id; the revision says the art changed.
+    val nowPlayingArtRevision = nowPlaying?.let { ArtworkCache.albumRevision(it.albumId) }
+    LaunchedEffect(nowPlaying?.albumId, nowPlayingCover, nowPlayingArtRevision, settings.colorSource) {
         val np = nowPlaying
         AlbumThemeSeed.seed.value =
             if (settings.colorSource == ColorSource.AlbumArt && np != null) {
