@@ -39,6 +39,11 @@ android {
     }
 
     buildTypes {
+        // Same key as releases, so a debug build and a GitHub release install over each other
+        // (and the in-app updater works on the development phone too).
+        debug {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
         release {
             optimization {
                 enable = true
