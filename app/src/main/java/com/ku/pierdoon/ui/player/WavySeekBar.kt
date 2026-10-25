@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.player
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -21,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
@@ -36,16 +38,30 @@ import com.ku.pierdoon.ui.components.rememberSmoothProgress
 import com.ku.pierdoon.ui.formatDuration
 import com.ku.pierdoon.ui.theme.LocalUiPrefs
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
 
 private const val DRAG_TICKS = 40
 
 /** Slightly longer than the indicator's own amplitude-decrease animation. */
 private const val WAVE_SETTLE_MS = 700L
 
+/** A seek stalls playback for a moment; a pause shorter than this keeps the wave up. */
+private const val STALL_GRACE_MS = 400L
+
+/** How long the bar holds a seek's target while the player catches up to it. */
+private const val SEEK_HOLD_MS = 1_500L
+
+/** Jumps larger than this glide instead of snapping. */
+private const val GLIDE_THRESHOLD = 0.01f
+
 /**
- * Seek bar drawn as an M3 Expressive wavy indicator. The wave flattens when paused or while
- * scrubbing, the stroke thickens under the finger and scrubbing ticks the haptic motor
- * like detents. Progress moves continuously (pixel-step extrapolation, no fast polling).
+ * Seek bar drawn as an M3 Expressive wavy indicator. The wave flattens when paused, the stroke
+ * thickens under the finger and scrubbing ticks the haptic motor like detents. Progress moves
+ * continuously (pixel-step extrapolation, no fast polling); a seek glides to its spot and stays
+ * there until the player catches up instead of flicking back to the old position.
  */
 @Composable
 fun WavySeekBar(
@@ -60,12 +76,44 @@ fun WavySeekBar(
     val dragging = dragFraction != null
     var widthPx by remember { mutableIntStateOf(0) }
     val playFraction by rememberSmoothProgress(position, durationMs, widthPx)
+    // Where a finished seek went, until playback reports it.
+    var seekTarget by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(seekTarget) {
+        val target = seekTarget ?: return@LaunchedEffect
+        withTimeoutOrNull(SEEK_HOLD_MS) {
+            snapshotFlow { abs(playFraction - target) < GLIDE_THRESHOLD }.first { it }
+        }
+        seekTarget = null
+    }
+    fun seek(fraction: Float) {
+        seekTarget = fraction
+        onSeek((fraction * durationMs).toLong())
+    }
+    val glideSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+    // Starts where playback is, so opening the player doesn't glide in from zero.
+    val shown = remember { Animatable(playFraction) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { Triple(dragFraction, seekTarget, playFraction) }.collectLatest { (drag, held, play) ->
+            val target = drag ?: held ?: play
+            if (drag == null && abs(target - shown.value) > GLIDE_THRESHOLD) {
+                shown.animateTo(target, glideSpec)
+            } else {
+                shown.snapTo(target)
+            }
+        }
+    }
 
     // The indicator animates amplitude itself; it must receive the *target* (0 or 1), not an
     // already-animating value, or it can get stuck mid-way. Read through a state so a change
     // invalidates its draw cache.
     val wavyEnabled = LocalUiPrefs.current.wavyProgress
-    val waveOn by rememberUpdatedState(wavyEnabled && isPlaying && !dragging)
+    // Scrubbing keeps the wave; only a real pause flattens it, not the stall right after a seek.
+    var playingSteady by remember { mutableStateOf(isPlaying) }
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) delay(STALL_GRACE_MS)
+        playingSteady = isPlaying
+    }
+    val waveOn by rememberUpdatedState(wavyEnabled && playingSteady)
     // Keep the wave travelling until it has flattened, then stop it: a still wave costs no frames.
     var waveMoving by remember { mutableStateOf(wavyEnabled && isPlaying) }
     LaunchedEffect(waveOn) {
@@ -95,7 +143,7 @@ fun WavySeekBar(
                     detectTapGestures { offset ->
                         if (durationMs <= 0) return@detectTapGestures
                         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                        onSeek(((offset.x / size.width).coerceIn(0f, 1f) * durationMs).toLong())
+                        seek((offset.x / size.width).coerceIn(0f, 1f))
                     }
                 }
                 .pointerInput(durationMs) {
@@ -110,7 +158,7 @@ fun WavySeekBar(
                             haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
                         },
                         onDragEnd = {
-                            dragFraction?.let { onSeek((it * durationMs).toLong()) }
+                            dragFraction?.let(::seek)
                             dragFraction = null
                             haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
                         },
@@ -129,7 +177,7 @@ fun WavySeekBar(
                 },
         ) {
             LinearWavyProgressIndicator(
-                progress = { dragFraction ?: playFraction },
+                progress = { shown.value.coerceIn(0f, 1f) },
                 amplitude = { if (waveOn) 1f else 0f },
                 stroke = stroke,
                 trackStroke = stroke,
@@ -140,7 +188,7 @@ fun WavySeekBar(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             // Recomposes once per second, not on every progress step.
             val shownSeconds by remember(durationMs) {
-                derivedStateOf { (((dragFraction ?: playFraction) * durationMs) / 1000).toLong() }
+                derivedStateOf { (((dragFraction ?: seekTarget ?: playFraction) * durationMs) / 1000).toLong() }
             }
             val style = MaterialTheme.typography.labelLarge
             val color = MaterialTheme.colorScheme.onSurfaceVariant

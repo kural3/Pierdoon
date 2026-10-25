@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.material3.ripple
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -795,7 +794,9 @@ private fun FloatingNavItem(tab: Route.Tab, selected: Boolean, onClick: () -> Un
             .scaleBy(scale)
             .clip(RoundedCornerShape(50))
             .background(container)
-            .clickable(interactionSource = source, indication = ripple(), role = Role.Tab) {
+            // The press scale and the indicator filling in are the feedback; a ripple would
+            // wash the pill white and stretch with it as the tab widens.
+            .clickable(interactionSource = source, indication = null, role = Role.Tab) {
                 haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                 onClick()
             }

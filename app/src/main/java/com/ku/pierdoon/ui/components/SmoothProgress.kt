@@ -27,7 +27,10 @@ fun rememberSmoothProgress(
     durationMs: Long,
     widthPx: Int,
 ): State<Float> {
-    val fraction = remember { mutableFloatStateOf(0f) }
+    // Seeded from the current sample so the first frame already shows the real spot.
+    val fraction = remember {
+        mutableFloatStateOf(if (durationMs > 0) (position().estimate().toFloat() / durationMs).coerceIn(0f, 1f) else 0f)
+    }
     val currentPosition by rememberUpdatedState(position)
     LaunchedEffect(durationMs, widthPx) {
         snapshotFlow { currentPosition() }.collectLatest { snap ->
