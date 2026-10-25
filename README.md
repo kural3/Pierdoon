@@ -14,6 +14,7 @@ A small offline music player for Android. Jetpack Compose + Material 3 Expressiv
 - Downloads tracks by link from YouTube, SoundCloud, Bandcamp and the other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports, with title, artist and cover; whole playlists and albums too, or search YouTube / SoundCloud by name (Android 10+)
 - Edits tags and covers, in the app or in the file; deletes tracks from the device
 - Expanding player, frosted glass, wallpaper / album art / custom color themes
+- A Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts, monospace included
 - Updates itself from GitHub releases
 - Tries to go easy on the battery
 
@@ -37,4 +38,4 @@ Release builds are signed only if a `keystore.properties` file exists in the pro
 
 ## License
 
-[GNU GPL v3](LICENSE). Downloads use [youtubedl-android](https://github.com/yausername/youtubedl-android) (GPL-3.0), which runs [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense). Tags are written with [jaudiotagger](https://bitbucket.org/ijabz/jaudiotagger) (LGPL).
+[GNU GPL v3](LICENSE). Downloads use [youtubedl-android](https://github.com/yausername/youtubedl-android) (GPL-3.0), which runs [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense). Tags are written with [jaudiotagger](https://bitbucket.org/ijabz/jaudiotagger) (LGPL). Bundled fonts: [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) and [IBM Plex Mono](https://github.com/IBM/plex), both under the SIL Open Font License (texts in `app/src/main/assets/licenses`).
