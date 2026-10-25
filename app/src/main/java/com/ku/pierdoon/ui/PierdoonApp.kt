@@ -590,7 +590,7 @@ private fun Screens(
                         currentSongId = currentSongId,
                         cover = { m ->
                             if (album != null) {
-                                Artwork(album.coverSongId, album.id, m.clip(RoundedCornerShape(40.dp)), large = true, placeholderIconSize = 64.dp)
+                                Artwork(album.coverSongId, album.coverAlbumId, m.clip(RoundedCornerShape(40.dp)), large = true, placeholderIconSize = 64.dp)
                             }
                         },
                         onBack = { nav.pop() },

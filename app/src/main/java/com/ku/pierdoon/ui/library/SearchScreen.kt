@@ -129,7 +129,7 @@ fun SearchScreen(
                         title = album.title,
                         subtitle = album.artist,
                         cover = {
-                            Artwork(album.coverSongId, album.id, Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)))
+                            Artwork(album.coverSongId, album.coverAlbumId, Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)))
                         },
                         onClick = { onOpen(Route.AlbumDetail(album.id)) },
                     )

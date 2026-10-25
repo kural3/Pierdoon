@@ -12,6 +12,9 @@ data class Album(
 ) {
     /** Any track of the album carries its art. */
     val coverSongId: Long get() = songs.first().id
+
+    /** MediaStore's album of that track, for its art; [id] may be the app's own. */
+    val coverAlbumId: Long get() = songs.first().albumId
 }
 
 @Immutable
@@ -35,10 +38,15 @@ data class MusicCollections(
         /** One pass over the library; call off the main thread. */
         fun from(songs: List<Song>): MusicCollections {
             val collator = Collator.getInstance().apply { strength = Collator.PRIMARY }
-            val albums = songs.groupBy { it.albumId }.map { (id, tracks) ->
+            // MediaStore files untagged tracks of a folder under one album; tags the app keeps
+            // for them (downloads that took none) still tell their albums apart.
+            val byName = songs.groupBy { it.albumId to it.album }
+            val namesPerId = byName.keys.groupingBy { it.first }.eachCount()
+            val albums = byName.map { (key, tracks) ->
+                val (mediaStoreId, name) = key
                 Album(
-                    id = id,
-                    title = tracks.first().album,
+                    id = if (namesPerId[mediaStoreId] == 1) mediaStoreId else mediaStoreId * 31 + name.hashCode(),
+                    title = name,
                     artist = tracks.map { it.artist }.filter { it.isNotBlank() }
                         .groupingBy { it }.eachCount().maxByOrNull { it.value }?.key.orEmpty(),
                     songs = tracks,
@@ -46,7 +54,7 @@ data class MusicCollections(
             }.sortedWith { a, b -> collator.compare(a.title, b.title) }
 
             val artists = songs.filter { it.artist.isNotBlank() }.groupBy { it.artist }.map { (name, tracks) ->
-                Artist(name, tracks, tracks.distinctBy { it.albumId }.size)
+                Artist(name, tracks, tracks.distinctBy { it.albumId to it.album }.size)
             }.sortedWith { a, b -> collator.compare(a.name, b.name) }
 
             return MusicCollections(

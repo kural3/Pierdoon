@@ -48,6 +48,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import kotlin.coroutines.coroutineContext
 
@@ -391,9 +392,20 @@ object Downloader {
             ?: throw DownloadException(FailReason.Other, null)
         if (audio.extension.equals("webm", ignoreCase = true)) {
             val opus = File(work, audio.nameWithoutExtension + ".opus")
-            if (!remuxToOgg(audio, opus)) throw DownloadException(FailReason.NoAudio, null)
+            if (!remux(audio, opus, MediaMuxer.OutputFormat.MUXER_OUTPUT_OGG, MediaFormat.MIMETYPE_AUDIO_OPUS)) {
+                throw DownloadException(FailReason.NoAudio, null)
+            }
             audio.delete()
             audio = opus
+        } else if (audio.extension.equals("m4a", ignoreCase = true)) {
+            // Without ffmpeg yt-dlp leaves YouTube's DASH m4a fragmented, and fragmented MP4 takes
+            // no tags. Rewritten as a plain MP4 it does; if that fails the original is kept.
+            val plain = File(work, audio.nameWithoutExtension + ".plain.m4a")
+            if (remux(audio, plain, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4, MediaFormat.MIMETYPE_AUDIO_AAC)) {
+                runCatching { dropMuxerExtras(plain) }.onFailure { Log.w(TAG, "moov not cleaned", it) }
+                audio.delete()
+                audio = plain
+            }
         }
         val ext = audio.extension.lowercase()
         val mime = MIME[ext] ?: throw DownloadException(FailReason.NoAudio, ext)
@@ -515,22 +527,65 @@ private fun squareJpeg(bytes: ByteArray): ByteArray? = runCatching {
 }.getOrNull()
 
 /**
- * WebM → Ogg, packets copied as they are. ffmpeg would do it too, but costs 35 MB;
- * the platform muxer writes Ogg Opus since Android 10.
+ * Some phones' muxers (Samsung's, for one) put vendor boxes into moov, a udta of their own and a
+ * bare meta, that the tag writer can't read. With moov written after mdat, as the muxer does,
+ * dropping them moves no sample offsets.
+ */
+private fun dropMuxerExtras(file: File) = RandomAccessFile(file, "rw").use { f ->
+    var pos = 0L
+    var moovAt = -1L
+    var moovSize = 0L
+    var mdatBefore = false
+    while (pos + 8 <= f.length()) {
+        f.seek(pos)
+        var size = f.readInt().toLong() and 0xffffffffL
+        val type = ByteArray(4).also { f.readFully(it) }.toString(Charsets.ISO_8859_1)
+        if (size == 1L) size = f.readLong() else if (size == 0L) size = f.length() - pos
+        if (size < 8) return
+        when (type) {
+            "mdat" -> mdatBefore = moovAt < 0
+            "moov" -> if (size <= Int.MAX_VALUE) { moovAt = pos; moovSize = size }
+        }
+        pos += size
+    }
+    if (moovAt < 0 || !mdatBefore || moovAt + moovSize != f.length()) return
+    val moov = ByteArray(moovSize.toInt()).also { f.seek(moovAt); f.readFully(it) }
+    val kept = ByteArrayOutputStream()
+    var o = 8
+    while (o + 8 <= moov.size) {
+        val size = ByteBuffer.wrap(moov, o, 4).int
+        if (size < 8 || o + size > moov.size) return
+        val type = String(moov, o + 4, 4, Charsets.ISO_8859_1)
+        if (type != "udta" && type != "meta") kept.write(moov, o, size)
+        o += size
+    }
+    val body = kept.toByteArray()
+    if (body.size + 8 == moov.size) return
+    f.seek(moovAt)
+    f.writeInt(body.size + 8)
+    f.write("moov".toByteArray(Charsets.ISO_8859_1))
+    f.write(body)
+    f.setLength(moovAt + 8 + body.size)
+}
+
+/**
+ * Copies the [mime] audio track of [source] into a new [format] container, packets as they are:
+ * WebM → Ogg Opus, fragmented → plain MP4. ffmpeg would do it too, but costs 35 MB;
+ * the platform muxer writes Ogg since Android 10.
  */
 @RequiresApi(Build.VERSION_CODES.Q)
-private fun remuxToOgg(source: File, target: File): Boolean {
+private fun remux(source: File, target: File, format: Int, mime: String): Boolean {
     val extractor = MediaExtractor()
     var muxer: MediaMuxer? = null
     return try {
         extractor.setDataSource(source.path)
         val track = (0 until extractor.trackCount).firstOrNull {
-            extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME) == MediaFormat.MIMETYPE_AUDIO_OPUS
+            extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME) == mime
         } ?: return false
         extractor.selectTrack(track)
-        val format = extractor.getTrackFormat(track)
-        val m = MediaMuxer(target.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_OGG).also { muxer = it }
-        val out = m.addTrack(format)
+        val trackFormat = extractor.getTrackFormat(track)
+        val m = MediaMuxer(target.path, format).also { muxer = it }
+        val out = m.addTrack(trackFormat)
         m.start()
         val buffer = ByteBuffer.allocate(256 * 1024)
         val info = MediaCodec.BufferInfo()

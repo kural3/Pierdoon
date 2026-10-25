@@ -42,6 +42,23 @@ class LibraryListsTest {
     }
 
     @Test
+    fun untaggedFolderAlbumSplitsByTheAppsAlbumNames() {
+        // MediaStore put all three under one album id; the app's tags name two albums.
+        val list = listOf(
+            Song(1, "A", "X", "One", albumId = 7, durationMs = 0),
+            Song(2, "B", "Y", "Two", albumId = 7, durationMs = 0),
+            Song(3, "C", "X", "One", albumId = 7, durationMs = 0),
+            Song(4, "D", "Z", "Solo", albumId = 9, durationMs = 0),
+        )
+        val albums = MusicCollections.from(list).albums
+        assertEquals(listOf("One", "Solo", "Two"), albums.map { it.title })
+        assertEquals(listOf(1L, 3L), albums.first { it.title == "One" }.songs.map { it.id })
+        assertEquals(9L, albums.first { it.title == "Solo" }.id)
+        assertEquals(3, albums.map { it.id }.distinct().size)
+        assertTrue(albums.all { it.coverAlbumId == it.songs.first().albumId })
+    }
+
+    @Test
     fun searchKeepsShortI() {
         val list = listOf(song(1, "Мой"), song(2, "Мои"))
         assertEquals(listOf(1L), searchLibrary("мой", list, MusicCollections()).songs.map { it.id })
