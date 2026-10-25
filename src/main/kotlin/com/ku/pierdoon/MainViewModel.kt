@@ -211,12 +211,7 @@ class MainViewModel {
         syncQueue(controller)
         viewModelScope.launch {
             Downloader.added.collect {
-                // Downloads land in Music/Pier.doon; a library without that folder would never show them.
-                val folder = Downloader.folder.absolutePath
-                val covered = SettingsStore.settings.value.musicFolders.any { root ->
-                    folder.startsWith(root.trimEnd('\\', '/') + File.separator, ignoreCase = true) || folder.equals(root, ignoreCase = true)
-                }
-                if (!covered) SettingsStore.update { it.copy(musicFolders = it.musicFolders + folder) }
+                scanDownloads()
                 rescanAfterDownload()
             }
         }
@@ -313,6 +308,47 @@ class MainViewModel {
     fun removeMusicFolder(path: String) {
         SettingsStore.update { s -> s.copy(musicFolders = s.musicFolders.filterNot { it == path }) }
         loadLibrary(force = true)
+    }
+
+    fun addExcludedFolder(folder: File) {
+        val path = folder.absolutePath
+        SettingsStore.update { s ->
+            if (s.excludedFolders.any { it.equals(path, ignoreCase = true) }) s else s.copy(excludedFolders = s.excludedFolders + path)
+        }
+        loadLibrary(force = true)
+    }
+
+    fun removeExcludedFolder(path: String) {
+        SettingsStore.update { s -> s.copy(excludedFolders = s.excludedFolders.filterNot { it == path }) }
+        loadLibrary(force = true)
+    }
+
+    /** Null goes back to the default folder. */
+    fun setDownloadFolder(folder: File?) {
+        SettingsStore.update { it.copy(downloadFolder = folder?.absolutePath) }
+        if (scanDownloads()) loadLibrary(force = true)
+    }
+
+    /**
+     * Downloads should show up in the library: adds their folder to the scanned ones unless one
+     * already holds it, and takes it off the skipped ones. True when something changed.
+     */
+    private fun scanDownloads(): Boolean {
+        val folder = Downloader.folder.absolutePath
+        val before = SettingsStore.settings.value
+        SettingsStore.update { s ->
+            val covered = s.musicFolders.any { it.encloses(folder) }
+            s.copy(
+                musicFolders = if (covered) s.musicFolders else s.musicFolders + folder,
+                excludedFolders = s.excludedFolders.filterNot { it.encloses(folder) },
+            )
+        }
+        return SettingsStore.settings.value != before
+    }
+
+    private fun String.encloses(path: String): Boolean {
+        val root = trimEnd('\\', '/')
+        return path.equals(root, ignoreCase = true) || path.startsWith(root + File.separator, ignoreCase = true)
     }
 
     fun playSongs(songs: List<Song>, startIndex: Int, shuffle: Boolean = false) {

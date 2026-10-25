@@ -36,8 +36,10 @@ class MusicRepository {
     )
 
     suspend fun loadSongs(): List<Song> = withContext(Dispatchers.IO) {
-        val folders = SettingsStore.settings.value.musicFolders.map(::File).filter { it.isDirectory }
-        val files = folders.flatMap(::walk).distinctBy { it.absolutePath.lowercase() }
+        val settings = SettingsStore.settings.value
+        val folders = settings.musicFolders.map(::File).filter { it.isDirectory }
+        val excluded = settings.excludedFolders.map { File(it).absolutePath.trimEnd('\\', '/').lowercase() }.toSet()
+        val files = folders.flatMap { walk(it, excluded) }.distinctBy { it.absolutePath.lowercase() }
         val idx = loaded()
         val seen = HashSet<String>(files.size)
         val songs = coroutineScope {
@@ -95,9 +97,9 @@ class MusicRepository {
         return if (withOverrides) overrides.apply(song) else song
     }
 
-    private fun walk(root: File): List<File> =
+    private fun walk(root: File, excluded: Set<String>): List<File> =
         root.walkTopDown()
-            .onEnter { !it.isHidden && it.name != "\$RECYCLE.BIN" }
+            .onEnter { !it.isHidden && it.name != "\$RECYCLE.BIN" && it.absolutePath.lowercase() !in excluded }
             .filter { it.isFile && it.extension.lowercase() in AUDIO_EXTENSIONS }
             .toList()
 

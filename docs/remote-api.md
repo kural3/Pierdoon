@@ -2,7 +2,7 @@
 
 Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 1 (`api: 1`). The server is in `src/main/kotlin/com/ku/pierdoon/remote/`.
 
-The server is off by default. The user turns it on in Settings → Телефон и Discord → Управление с телефона. While it runs, that page shows a six-digit pairing code and the computer's addresses.
+The server is off by default. The user turns it on in the Телефон tab of the side menu → Управление с телефона. While it runs, that tab shows a six-digit pairing code and the computer's addresses.
 
 ## Finding the computer
 
