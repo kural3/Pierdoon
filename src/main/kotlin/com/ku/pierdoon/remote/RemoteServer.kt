@@ -6,6 +6,10 @@ import com.ku.pierdoon.MainViewModel
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
+import com.ku.pierdoon.data.download.DownloadStatus
+import com.ku.pierdoon.data.download.DownloadTask
+import com.ku.pierdoon.data.download.Downloader
+import com.ku.pierdoon.data.download.SearchSource
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.platform.ErrorLog
 import com.ku.pierdoon.platform.Images
@@ -23,7 +27,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
@@ -73,7 +79,9 @@ data class RemoteDevice(val id: String, val name: String, val pairedAt: Long)
  */
 object RemoteServer {
     const val PORT = 47231
-    const val API_VERSION = 1
+    const val API_VERSION = 2
+    private const val DOWNLOADS_THROTTLE_MS = 400L
+    private const val MAX_DOWNLOADS_SENT = 20
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val prefs by lazy { Prefs("remote") }
@@ -170,6 +178,13 @@ object RemoteServer {
                     broadcast("lyricsOffset", JSONObject().put("songId", id).put("offsetMs", model.lyricsOffsetFor(id)))
                 }
             }
+            launch {
+                // Progress ticks many times a second; the phone needs a couple.
+                Downloader.tasks.drop(1).conflate().collect {
+                    broadcast("downloads", downloadsJson(it))
+                    delay(DOWNLOADS_THROTTLE_MS)
+                }
+            }
         }.also { job -> job.invokeOnCompletion { player.removeListener(playerListener) } }
     }
 
@@ -195,6 +210,8 @@ object RemoteServer {
             path == "/queue" && method == "GET" -> send(ex, 200, onUi { queueJson() })
             path == "/library" && method == "GET" -> send(ex, 200, libraryJson())
             path == "/lyrics" && method == "GET" -> lyrics(ex)
+            path == "/downloads" && method == "GET" -> send(ex, 200, downloadsJson(Downloader.tasks.value))
+            path == "/downloads/search" && method == "GET" -> downloadSearch(ex)
             path.startsWith("/cover/") && method == "GET" -> cover(ex, path.removePrefix("/cover/"))
             path == "/command" && method == "POST" -> command(ex)
             path == "/unpair" && method == "POST" -> {
@@ -256,6 +273,7 @@ object RemoteServer {
         queue.offer("event: state\ndata: $state\n\n")
         queue.offer("event: queue\ndata: $q\n\n")
         queue.offer("event: library\ndata: ${JSONObject().put("version", libraryVersion)}\n\n")
+        queue.offer("event: downloads\ndata: ${downloadsJson(Downloader.tasks.value)}\n\n")
         clients += queue
         try {
             val out = ex.responseBody
@@ -290,6 +308,26 @@ object RemoteServer {
             null -> json.put("type", "error")
         }
         send(ex, 200, json)
+    }
+
+    /** /downloads/search?q=…&source=youtube|soundcloud : tracks to pick from before downloading. */
+    private fun downloadSearch(ex: HttpExchange) {
+        val params = query(ex)
+        val q = params["q"]?.trim()?.takeIf { it.isNotEmpty() } ?: return send(ex, 400, JSONObject().put("error", "q"))
+        val source = if (params["source"] == "soundcloud") SearchSource.SoundCloud else SearchSource.YouTube
+        val hits = runCatching { runBlocking { Downloader.search(q, source) } }
+            .getOrElse { return send(ex, 502, JSONObject().put("error", "search failed")) }
+        send(
+            ex, 200,
+            JSONObject().put("hits", JSONArray(hits.map {
+                JSONObject()
+                    .put("url", it.url)
+                    .put("title", it.title)
+                    .put("artist", it.artist)
+                    .put("durationSec", it.durationSec ?: JSONObject.NULL)
+                    .put("thumbnail", it.thumbnail ?: JSONObject.NULL)
+            })),
+        )
     }
 
     private val covers = object : LruCache<String, ByteArray>(COVER_CACHE_BYTES) {
@@ -341,6 +379,16 @@ object RemoteServer {
                 "moveQueueEntry" -> model.moveQueueEntry(c.optString("key"), c.optInt("position"))
                 "favorite" -> model.toggleFavorite(c.optLong("songId"))
                 "lyricsOffset" -> if (c.optBoolean("reset")) model.resetLyricsOffset() else model.shiftLyrics(c.optLong("deltaMs"))
+                "download" -> {
+                    val url = c.optString("url").trim().takeIf { it.startsWith("http://") || it.startsWith("https://") }
+                        ?: return@onUi false
+                    Downloader.enqueue(
+                        url,
+                        SettingsStore.settings.value.downloadFormat,
+                        c.optString("title").ifBlank { null },
+                        c.optString("artist").ifBlank { null },
+                    )
+                }
                 else -> return@onUi false
             }
             true
@@ -371,6 +419,26 @@ object RemoteServer {
             .put("favorite", song != null && vm?.userData?.value?.favorites?.contains(song.id) == true)
             .put("serverTimeMs", System.currentTimeMillis())
     }
+
+    /** The latest downloads, newest first: what the phone sent and what was started here. */
+    private fun downloadsJson(tasks: List<DownloadTask>): JSONObject = JSONObject().put(
+        "tasks",
+        JSONArray(tasks.takeLast(MAX_DOWNLOADS_SENT).asReversed().map { t ->
+            val json = JSONObject()
+                .put("id", t.id)
+                .put("url", t.url)
+                .put("title", t.title ?: JSONObject.NULL)
+                .put("artist", t.artist ?: JSONObject.NULL)
+            when (val st = t.status) {
+                DownloadStatus.Queued -> json.put("status", "queued")
+                DownloadStatus.Preparing -> json.put("status", "preparing")
+                is DownloadStatus.Downloading -> json.put("status", "downloading").put("progress", st.progress?.toDouble() ?: JSONObject.NULL)
+                DownloadStatus.Saving -> json.put("status", "saving")
+                is DownloadStatus.Done -> json.put("status", "done").put("songId", st.songId)
+                is DownloadStatus.Failed -> json.put("status", "failed").put("reason", st.reason.name.lowercase())
+            }
+        }),
+    )
 
     private fun queueJson(): JSONObject {
         val q = vm?.queue?.value ?: return JSONObject()

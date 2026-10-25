@@ -43,7 +43,7 @@ Forgets this phone's token on the PC.
 
 ### `GET /events`
 
-A [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html) stream that stays open. Right after connecting it sends `state`, `queue` and `library`, then every change as it happens. A `: keepalive` comment comes every 15 s; if nothing arrives for ~45 s, reconnect.
+A [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html) stream that stays open. Right after connecting it sends `state`, `queue`, `library` and `downloads`, then every change as it happens. A `: keepalive` comment comes every 15 s; if nothing arrives for ~45 s, reconnect.
 
 | event | data | when |
 | --- | --- | --- |
@@ -51,6 +51,7 @@ A [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events
 | `queue` | [Queue](#queue) | the queue changed |
 | `library` | `{"version": n}` | tracks, playlists or favourites changed: fetch `/library` again |
 | `lyricsOffset` | `{"songId": …, "offsetMs": …}` | the sync offset of the current track changed |
+| `downloads` | [Downloads](#get-downloads--downloads) | a download was added, moved on or finished (at most ~2 a second) |
 
 ### `GET /state` → State
 
@@ -118,6 +119,33 @@ The track's cover as JPEG, at most `size` px on a side (64–1200). `404` means 
 - The PC fetches lyrics from LRCLIB if it hasn't yet, so the first request for a track can take a few seconds.
 - `error` means the PC couldn't reach LRCLIB.
 
+### `GET /downloads` → Downloads
+
+The latest 20 downloads on the computer, newest first.
+
+```json
+{
+  "tasks": [
+    {
+      "id": 7,
+      "url": "https://youtu.be/…",
+      "title": "…" | null,
+      "artist": "…" | null,
+      "status": "queued" | "preparing" | "downloading" | "saving" | "done" | "failed",
+      "progress": 0.42 | null,
+      "songId": 123,
+      "reason": "unsupported" | "unavailable" | "drm" | "noaudio" | "network" | "save" | "other"
+    }
+  ]
+}
+```
+
+`progress` comes only with `downloading`, `songId` with `done`, `reason` with `failed`. Title and artist are null until the page has been read.
+
+### `GET /downloads/search?q=…&source=youtube`
+
+Finds tracks to download by name: `source` is `youtube` (default) or `soundcloud`. Takes a few seconds. `{"hits": [{"url", "title", "artist", "durationSec", "thumbnail"}]}`, or `502` when the site can't be reached.
+
 ### `POST /command`
 
 `{"action": "…", …}` → `{"ok": true}`, or `400 {"ok": false}` for an unknown action or bad arguments.
@@ -136,5 +164,6 @@ The track's cover as JPEG, at most `size` px on a side (64–1200). `404` means 
 | `moveQueueEntry` | `key`, `position` (0 = right after the current track) |
 | `favorite` | `songId` (toggles) |
 | `lyricsOffset` | `deltaMs`, or `reset: true` |
+| `download` | `url` (http or https), `title` and `artist` (optional, from a search hit). Saved in the computer's download format and folder. Since API 2 |
 
 The result of a command arrives as events. Don't wait for it in the reply.
