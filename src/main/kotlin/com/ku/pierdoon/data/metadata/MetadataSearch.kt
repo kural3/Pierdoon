@@ -77,18 +77,42 @@ object MetadataSearch {
      * A public link to [title]'s cover, for places that can only show pictures from the web
      * (the Discord status). Only a confident match: the same title by the same artist. Blocking.
      */
-    fun coverUrl(title: String, artist: String): String? = runCatching {
+    fun coverUrl(title: String, artist: String): String? {
         fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
         val t = norm(title)
         val a = norm(artist)
-        deezer("$artist $title".trim()).firstOrNull { c ->
-            val ct = norm(c.title)
-            val ca = norm(c.artist)
-            val sameArtist = a.isNotEmpty() && ca.isNotEmpty() && (ca.contains(a) || a.contains(ca))
-            val sameTitle = t.isNotEmpty() && (ct.contains(t) || t.contains(ct))
-            sameTitle && (sameArtist || a.isEmpty())
-        }?.thumbUrl
-    }.getOrNull()
+        val query = "$artist $title".trim()
+        // Deezer first (it knows CIS music best), iTunes for what it misses.
+        return listOf(::deezer, ::itunes).firstNotNullOfOrNull { source ->
+            runCatching { source(query) }.getOrNull()?.firstOrNull { c ->
+                val ct = norm(c.title)
+                val ca = norm(c.artist)
+                val sameArtist = a.isNotEmpty() && ca.isNotEmpty() && (ca.contains(a) || a.contains(ca))
+                val sameTitle = t.isNotEmpty() && (ct.contains(t) || t.contains(ct))
+                sameTitle && (sameArtist || a.isEmpty())
+            }?.thumbUrl
+        }
+    }
+
+    /** The iTunes Store catalogue; only used for [coverUrl]. Its artwork urls name their size. */
+    private fun itunes(query: String): List<MetadataCandidate> {
+        val body = httpGetText("https://itunes.apple.com/search?term=${enc(query)}&media=music&entity=song&limit=$LIMIT")
+            ?: return emptyList()
+        val results = JSONObject(body).optJSONArray("results") ?: return emptyList()
+        return List(results.length()) { i ->
+            val o = results.getJSONObject(i)
+            val art = o.optString("artworkUrl100").takeIf { it.isNotBlank() }
+            MetadataCandidate(
+                title = o.optString("trackName"),
+                artist = o.optString("artistName"),
+                album = o.optString("collectionName"),
+                durationMs = o.optLong("trackTimeMillis"),
+                coverUrl = art?.replace("100x100bb", "1000x1000bb"),
+                thumbUrl = art?.replace("100x100bb", "512x512bb"),
+                source = "iTunes",
+            )
+        }
+    }
 
     private fun deezer(query: String): List<MetadataCandidate> {
         val body = httpGetText("https://api.deezer.com/search?q=${enc(query)}&limit=$LIMIT") ?: return emptyList()

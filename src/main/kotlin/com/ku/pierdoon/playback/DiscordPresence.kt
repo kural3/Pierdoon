@@ -29,9 +29,10 @@ import java.util.concurrent.Executors
  * bar, cleared while paused. Off unless switched on in the settings.
  *
  * Talks to the Discord app on this computer through its local IPC pipe (`discord-ipc-N`), the
- * same way Discord's own SDK does, so nothing goes through the internet but the cover lookup.
- * Discord can only show pictures from the web; covers come from Deezer when it knows the track,
- * otherwise the app icon stands in.
+ * same way Discord's own SDK does.
+ *
+ * Discord can only show pictures from the web: the cover comes from Deezer or iTunes when they
+ * know the track, otherwise the status goes without one.
  */
 object DiscordPresence {
     /**
@@ -39,7 +40,6 @@ object DiscordPresence {
      * what Discord shows. Empty: the status stays off.
      */
     private const val CLIENT_ID = "1564028006392004658"
-    private const val APP_ICON = "https://raw.githubusercontent.com/kural3/Pierdoon4Desktop/main/icons/pierdoon.png"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     /** The pipe is used from one thread only: Windows serialises I/O on it anyway. */
@@ -47,6 +47,7 @@ object DiscordPresence {
     private val pipeDispatcher = io.asCoroutineDispatcher()
 
     private var pipe: RandomAccessFile? = null
+
     private val coverUrls = HashMap<Long, String?>()
 
     private data class Shown(val song: Song?, val playing: Boolean, val startMs: Long)
@@ -91,16 +92,18 @@ object DiscordPresence {
     private fun show(s: Shown) {
         val song = s.song
         if (song == null || !s.playing) return clear(disconnect = false)
-        val cover = coverUrls.getOrPut(song.id) { MetadataSearch.coverUrl(song.title, song.artist) } ?: APP_ICON
+        val cover = coverUrls.getOrPut(song.id) { MetadataSearch.coverUrl(song.title, song.artist) }
         val activity = JSONObject()
             .put("type", ACTIVITY_LISTENING)
             // The member list shows the track's name instead of "Pier.doon".
             .put("status_display_type", STATUS_DISPLAY_DETAILS)
             .put("details", fit(song.title))
             .put("state", fit(song.artist.ifBlank { song.album }))
-            .put("assets", JSONObject().put("large_image", cover).apply {
+        if (cover != null) {
+            activity.put("assets", JSONObject().put("large_image", cover).apply {
                 if (song.album.isNotBlank()) put("large_text", fit(song.album))
             })
+        }
         if (song.durationMs > 0) {
             activity.put("timestamps", JSONObject().put("start", s.startMs).put("end", s.startMs + song.durationMs))
         }
