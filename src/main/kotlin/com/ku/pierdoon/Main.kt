@@ -1,5 +1,9 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.platform.GpuMemory
+import kotlinx.coroutines.delay
+import com.ku.pierdoon.ui.components.trimRemoteImages
+import com.ku.pierdoon.ui.components.ArtworkCache
 import com.ku.pierdoon.platform.ErrorLog
 import androidx.compose.ui.window.DefaultWindowExceptionHandlerFactory
 import androidx.compose.ui.window.WindowExceptionHandler
@@ -106,6 +110,25 @@ fun main(args: Array<String>) {
                 placement = if (windowPrefs.getBoolean("maximized", false)) WindowPlacement.Maximized else WindowPlacement.Floating,
             )
             val nav = remember { Navigator(listOf(Route.Home)) }
+            // In the tray or minimized nothing is drawn: give back the decoded covers and the
+            // heap's slack. A short wait so a quick peek and back doesn't redo every cover.
+            LaunchedEffect(visible, state.isMinimized) {
+                if (visible && !state.isMinimized) {
+                    // The renderer may have been recreated meanwhile (a display change), with
+                    // Skia's default limit; the first frame may not be drawn yet either.
+                    repeat(GPU_LIMIT_TRIES) {
+                        val window = SingleInstance.window
+                        if (window != null && GpuMemory.limit(window, GpuMemory.NORMAL_BYTES)) return@LaunchedEffect
+                        delay(GPU_LIMIT_RETRY_MS)
+                    }
+                    return@LaunchedEffect
+                }
+                delay(TRIM_DELAY_MS)
+                ArtworkCache.trim()
+                trimRemoteImages()
+                SingleInstance.window?.let { GpuMemory.limit(it, GpuMemory.HIDDEN_BYTES) }
+                System.gc()
+            }
             saveWindowOnQuit = { saveWindow(windowPrefs, state) }
             val icon = painterResource(Res.drawable.pierdoon)
 
@@ -261,3 +284,7 @@ private object DarkTitleBar {
         }
     }
 }
+
+private const val TRIM_DELAY_MS = 10_000L
+private const val GPU_LIMIT_TRIES = 20
+private const val GPU_LIMIT_RETRY_MS = 500L

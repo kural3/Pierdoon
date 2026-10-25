@@ -25,13 +25,16 @@ import kotlinx.coroutines.withContext
 /** Search thumbnails stay around while the user goes through results. */
 private val thumbs = LruCache<String, ImageBitmap>(48)
 
+/** Forgets the search thumbnails; see [ArtworkCache.trim]. */
+fun trimRemoteImages() = thumbs.evictAll()
+
 @Composable
 fun RemoteImage(url: String?, modifier: Modifier) {
     val bitmap by produceState(url?.let { thumbs.get(it) }, url) {
         if (url == null || value != null) return@produceState
         val bytes = MetadataSearch.download(url) ?: return@produceState
         value = withContext(Dispatchers.Default) {
-            Images.decode(bytes)?.let { Images.toBitmap(Images.scaled(it, THUMB_PX)) }
+            Images.decode(bytes)?.let { Images.scaledBitmap(it, THUMB_PX) }
         }?.also { thumbs.put(url, it) }
     }
     Box(modifier.background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {

@@ -13,7 +13,13 @@ import org.jetbrains.skia.MipmapMode
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.Surface
 
-/** Picture decoding and scaling through Skia, which Compose already ships. */
+/**
+ * Picture decoding and scaling through Skia, which Compose already ships.
+ *
+ * Skia keeps pixels outside the Java heap, where the garbage collector neither sees nor hurries
+ * to free them: a decoded 3000 px cover is 36 MB until it's collected. So whatever is only a
+ * step on the way (the full-size decode, a drawing surface) is closed as soon as it's used.
+ */
 object Images {
 
     fun decode(bytes: ByteArray): Image? = runCatching { Image.makeFromEncoded(bytes) }.getOrNull()
@@ -29,24 +35,40 @@ object Images {
     fun centreSquare(image: Image, maxPx: Int): Image {
         val side = minOf(image.width, image.height)
         val out = minOf(side, maxPx)
-        val surface = Surface.makeRasterN32Premul(out, out)
-        val src = Rect.makeXYWH((image.width - side) / 2f, (image.height - side) / 2f, side.toFloat(), side.toFloat())
-        surface.canvas.drawImageRect(image, src, Rect.makeWH(out.toFloat(), out.toFloat()), SAMPLING, null, true)
-        return surface.makeImageSnapshot()
+        return Surface.makeRasterN32Premul(out, out).use { surface ->
+            val src = Rect.makeXYWH((image.width - side) / 2f, (image.height - side) / 2f, side.toFloat(), side.toFloat())
+            surface.canvas.drawImageRect(image, src, Rect.makeWH(out.toFloat(), out.toFloat()), SAMPLING, null, true)
+            surface.makeImageSnapshot()
+        }
     }
 
-    fun resized(image: Image, w: Int, h: Int): Image {
-        val surface = Surface.makeRasterN32Premul(w, h)
-        surface.canvas.drawImageRect(
-            image,
-            Rect.makeWH(image.width.toFloat(), image.height.toFloat()),
-            Rect.makeWH(w.toFloat(), h.toFloat()),
-            SAMPLING, null, true,
-        )
-        return surface.makeImageSnapshot()
-    }
+    fun resized(image: Image, w: Int, h: Int): Image =
+        Surface.makeRasterN32Premul(w, h).use { surface ->
+            surface.canvas.drawImageRect(
+                image,
+                Rect.makeWH(image.width.toFloat(), image.height.toFloat()),
+                Rect.makeWH(w.toFloat(), h.toFloat()),
+                SAMPLING, null, true,
+            )
+            surface.makeImageSnapshot()
+        }
 
-    fun jpeg(image: Image, quality: Int = 90): ByteArray? = image.encodeToData(EncodedImageFormat.JPEG, quality)?.bytes
+    fun jpeg(image: Image, quality: Int = 90): ByteArray? =
+        image.encodeToData(EncodedImageFormat.JPEG, quality)?.use { it.bytes }
+
+    /** [image] fitted into [maxPx] as a Compose bitmap (a copy); [image] is closed. */
+    fun scaledBitmap(image: Image, maxPx: Int): ImageBitmap = image.use { scaled(it, maxPx).consume(it, ::toBitmap) }
+
+    /** [image] fitted into [maxPx] as JPEG; [image] is closed. */
+    fun scaledJpeg(image: Image, maxPx: Int, quality: Int = 90): ByteArray? =
+        image.use { scaled(it, maxPx).consume(it) { s -> jpeg(s, quality) } }
+
+    /** The centre square of [image] as JPEG; [image] is closed. */
+    fun squareJpeg(image: Image, maxPx: Int): ByteArray? = image.use { centreSquare(it, maxPx).use(::jpeg) }
+
+    /** Runs [block] on [this] and closes it, unless it's [source] itself (closed by its owner). */
+    private inline fun <T> Image.consume(source: Image, block: (Image) -> T): T =
+        if (this === source) block(this) else use(block)
 
     fun toBitmap(image: Image): ImageBitmap = image.toComposeImageBitmap()
 

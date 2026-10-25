@@ -341,7 +341,7 @@ object RemoteServer {
         val size = query(ex)["size"]?.toIntOrNull()?.coerceIn(64, 1200) ?: 600
         val key = "${artKey(song)}@$size"
         val jpeg = covers.get(key) ?: ArtworkCache.coverBytes(song.id, song.albumId)
-            ?.let(Images::decode)?.let { Images.jpeg(Images.scaled(it, size), 88) }
+            ?.let(Images::decode)?.let { Images.scaledJpeg(it, size, 88) }
             ?.also { covers.put(key, it) }
             ?: return send(ex, 404, JSONObject().put("error", "no cover"))
         ex.responseHeaders.add("Content-Type", "image/jpeg")

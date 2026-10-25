@@ -539,5 +539,5 @@ private fun errorLine(message: String?): String? =
 /** Thumbnails are mostly 16:9 video frames; the centre square is what a cover looks like. */
 private fun squareJpeg(bytes: ByteArray): ByteArray? = runCatching {
     val decoded = Images.decode(bytes) ?: return null
-    Images.jpeg(Images.centreSquare(decoded, COVER_MAX_PX))
+    Images.squareJpeg(decoded, COVER_MAX_PX)
 }.getOrNull()

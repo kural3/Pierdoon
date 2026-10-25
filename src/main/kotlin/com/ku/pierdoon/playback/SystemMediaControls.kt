@@ -124,7 +124,7 @@ object SystemMediaControls {
     /** A small JPEG, handed over as an in-memory stream: no temp files, nothing to clean up. */
     private fun setThumbnail(updater: Pointer, bytes: ByteArray?) {
         val statics = streamRefs
-        val jpeg = bytes?.let(Images::decode)?.let { Images.jpeg(Images.scaled(it, THUMB_PX)) }
+        val jpeg = bytes?.let(Images::decode)?.let { Images.scaledJpeg(it, THUMB_PX) }
         if (statics == null || jpeg == null) {
             call(updater, 11, Pointer.NULL)
             return
