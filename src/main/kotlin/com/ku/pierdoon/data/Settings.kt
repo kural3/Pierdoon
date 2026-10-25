@@ -63,6 +63,10 @@ data class AppSettings(
     val songSortDescending: Boolean = false,
     /** Folders scanned for music, subfolders included. */
     val musicFolders: List<String> = listOf(AppDirs.music.absolutePath),
+    /** Folders inside the music folders that the library skips, subfolders included. */
+    val excludedFolders: List<String> = emptyList(),
+    /** Where downloads are saved; null = a Pier.doon folder in the user's Music. */
+    val downloadFolder: String? = null,
     val volume: Float = 1f,
     val muted: Boolean = false,
     /** Closing the window hides it to the tray while music keeps playing. */
@@ -117,6 +121,9 @@ object SettingsStore {
             songSortDescending = p.getBoolean(K_SONG_SORT_DESC, d.songSortDescending),
             musicFolders = p.getString(K_FOLDERS, null)?.split(FOLDER_SEPARATOR)?.filter { it.isNotBlank() }
                 ?: d.musicFolders,
+            excludedFolders = p.getString(K_EXCLUDED, null)?.split(FOLDER_SEPARATOR)?.filter { it.isNotBlank() }
+                ?: d.excludedFolders,
+            downloadFolder = p.getString(K_DOWNLOAD_FOLDER, null)?.takeIf { it.isNotBlank() },
             volume = p.getFloat(K_VOLUME, d.volume).coerceIn(0f, 1f),
             muted = p.getBoolean(K_MUTED, d.muted),
             closeToTray = p.getBoolean(K_TRAY, d.closeToTray),
@@ -169,6 +176,8 @@ object SettingsStore {
             putString(K_SONG_SORT, s.songSort.name)
             putBoolean(K_SONG_SORT_DESC, s.songSortDescending)
             putString(K_FOLDERS, s.musicFolders.joinToString(FOLDER_SEPARATOR))
+            putString(K_EXCLUDED, s.excludedFolders.joinToString(FOLDER_SEPARATOR))
+            putString(K_DOWNLOAD_FOLDER, s.downloadFolder)
             putFloat(K_VOLUME, s.volume)
             putBoolean(K_MUTED, s.muted)
             putBoolean(K_TRAY, s.closeToTray)
@@ -207,6 +216,8 @@ object SettingsStore {
     private const val K_SONG_SORT = "song_sort"
     private const val K_SONG_SORT_DESC = "song_sort_desc"
     private const val K_FOLDERS = "music_folders"
+    private const val K_EXCLUDED = "excluded_folders"
+    private const val K_DOWNLOAD_FOLDER = "download_folder"
     private const val K_VOLUME = "volume"
     private const val K_MUTED = "muted"
     private const val K_TRAY = "close_to_tray"

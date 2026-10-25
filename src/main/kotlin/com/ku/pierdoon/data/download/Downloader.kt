@@ -10,6 +10,7 @@ import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.data.USER_AGENT
 import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.TagWriter
+import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.platform.Images
 import com.ku.pierdoon.platform.Prefs
@@ -138,8 +139,10 @@ object Downloader {
     private val ytDlp get() = File(AppDirs.tools, "yt-dlp.exe")
     private val prefs by lazy { Prefs("downloader") }
 
-    /** Where downloads go: a folder of their own inside the user's Music, which the library scans. */
-    val folder: File get() = File(AppDirs.music, FOLDER)
+    /** Where downloads go: the folder chosen in the settings, else one of their own inside the user's Music. */
+    val folder: File get() = SettingsStore.settings.value.downloadFolder?.let(::File) ?: defaultFolder
+
+    val defaultFolder: File get() = File(AppDirs.music, FOLDER)
 
     @Synchronized
     fun init() {

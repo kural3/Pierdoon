@@ -35,7 +35,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
@@ -61,10 +60,9 @@ import com.ku.pierdoon.data.NAV_MAX_WIDTH
 import com.ku.pierdoon.data.NAV_MIN_WIDTH
 import com.ku.pierdoon.data.ThemeMode
 import com.ku.pierdoon.data.update.UpdateState
+import com.ku.pierdoon.data.download.DownloadFormat
+import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.playback.DiscordPresence
-import com.ku.pierdoon.remote.RemoteServer
-import com.ku.pierdoon.remote.RemoteStatus
-import androidx.compose.foundation.text.selection.SelectionContainer
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.library.AppScaffold
@@ -83,8 +81,11 @@ internal fun groupShape(index: Int, count: Int): Shape {
     )
 }
 
-/** A page of settings, opened from the list on the Settings tab. */
-enum class SettingsSection { Appearance, Playback, Lyrics, Library, Window, Connections, Updates }
+/** A page of settings, opened from the list on the Settings tab; [music] ones come first, under their own heading. */
+enum class SettingsSection(val music: Boolean) {
+    Library(true), Downloads(true), Playback(true), Lyrics(true),
+    Appearance(false), Window(false), Integrations(false), Updates(false),
+}
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
 
@@ -105,6 +106,9 @@ fun SettingsScreen(
     onRescan: () -> Unit,
     onAddFolder: (File) -> Unit,
     onRemoveFolder: (String) -> Unit,
+    onExcludeFolder: (File) -> Unit,
+    onUnexcludeFolder: (String) -> Unit,
+    onDownloadFolder: (File?) -> Unit,
     updateState: UpdateState,
     onCheckUpdates: () -> Unit,
     onShowUpdate: () -> Unit,
@@ -121,8 +125,6 @@ fun SettingsScreen(
         is UpdateState.InstallFailed -> stringResource(Res.string.update_failed)
         UpdateState.Idle -> stringResource(Res.string.update_current, version)
     }
-
-    val remote by RemoteServer.status.collectAsState()
 
     AppScaffold(
         title = stringResource(section?.title() ?: Res.string.nav_settings),
@@ -144,8 +146,9 @@ fun SettingsScreen(
                 SettingsSection.Window -> window(settings, onUpdate)
                 SettingsSection.Playback -> playback(settings, onUpdate)
                 SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
-                SettingsSection.Library -> library(settings, trackCount, onRescan, onAddFolder, onRemoveFolder)
-                SettingsSection.Connections -> connections(settings, onUpdate, remote)
+                SettingsSection.Library -> library(settings, trackCount, onRescan, onAddFolder, onRemoveFolder, onExcludeFolder, onUnexcludeFolder)
+                SettingsSection.Downloads -> downloads(settings, onUpdate, onDownloadFolder)
+                SettingsSection.Integrations -> integrations(settings, onUpdate)
                 SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
             }
         }
@@ -158,7 +161,8 @@ private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Playback -> Res.string.settings_playback
     SettingsSection.Lyrics -> Res.string.settings_lyrics
     SettingsSection.Library -> Res.string.settings_library
-    SettingsSection.Connections -> Res.string.settings_connections
+    SettingsSection.Downloads -> Res.string.settings_downloads
+    SettingsSection.Integrations -> Res.string.settings_integrations
     SettingsSection.Updates -> Res.string.settings_updates
 }
 
@@ -168,7 +172,8 @@ private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Playback -> PlayerIcons.Play
     SettingsSection.Lyrics -> PlayerIcons.Lyrics
     SettingsSection.Library -> PlayerIcons.Library
-    SettingsSection.Connections -> PlayerIcons.Phone
+    SettingsSection.Downloads -> PlayerIcons.Download
+    SettingsSection.Integrations -> PlayerIcons.Extension
     SettingsSection.Updates -> PlayerIcons.Refresh
 }
 
@@ -178,9 +183,9 @@ private fun LazyListScope.sectionList(
     updateStatus: String,
     version: String,
 ) {
-    item(key = "sections") {
-        Group(null) {
-            SettingsSection.entries.map { s ->
+    for (music in listOf(true, false)) item(key = if (music) "sections_music" else "sections_app") {
+        Group(stringResource(if (music) Res.string.settings_group_music else Res.string.settings_group_app)) {
+            SettingsSection.entries.filter { it.music == music }.map { s ->
                 { shape ->
                     SectionItem(
                         shape = shape,
@@ -191,8 +196,12 @@ private fun LazyListScope.sectionList(
                             SettingsSection.Window -> stringResource(Res.string.settings_desktop_summary)
                             SettingsSection.Playback -> stringResource(Res.string.settings_playback_summary)
                             SettingsSection.Lyrics -> stringResource(Res.string.settings_lyrics_summary)
-                            SettingsSection.Library -> stringResource(Res.string.tracks_count, trackCount)
-                            SettingsSection.Connections -> stringResource(Res.string.settings_connections_summary)
+                            SettingsSection.Library -> stringResource(
+                                Res.string.settings_library_summary,
+                                stringResource(Res.string.tracks_count, trackCount),
+                            )
+                            SettingsSection.Downloads -> stringResource(Res.string.settings_downloads_summary)
+                            SettingsSection.Integrations -> stringResource(Res.string.settings_integrations_summary)
                             SettingsSection.Updates -> updateStatus
                         },
                         onClick = { onOpen(s) },
@@ -500,6 +509,8 @@ private fun LazyListScope.library(
     onRescan: () -> Unit,
     onAddFolder: (File) -> Unit,
     onRemoveFolder: (String) -> Unit,
+    onExcludeFolder: (File) -> Unit,
+    onUnexcludeFolder: (String) -> Unit,
 ) {
     item(key = "folders") {
         val chooseTitle = stringResource(Res.string.choose_folder)
@@ -529,6 +540,30 @@ private fun LazyListScope.library(
             }
         }
     }
+    item(key = "excluded") {
+        val chooseTitle = stringResource(Res.string.choose_excluded_folder)
+        Group(stringResource(Res.string.excluded_folders)) {
+            buildList<@Composable (Shape) -> Unit> {
+                settings.excludedFolders.forEach { path ->
+                    add { shape -> FolderItem(shape = shape, path = path, onRemove = { onUnexcludeFolder(path) }) }
+                }
+                add { shape ->
+                    ActionItem(
+                        shape = shape,
+                        title = stringResource(Res.string.exclude_folder),
+                        subtitle = stringResource(
+                            if (settings.excludedFolders.isEmpty()) Res.string.excluded_folders_none
+                            else Res.string.exclude_folder_desc
+                        ),
+                        onClick = {
+                            val start = settings.musicFolders.firstOrNull()?.let(::File)
+                            Files.pickFolder(chooseTitle, start)?.let(onExcludeFolder)
+                        },
+                    )
+                }
+            }
+        }
+    }
     item(key = "library") {
         val done = stringResource(Res.string.settings_rescan_done)
         Group(null) {
@@ -551,7 +586,7 @@ private fun LazyListScope.library(
 }
 
 @Composable
-private fun FolderItem(shape: Shape, path: String, onRemove: (() -> Unit)?) {
+private fun FolderItem(shape: Shape, path: String, onRemove: (() -> Unit)?, removeLabel: String? = null) {
     ItemContainer(shape) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -568,7 +603,7 @@ private fun FolderItem(shape: Shape, path: String, onRemove: (() -> Unit)?) {
             )
             if (onRemove != null) {
                 IconButton(onClick = onRemove) {
-                    Icon(PlayerIcons.Close, contentDescription = stringResource(Res.string.remove_folder))
+                    Icon(PlayerIcons.Close, contentDescription = removeLabel ?: stringResource(Res.string.remove_folder))
                 }
             }
         }
@@ -594,70 +629,63 @@ private fun ChoiceItem(shape: Shape, title: String, selected: Boolean, onClick: 
     }
 }
 
-private fun LazyListScope.connections(settings: AppSettings, onUpdate: Update, remote: RemoteStatus) {
-    item(key = "remote") {
-        Group(null) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    SwitchItem(
+private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update, onDownloadFolder: (File?) -> Unit) {
+    item(key = "download_folder") {
+        val chooseTitle = stringResource(Res.string.choose_download_folder)
+        Group(stringResource(Res.string.download_folder)) {
+            buildList<@Composable (Shape) -> Unit> {
+                add { shape ->
+                    FolderItem(
                         shape = shape,
-                        title = stringResource(Res.string.remote_control),
-                        subtitle = remote.error?.let { stringResource(Res.string.remote_error, it) }
-                            ?: stringResource(Res.string.remote_control_desc),
-                        checked = settings.remoteControl,
-                        onChange = { v -> onUpdate { it.copy(remoteControl = v) } },
+                        path = settings.downloadFolder ?: Downloader.defaultFolder.absolutePath,
+                        onRemove = if (settings.downloadFolder != null) ({ onDownloadFolder(null) }) else null,
+                        removeLabel = stringResource(Res.string.download_folder_reset),
                     )
-                },
-            )
-        }
-    }
-    if (remote.running) {
-        item(key = "remote_pair") {
-            Group(null) {
-                listOf<@Composable (Shape) -> Unit>(
-                    { shape ->
-                        ValueItem(
-                            shape = shape,
-                            title = stringResource(Res.string.remote_pair_title),
-                            value = remote.pairingCode.chunked(3).joinToString(" "),
-                            subtitle = stringResource(Res.string.remote_pair_desc),
-                        )
-                    },
-                    { shape ->
-                        ValueItem(
-                            shape = shape,
-                            title = stringResource(Res.string.remote_address),
-                            value = remote.addresses.joinToString("\n") { "$it:${remote.port}" }
-                                .ifEmpty { stringResource(Res.string.remote_address_none) },
-                            subtitle = null,
-                        )
-                    },
-                )
-            }
-        }
-    }
-    item(key = "remote_devices") {
-        Group(stringResource(Res.string.remote_devices)) {
-            if (remote.devices.isEmpty()) {
-                listOf<@Composable (Shape) -> Unit>(
-                    { shape ->
-                        ItemContainer(shape) {
-                            Text(
-                                stringResource(Res.string.remote_devices_none),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                            )
-                        }
-                    },
-                )
-            } else {
-                remote.devices.map { device ->
-                    { shape: Shape -> DeviceItem(shape, device.name) { RemoteServer.forget(device) } }
+                }
+                add { shape ->
+                    ActionItem(
+                        shape = shape,
+                        title = stringResource(Res.string.download_folder_choose),
+                        subtitle = stringResource(Res.string.download_folder_choose_desc),
+                        onClick = { Files.pickFolder(chooseTitle, Downloader.folder.takeIf { it.isDirectory })?.let(onDownloadFolder) },
+                    )
                 }
             }
         }
     }
+    item(key = "download_format") {
+        Group(stringResource(Res.string.download_format)) {
+            listOf<@Composable (Shape) -> Unit>(
+                { shape ->
+                    ItemContainer(shape) {
+                        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                            ConnectedChoice(
+                                options = listOf(
+                                    stringResource(Res.string.download_format_m4a),
+                                    stringResource(Res.string.download_format_opus),
+                                ),
+                                selected = settings.downloadFormat.ordinal,
+                                onSelect = { i -> onUpdate { it.copy(downloadFormat = DownloadFormat.entries[i]) } },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                stringResource(
+                                    if (settings.downloadFormat == DownloadFormat.M4a) Res.string.download_format_m4a_desc
+                                    else Res.string.download_format_opus_desc
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun LazyListScope.integrations(settings: AppSettings, onUpdate: Update) {
     if (DiscordPresence.available) item(key = "discord") {
         Group(null) {
             listOf<@Composable (Shape) -> Unit>(
@@ -671,45 +699,6 @@ private fun LazyListScope.connections(settings: AppSettings, onUpdate: Update, r
                     )
                 },
             )
-        }
-    }
-}
-
-/** A setting that is read, not changed: a code, an address. */
-@Composable
-private fun ValueItem(shape: Shape, title: String, value: String, subtitle: String?) {
-    ItemContainer(shape) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SelectionContainer {
-                Text(value, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
-            }
-            if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeviceItem(shape: Shape, name: String, onForget: () -> Unit) {
-    ItemContainer(shape) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-        ) {
-            Icon(PlayerIcons.Phone, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(16.dp))
-            Text(
-                name,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(vertical = 10.dp),
-            )
-            IconButton(onClick = onForget) {
-                Icon(PlayerIcons.Close, contentDescription = stringResource(Res.string.remote_forget))
-            }
         }
     }
 }
@@ -873,7 +862,7 @@ private fun FontItem(shape: Shape, font: AppFont, selected: Boolean, onClick: ()
 }
 
 @Composable
-private fun SwitchItem(
+internal fun SwitchItem(
     shape: Shape,
     title: String,
     subtitle: String,

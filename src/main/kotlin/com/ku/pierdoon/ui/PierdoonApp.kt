@@ -141,6 +141,7 @@ import com.ku.pierdoon.ui.player.NowPlayingScreen
 import com.ku.pierdoon.ui.player.PlayerBar
 import com.ku.pierdoon.ui.player.QueuePanel
 import com.ku.pierdoon.ui.settings.SettingsScreen
+import com.ku.pierdoon.ui.phone.PhoneScreen
 import com.ku.pierdoon.ui.theme.AlbumThemeSeed
 import com.ku.pierdoon.ui.update.UpdateDialog
 import kotlinx.coroutines.launch
@@ -638,6 +639,7 @@ private fun Screens(
                     onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
                     bottomInset = bottomInset,
                 )
+                Route.Phone -> PhoneScreen(settings = settings, bottomInset = bottomInset)
                 Route.Settings, is Route.SettingsPage -> {
                     val updateState by vm.update.collectAsState()
                     SettingsScreen(
@@ -652,6 +654,9 @@ private fun Screens(
                         onRescan = vm::rescanLibrary,
                         onAddFolder = vm::addMusicFolder,
                         onRemoveFolder = vm::removeMusicFolder,
+                        onExcludeFolder = vm::addExcludedFolder,
+                        onUnexcludeFolder = vm::removeExcludedFolder,
+                        onDownloadFolder = vm::setDownloadFolder,
                         updateState = updateState,
                         onCheckUpdates = vm::checkForUpdates,
                         onShowUpdate = vm::showUpdate,
@@ -852,7 +857,7 @@ private fun NavRail(nav: Navigator, width: Float, onResize: (Float) -> Unit, bot
                     nav.selectTab(tab)
                 }
                 if (tab == Route.Search) Spacer(Modifier.height(8.dp))
-                if (tab == Route.Downloads) Spacer(Modifier.weight(1f))
+                if (tab == Route.Phone) Spacer(Modifier.weight(1f))
             }
         }
         // The grab strip along the right edge; a thin line shows while it's hovered or dragged.
@@ -943,6 +948,7 @@ private fun Route.Tab.icon() = when (this) {
     Route.Library -> PlayerIcons.Library
     Route.Playlists -> PlayerIcons.Playlist
     Route.Downloads -> PlayerIcons.Download
+    Route.Phone -> PlayerIcons.Phone
     Route.Settings -> PlayerIcons.Settings
 }
 
@@ -952,6 +958,7 @@ private fun Route.Tab.label() = when (this) {
     Route.Library -> Res.string.nav_library
     Route.Playlists -> Res.string.nav_playlists
     Route.Downloads -> Res.string.nav_downloads
+    Route.Phone -> Res.string.nav_phone
     Route.Settings -> Res.string.nav_settings
 }
 

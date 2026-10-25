@@ -23,10 +23,11 @@ sealed interface Route {
     data class EditSong(val songId: Long) : Route { override val key = "edit:$songId" }
     data object Downloads : Tab { override val key = "downloads" }
     data object Search : Tab { override val key = "search" }
+    data object Phone : Tab { override val key = "phone" }
     data class SettingsPage(val section: SettingsSection) : Route { override val key = "settings:${section.name}" }
 
     companion object {
-        val tabs = listOf(Home, Search, Library, Playlists, Downloads, Settings)
+        val tabs = listOf(Home, Search, Library, Playlists, Downloads, Phone, Settings)
 
         fun decode(key: String): Route = when {
             key.startsWith("album:") -> AlbumDetail(key.removePrefix("album:").toLong())
