@@ -9,7 +9,7 @@ The server is off by default. The user turns it on in the Телефон tab of 
 Send the UDP datagram `PIERDOON_DISCOVER` (UTF-8, nothing else) to port **47232**, to the broadcast address (`255.255.255.255` or the subnet's). Every running Pier.doon replies to the sender:
 
 ```json
-{"app": "Pier.doon", "name": "DESKTOP-7O84MEM", "port": 47231, "version": "1.0.4", "api": 1}
+{"app": "Pier.doon", "name": "DESKTOP-7O84MEM", "port": 47231, "version": "1.0.5", "api": 1}
 ```
 
 Use the packet's source address with `port`. If nothing replies within a couple of seconds, offer manual entry of `address:47231`.
@@ -25,7 +25,7 @@ Use the packet's source address with `port`. If nothing replies within a couple 
 ### `GET /info` (no auth)
 
 ```json
-{"app": "Pier.doon", "name": "DESKTOP-7O84MEM", "version": "1.0.4", "api": 1}
+{"app": "Pier.doon", "name": "DESKTOP-7O84MEM", "version": "1.0.5", "api": 1}
 ```
 
 ### `POST /pair` (no auth)

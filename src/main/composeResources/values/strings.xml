@@ -297,7 +297,7 @@
     <string name="remote_devices_none">Пока ни одного</string>
     <string name="remote_forget">Отключить</string>
     <string name="discord_presence">Статус в Discord</string>
-    <string name="discord_presence_desc">Показывать в профиле Discord, что сейчас играет. Discord должен быть запущен, обложки берутся с Deezer</string>
+    <string name="discord_presence_desc">Показывать в профиле Discord, что сейчас играет. Discord должен быть запущен, обложки находятся в Deezer и iTunes</string>
     <string name="output_unavailable">Звук некуда выводить: проверьте наушники или колонки</string>
     <string name="choose_image">Выберите изображение</string>
     <string name="choose_folder">Выберите папку с музыкой</string>
