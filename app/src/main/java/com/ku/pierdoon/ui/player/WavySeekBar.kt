@@ -2,6 +2,7 @@ package com.ku.pierdoon.ui.player
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -106,7 +108,8 @@ fun WavySeekBar(
     // The indicator animates amplitude itself; it must receive the *target* (0 or 1), not an
     // already-animating value, or it can get stuck mid-way. Read through a state so a change
     // invalidates its draw cache.
-    val wavyEnabled = LocalUiPrefs.current.wavyProgress
+    val nothing = LocalUiPrefs.current.nothing
+    val wavyEnabled = LocalUiPrefs.current.wavyProgress && !nothing
     // Scrubbing keeps the wave; only a real pause flattens it, not the stall right after a seek.
     var playingSteady by remember { mutableStateOf(isPlaying) }
     LaunchedEffect(isPlaying) {
@@ -176,14 +179,22 @@ fun WavySeekBar(
                     }
                 },
         ) {
-            LinearWavyProgressIndicator(
-                progress = { shown.value.coerceIn(0f, 1f) },
-                amplitude = { if (waveOn) 1f else 0f },
-                stroke = stroke,
-                trackStroke = stroke,
-                waveSpeed = if (waveMoving) 16.dp else 0.dp,
-                modifier = Modifier.fillMaxWidth().height(20.dp),
-            )
+            if (nothing) {
+                DotProgress(
+                    progress = { shown.value.coerceIn(0f, 1f) },
+                    dragging = dragging,
+                    modifier = Modifier.fillMaxWidth().height(20.dp),
+                )
+            } else {
+                LinearWavyProgressIndicator(
+                    progress = { shown.value.coerceIn(0f, 1f) },
+                    amplitude = { if (waveOn) 1f else 0f },
+                    stroke = stroke,
+                    trackStroke = stroke,
+                    waveSpeed = if (waveMoving) 16.dp else 0.dp,
+                    modifier = Modifier.fillMaxWidth().height(20.dp),
+                )
+            }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             // Recomposes once per second, not on every progress step.
@@ -197,3 +208,33 @@ fun WavySeekBar(
         }
     }
 }
+
+/**
+ * Nothing-style track: a row of dots, lit up to the playhead, which is a larger red dot.
+ * The head swells under the finger.
+ */
+@Composable
+private fun DotProgress(progress: () -> Float, dragging: Boolean, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val head by animateDpAsState(
+        targetValue = if (dragging) 8.dp else 5.dp,
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+        label = "dotHead",
+    )
+    Canvas(modifier) {
+        val pitch = DOT_PITCH.toPx()
+        val count = (size.width / pitch).toInt().coerceAtLeast(2)
+        val step = (size.width - pitch) / (count - 1)
+        val y = size.height / 2
+        val at = progress() * (count - 1)
+        val lit = colors.onSurface
+        val unlit = colors.onSurface.copy(alpha = 0.22f)
+        for (i in 0 until count) {
+            drawCircle(if (i <= at) lit else unlit, radius = DOT_RADIUS.toPx(), center = Offset(pitch / 2 + i * step, y))
+        }
+        drawCircle(colors.primary, radius = head.toPx(), center = Offset(pitch / 2 + at * step, y))
+    }
+}
+
+private val DOT_PITCH = 9.dp
+private val DOT_RADIUS = 2.dp

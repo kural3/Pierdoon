@@ -15,6 +15,9 @@ enum class ThemeMode { System, Light, Dark }
 /** Where the palette comes from: device wallpaper, current album art, or a chosen colour. */
 enum class ColorSource { Wallpaper, AlbumArt, Custom }
 
+/** Typeface for the whole app. */
+enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono }
+
 const val DEFAULT_SEED: Int = 0xFF6750A4.toInt()
 
 @Immutable
@@ -33,6 +36,9 @@ data class AppSettings(
     /** Rounded tab bar hovering above content instead of docked to the bottom edge. */
     val floatingNav: Boolean = false,
     val wavyProgress: Boolean = true,
+    /** Nothing-style look: monochrome with a red accent, dot-matrix headings, dotted progress. */
+    val nothingStyle: Boolean = false,
+    val font: AppFont = AppFont.System,
     val lyricsWifiOnly: Boolean = false,
     /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
     val lyricsSyncControls: Boolean = false,
@@ -75,6 +81,8 @@ object SettingsStore {
             glass = p.getBoolean(K_GLASS, d.glass),
             floatingNav = p.getBoolean(K_FLOATING_NAV, d.floatingNav),
             wavyProgress = p.getBoolean(K_WAVY, d.wavyProgress),
+            nothingStyle = p.getBoolean(K_NOTHING, d.nothingStyle),
+            font = runCatching { AppFont.valueOf(p.getString(K_FONT, d.font.name)!!) }.getOrDefault(d.font),
             lyricsWifiOnly = p.getBoolean(K_WIFI, d.lyricsWifiOnly),
             lyricsSyncControls = p.getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
             skipSilence = p.getBoolean(K_SILENCE, d.skipSilence),
@@ -103,6 +111,8 @@ object SettingsStore {
             putBoolean(K_GLASS, s.glass)
             putBoolean(K_FLOATING_NAV, s.floatingNav)
             putBoolean(K_WAVY, s.wavyProgress)
+            putBoolean(K_NOTHING, s.nothingStyle)
+            putString(K_FONT, s.font.name)
             putBoolean(K_WIFI, s.lyricsWifiOnly)
             putBoolean(K_SYNC_CONTROLS, s.lyricsSyncControls)
             putBoolean(K_SILENCE, s.skipSilence)
@@ -125,6 +135,8 @@ object SettingsStore {
     private const val K_GLASS = "glass"
     private const val K_FLOATING_NAV = "floating_nav"
     private const val K_WAVY = "wavy_progress"
+    private const val K_NOTHING = "nothing_style"
+    private const val K_FONT = "font"
     private const val K_WIFI = "lyrics_wifi_only"
     private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
     private const val K_SILENCE = "skip_silence"

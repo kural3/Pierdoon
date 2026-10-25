@@ -138,6 +138,7 @@ import com.ku.pierdoon.ui.navigation.Route
 import com.ku.pierdoon.ui.navigation.rememberNavigator
 import com.ku.pierdoon.ui.player.ExpandingPlayerEffect
 import com.ku.pierdoon.ui.player.ExpandingPlayerSheet
+import com.ku.pierdoon.ui.player.MINI_HANDOFF
 import com.ku.pierdoon.ui.player.FullPlayer
 import com.ku.pierdoon.ui.player.expandingPlayerDrag
 import com.ku.pierdoon.ui.player.rememberExpandingPlayerState
@@ -335,7 +336,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                                 .padding(bottom = 8.dp)
                                 .fillMaxWidth()
                                 .onGloballyPositioned { sheet.onMiniBounds(it.boundsInRoot()) }
-                                .graphicsLayer { alpha = (1f - sheet.progress.value * 5f).coerceIn(0f, 1f) },
+                                .graphicsLayer { alpha = (1f - sheet.progress.value / MINI_HANDOFF).coerceIn(0f, 1f) },
                             dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
                         )
                     }
@@ -557,8 +558,11 @@ private fun Screens(
                     onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
                     bottomInset = bottomInset,
                 )
-                Route.Settings -> {
+                Route.Settings, is Route.SettingsPage -> {
                     SettingsScreen(
+                        section = (route as? Route.SettingsPage)?.section,
+                        onOpen = { nav.push(Route.SettingsPage(it)) },
+                        onBack = { nav.pop() },
                         settings = settings,
                         onUpdate = SettingsStore::update,
                         trackCount = songs.size,

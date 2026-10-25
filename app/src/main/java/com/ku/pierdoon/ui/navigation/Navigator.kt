@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.ku.pierdoon.ui.settings.SettingsSection
 
 sealed interface Route {
     val key: String
@@ -22,6 +23,7 @@ sealed interface Route {
     data class EditSong(val songId: Long) : Route { override val key = "edit:$songId" }
     data object Downloads : Route { override val key = "downloads" }
     data object Search : Route { override val key = "search" }
+    data class SettingsPage(val section: SettingsSection) : Route { override val key = "settings:${section.name}" }
 
     companion object {
         val tabs = listOf(Home, Library, Playlists, Settings)
@@ -34,6 +36,8 @@ sealed interface Route {
             key == Favorites.key -> Favorites
             key == Downloads.key -> Downloads
             key == Search.key -> Search
+            key.startsWith("settings:") -> SettingsSection.entries.firstOrNull { it.name == key.removePrefix("settings:") }
+                ?.let(::SettingsPage) ?: Settings
             else -> tabs.firstOrNull { it.key == key } ?: Home
         }
     }

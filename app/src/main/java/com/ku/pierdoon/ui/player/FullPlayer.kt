@@ -106,6 +106,7 @@ import com.ku.pierdoon.playback.QueueState
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.BlurredArtwork
+import com.ku.pierdoon.ui.theme.LocalUiPrefs
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.ExpressiveToggleButton
 import com.ku.pierdoon.ui.components.PlayerIcons
@@ -154,9 +155,11 @@ fun FullPlayer(
     dragModifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
+    // Nothing style: flat black page, no frosted art, no immersive lyrics.
+    val nothing = LocalUiPrefs.current.nothing
 
     // Matte-glass tints over the frosted art: translucent containers pick up its colour.
-    val glassButton = colors.surfaceContainerHighest.copy(alpha = 0.45f)
+    val glassButton = if (nothing) colors.surfaceContainerHigh else colors.surfaceContainerHighest.copy(alpha = 0.45f)
     val sleepTimer by SleepTimer.state.collectAsStateWithLifecycle()
     var showSleepSheet by remember { mutableStateOf(false) }
     if (showSleepSheet) SleepTimerSheet(sleepTimer, onDismiss = { showSleepSheet = false })
@@ -170,9 +173,9 @@ fun FullPlayer(
     var immersive by remember { mutableStateOf(false) }
     val immersiveNow by rememberUpdatedState(immersive)
     val lyricsReady = lyrics is LyricsState.Ready
-    LaunchedEffect(showLyrics, lyricsReady, touchTick, nowPlaying.songId) {
+    LaunchedEffect(showLyrics, lyricsReady, touchTick, nowPlaying.songId, nothing) {
         immersive = false
-        if (showLyrics && lyricsReady) {
+        if (showLyrics && lyricsReady && !nothing) {
             delay(IMMERSIVE_DELAY_MS)
             immersive = true
         }
@@ -193,19 +196,21 @@ fun FullPlayer(
             }
             .then(dragModifier),
     ) {
-        BlurredArtwork(nowPlaying.songId, nowPlaying.albumId, Modifier.fillMaxSize())
-        // Frosted scrim: keeps text readable while the art's colour glows through.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to colors.surface.copy(alpha = 0.30f),
-                        0.5f to colors.surface.copy(alpha = 0.55f),
-                        1f to colors.surface.copy(alpha = 0.85f),
+        if (!nothing) {
+            BlurredArtwork(nowPlaying.songId, nowPlaying.albumId, Modifier.fillMaxSize())
+            // Frosted scrim: keeps text readable while the art's colour glows through.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to colors.surface.copy(alpha = 0.30f),
+                            0.5f to colors.surface.copy(alpha = 0.55f),
+                            1f to colors.surface.copy(alpha = 0.85f),
+                        )
                     )
-                )
-        )
+            )
+        }
 
         Column(
             modifier = Modifier

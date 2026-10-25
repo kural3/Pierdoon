@@ -3,7 +3,6 @@ package com.ku.pierdoon.ui.player
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -20,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -167,10 +167,14 @@ private class SheetShape(
     }
 }
 
+/** Share of the gesture over which the mini player hands over to the sheet. */
+const val MINI_HANDOFF = 0.25f
+
 /**
- * The growing sheet. Composed only while open or moving; the full player inside fades in
- * after the first fifth of the gesture and rises slightly, so mid-drag it reads as the mini
- * player physically unfolding.
+ * The growing sheet. Composed only while open or moving. Its background fades in while the
+ * mini player underneath fades out, and the full player starts showing almost at once and
+ * rises slightly, so there's never an empty frame: mid-drag it reads as the mini player
+ * physically unfolding.
  */
 @Composable
 fun ExpandingPlayerSheet(
@@ -191,12 +195,14 @@ fun ExpandingPlayerSheet(
                 shape = SheetShape(state.miniBounds, state.progress.value, cornerPx)
                 clip = true
             }
-            .background(container)
+            .drawBehind {
+                drawRect(container, alpha = (state.progress.value / MINI_HANDOFF).coerceIn(0f, 1f))
+            }
     ) {
         content(
             Modifier.graphicsLayer {
                 val p = state.progress.value
-                alpha = ((p - 0.2f) / 0.6f).coerceIn(0f, 1f)
+                alpha = ((p - 0.05f) / 0.35f).coerceIn(0f, 1f)
                 translationY = (1f - p) * risePx
             }
         )
