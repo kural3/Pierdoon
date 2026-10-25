@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.ku.pierdoon"
-version = "1.0.5"
+version = "1.0.6"
 
 // FFmpeg (decoding every format, remuxing downloads) is pulled in for Windows x64 only:
 // the -platform artifacts would bring every OS and CPU along, some 300 MB.
@@ -49,6 +49,19 @@ compose.desktop {
     application {
         mainClass = "com.ku.pierdoon.MainKt"
         jvmArgs += listOf("-Dfile.encoding=UTF-8", "-Xss4m", "--enable-native-access=ALL-UNNAMED")
+        // A music player's live heap is a few dozen MB. The defaults (G1, heap sized from the
+        // PC's RAM) kept 300+ MB committed: G1's own bookkeeping alone is ~60 MB. The serial
+        // collector has next to no overhead, pauses of a few ms at this size, and with the free
+        // ratios hands unused heap back to Windows. Compact headers save ~10% of the heap.
+        jvmArgs += listOf(
+            "-XX:+UseSerialGC",
+            "-Xms24m",
+            "-Xmx1g",
+            "-XX:MinHeapFreeRatio=15",
+            "-XX:MaxHeapFreeRatio=35",
+            "-XX:+UseCompactObjectHeaders",
+            "-XX:ReservedCodeCacheSize=96m",
+        )
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Pier.doon"

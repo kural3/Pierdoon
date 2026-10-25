@@ -74,7 +74,7 @@ const val COVER_MAX_PX = 1200
 /** Decodes [source] scaled to about [maxPx] and saves it as JPEG. False if it isn't an image. */
 fun writeScaledJpeg(source: File, target: File, maxPx: Int = COVER_MAX_PX): Boolean = runCatching {
     val image = Images.decode(source.readBytes()) ?: return false
-    val bytes = Images.jpeg(Images.scaled(image, maxPx)) ?: return false
+    val bytes = Images.scaledJpeg(image, maxPx) ?: return false
     val tmp = File(target.parentFile, target.name + ".tmp")
     tmp.writeBytes(bytes)
     tmp.renameTo(target)

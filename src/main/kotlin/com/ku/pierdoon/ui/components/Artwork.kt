@@ -55,9 +55,11 @@ object ArtworkCache {
     private const val SMALL_PX = 192
     private const val LARGE_PX = 1024
     private const val BLUR_PX = 36
+    private const val CACHE_BYTES = 48 * 1024 * 1024
 
-    private val maxBytes = (Runtime.getRuntime().maxMemory() / 8).toInt()
-    private val cache = object : LruCache<String, ImageBitmap>(maxBytes) {
+    // A fixed budget: the bitmaps live outside the Java heap, so its size says nothing about them.
+    // 48 MB is a few hundred list thumbnails plus the open player's covers.
+    private val cache = object : LruCache<String, ImageBitmap>(CACHE_BYTES) {
         override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
     }
     private val missing = HashSet<String>()
@@ -93,7 +95,7 @@ object ArtworkCache {
             coroutineContext.ensureActive()
             val px = if (large) LARGE_PX else SMALL_PX
             val image = if (custom != null) decodeFile(custom) else decodeAlbum(albumId)
-            val bitmap = image?.let { Images.toBitmap(Images.scaled(it, px)) }
+            val bitmap = image?.let { Images.scaledBitmap(it, px) }
             if (bitmap != null) cache.put(key, bitmap) else synchronized(missing) { missing += key }
             bitmap
         }
@@ -104,12 +106,20 @@ object ArtworkCache {
         val key = key("f${file.name}.$version", large)
         cache.get(key)?.let { return it }
         return withContext(io) {
-            decodeFile(file)?.let { Images.toBitmap(Images.scaled(it, if (large) LARGE_PX else SMALL_PX)) }
+            decodeFile(file)?.let { Images.scaledBitmap(it, if (large) LARGE_PX else SMALL_PX) }
                 ?.also { cache.put(key, it) }
         }
     }
 
     fun peekFile(file: File, version: Long, large: Boolean): ImageBitmap? = cache.get(key("f${file.name}.$version", large))
+
+    /**
+     * Drops every cached bitmap: the window went to the tray, nothing is drawn. Anything shown
+     * again is decoded anew; the negative cache and the theme seeds stay.
+     */
+    fun trim() {
+        cache.evictAll()
+    }
 
     /** Bumped by [invalidateAlbum]; artwork on screen reads it to reload. */
     private val albumRevisions = mutableStateMapOf<Long, Int>()
@@ -133,7 +143,7 @@ object ArtworkCache {
         synchronized(smallImages) { if (source in smallImages) return smallImages[source] }
         val image = withContext(io) {
             val custom = CoverStore.songFile(songId)
-            (if (custom != null) decodeFile(custom) else decodeAlbum(albumId))?.let { Images.resized(it, BLUR_PX, BLUR_PX) }
+            (if (custom != null) decodeFile(custom) else decodeAlbum(albumId))?.use { Images.resized(it, BLUR_PX, BLUR_PX) }
         }
         synchronized(smallImages) { smallImages[source] = image }
         return image
@@ -151,7 +161,7 @@ object ArtworkCache {
         return withContext(io) {
             val pixels = Images.pixels(small)
             repeat(3) { boxBlur(pixels, BLUR_PX, BLUR_PX, radius = 2) }
-            Images.toBitmap(Images.fromPixels(pixels, BLUR_PX, BLUR_PX)).also { cache.put(key, it) }
+            Images.fromPixels(pixels, BLUR_PX, BLUR_PX).use(Images::toBitmap).also { cache.put(key, it) }
         }
     }
 

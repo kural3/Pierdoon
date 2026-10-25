@@ -151,14 +151,15 @@ internal object OpusTags {
 
     /** FLAC's picture block, which Opus and Vorbis players read from METADATA_BLOCK_PICTURE. */
     private fun pictureBlock(jpeg: ByteArray): ByteArray {
-        val image = com.ku.pierdoon.platform.Images.decode(jpeg)
+        // Only the size is needed; the pixels go right away.
+        val size = com.ku.pierdoon.platform.Images.decode(jpeg)?.use { it.width to it.height }
         val mime = "image/jpeg".toByteArray()
         return ByteBuffer.allocate(32 + mime.size + jpeg.size)
             .putInt(3) // front cover
             .putInt(mime.size).put(mime)
             .putInt(0) // no description
-            .putInt(image?.width ?: 0)
-            .putInt(image?.height ?: 0)
+            .putInt(size?.first ?: 0)
+            .putInt(size?.second ?: 0)
             .putInt(24)
             .putInt(0)
             .putInt(jpeg.size).put(jpeg)
