@@ -15,12 +15,12 @@ Download `Pier.doon-<version>.msi` from [Releases](https://github.com/kural3/Pie
 **Library**
 - Plays music from folders on your computer (Music by default, add more in Settings → Library): tracks, albums, artists, playlists, favorites, search, sorting, multi-select
 - Tag and cover editing, in the app or in the file; deleting sends files to the Recycle Bin
-- Downloads by link or search from YouTube, SoundCloud, Bandcamp and everything else [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports (yt-dlp.exe is fetched on first use and updates itself). Drop a link on the window to download it
+- Downloads by link or search from YouTube, SoundCloud, Bandcamp and everything else [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports (yt-dlp.exe is fetched on first use, checked against its published SHA-256, and updates itself). Drop a link on the window to download it
 
 **Playback**
 - Any format FFmpeg reads (MP3, M4A/AAC, FLAC, Opus, Ogg, WAV, WMA, APE, WavPack…), gapless between tracks, output device choice, skip silence
 - Synced lyrics from [LRCLIB](https://lrclib.net) with a per-track sync offset
-- Sleep timer, media keys, tray icon (closing the window keeps the music playing), one instance at a time
+- Sleep timer, media keys and the Windows media overlay (title, cover, controls), tray icon (closing the window keeps the music playing), one instance at a time
 
 **Desktop layout**
 - Navigation on the left: drag its right edge to resize it, down to a column of round icons; double-click the edge to switch
@@ -43,7 +43,7 @@ Download `Pier.doon-<version>.msi` from [Releases](https://github.com/kural3/Pie
 
 ## Build
 
-JDK 21+ (25 is what it's built with).
+Any JDK to start Gradle with; the JDK 25 it builds with is downloaded automatically if missing.
 
 ```
 ./gradlew run                 # start it

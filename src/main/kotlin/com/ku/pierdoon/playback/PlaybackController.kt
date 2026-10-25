@@ -3,11 +3,15 @@ package com.ku.pierdoon.playback
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserLibrary
+import com.ku.pierdoon.ui.components.ArtworkCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -30,6 +34,10 @@ object PlaybackController {
     private var restoring = true
     private var started = false
 
+    private val _outputUnavailable = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** Playback stopped for want of an audio output; the UI says so. */
+    val outputUnavailable: SharedFlow<Unit> = _outputUnavailable.asSharedFlow()
+
     fun start() {
         if (started) return
         started = true
@@ -45,7 +53,9 @@ object PlaybackController {
                 }
             }
             if (events.any { it in QUEUE_EVENTS }) scheduleSave()
+            syncMediaControls()
         }
+        player.onOutputUnavailable = { _outputUnavailable.tryEmit(Unit) }
         player.onPausedAtEnd = {
             if (SleepTimer.state.value == SleepTimerState.EndOfTrack) SleepTimer.fired()
         }
@@ -97,6 +107,35 @@ object PlaybackController {
     }
 
     @Volatile private var fading = false
+
+    /**
+     * Puts the app in the Windows media overlay. Once that works, Windows routes the media keys
+     * to it as well, so the app's own key catching steps aside and other players keep theirs.
+     */
+    fun attachWindow(window: java.awt.Window) {
+        if (System.getProperty("pierdoon.shots") != null) return
+        val ok = SystemMediaControls.install(window, object : SystemMediaControls.Buttons {
+            override fun play() { if (!player.isPlaying) togglePlay() }
+            override fun pause() = player.pause()
+            override fun next() = player.seekToNext()
+            override fun previous() = player.seekToPrevious()
+            override fun stop() = player.pause()
+        })
+        if (!ok) return
+        MediaKeys.uninstall()
+        shownInOverlay = null
+        syncMediaControls()
+    }
+
+    private var shownInOverlay: Pair<NowPlaying?, Boolean>? = null
+
+    private fun syncMediaControls() {
+        val song = player.currentMediaItem?.song?.let { NowPlaying(it.id, it.albumId, it.title, it.artist) }
+        val state = song to player.isPlaying
+        if (state == shownInOverlay) return
+        shownInOverlay = state
+        SystemMediaControls.update(song, player.isPlaying) { ArtworkCache.coverBytes(it.songId, it.albumId) }
+    }
 
     /**
      * Puts the saved queue back, resolved against the library; tracks deleted since are dropped.

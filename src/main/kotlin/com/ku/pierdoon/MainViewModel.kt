@@ -196,8 +196,25 @@ class MainViewModel {
                     folder.startsWith(root.trimEnd('\\', '/') + File.separator, ignoreCase = true) || folder.equals(root, ignoreCase = true)
                 }
                 if (!covered) SettingsStore.update { it.copy(musicFolders = it.musicFolders + folder) }
-                loadLibrary(force = true)
+                rescanAfterDownload()
             }
+        }
+    }
+
+    private var downloadRescan: Job? = null
+
+    /**
+     * One rescan for a run of downloads: a playlist link brings tracks one after another, and
+     * the library needn't be walked again for each. The last one shows up right away.
+     */
+    private fun rescanAfterDownload() {
+        val more = Downloader.tasks.value.any { it.active }
+        // Still waiting to batch, but that was the last one: no need to wait any longer.
+        if (downloadRescan?.isActive == true && more) return
+        downloadRescan?.cancel()
+        downloadRescan = viewModelScope.launch {
+            delay(if (more) DOWNLOAD_RESCAN_BATCH_MS else DOWNLOAD_RESCAN_MS)
+            loadLibrary(force = true)
         }
     }
 
@@ -621,6 +638,8 @@ class MainViewModel {
         const val STOP_TIMEOUT_MS = 1_000L
         const val FOCUS_RESCAN_MS = 30_000L
         const val CLOSE_TIMEOUT_MS = 2_000L
+        const val DOWNLOAD_RESCAN_MS = 300L
+        const val DOWNLOAD_RESCAN_BATCH_MS = 8_000L
         const val COVER_PICKS = "cover-picks"
         val QUEUE_EVENTS = setOf(
             Player.Event.Timeline,

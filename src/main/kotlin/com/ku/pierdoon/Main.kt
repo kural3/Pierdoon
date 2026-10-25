@@ -132,6 +132,7 @@ fun main(args: Array<String>) {
                     window.minimumSize = java.awt.Dimension(720, 560)
                     Files.owner = window
                     SingleInstance.window = window
+                    PlaybackController.attachWindow(window)
                     window.addWindowFocusListener(object : java.awt.event.WindowAdapter() {
                         override fun windowGainedFocus(e: java.awt.event.WindowEvent?) {
                             SystemAccent.refresh()
@@ -229,6 +230,7 @@ private var saveWindowOnQuit: (() -> Unit)? = null
 
 private fun quit(vm: MainViewModel) {
     runCatching { saveWindowOnQuit?.invoke() }
+    SettingsStore.flush()
     vm.dispose()
     PlaybackController.shutdown()
     SingleInstance.release()

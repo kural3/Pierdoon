@@ -87,6 +87,7 @@ import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserData
 import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.playback.NowPlaying
+import com.ku.pierdoon.playback.PlaybackController
 import com.ku.pierdoon.resources.*
 import com.ku.pierdoon.resources.Res
 import com.ku.pierdoon.ui.components.Artwork
@@ -181,6 +182,11 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { vm.loadLibrary() }
+
+    val noOutput = stringResource(Res.string.output_unavailable)
+    LaunchedEffect(Unit) {
+        PlaybackController.outputUnavailable.collect { Toast.show(noOutput, Toast.LENGTH_LONG) }
+    }
 
     // "Album art" palette: extract a seed once per album, only while that mode is on.
     val nowPlayingCover = nowPlaying?.let { CoverStore.songVersion(it.songId) }
