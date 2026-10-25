@@ -75,7 +75,10 @@ object DiscordPresence {
                     delay(UPDATE_DELAY_MS)
                     withContext(pipeDispatcher) {
                         runCatching { if (on) show(s) else clear(disconnect = true) }
-                            .onFailure { closePipe() }
+                            .onFailure {
+                                ErrorLog.record("discord", it)
+                                closePipe()
+                            }
                     }
                 }
         }
