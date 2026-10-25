@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.player
 
+import androidx.compose.material3.Icon
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -61,6 +62,8 @@ fun MiniPlayer(
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
     dragModifier: Modifier = Modifier,
+    /** Name of the computer whose playback this shows; null for the phone's own. */
+    sourceName: String? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val colors = MaterialTheme.colorScheme
@@ -113,13 +116,24 @@ fun MiniPlayer(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        text = nowPlaying.artist.ifEmpty { stringResource(R.string.unknown_artist) },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (sourceName != null) {
+                            Icon(
+                                PlayerIcons.Desktop,
+                                contentDescription = sourceName,
+                                tint = colors.primary,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = nowPlaying.artist.ifEmpty { stringResource(R.string.unknown_artist) },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
                 PlayPauseButton(

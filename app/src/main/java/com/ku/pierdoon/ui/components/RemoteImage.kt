@@ -24,10 +24,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Search thumbnails stay around while the user goes through results. */
-private val thumbs = LruCache<String, ImageBitmap>(48)
+private val thumbs = LruCache<String, ImageBitmap>(64)
 
+/** A picture from the web (or the paired computer), decoded down to about [maxPx]. */
 @Composable
-fun RemoteImage(url: String?, modifier: Modifier) {
+fun RemoteImage(url: String?, modifier: Modifier, maxPx: Int = THUMB_PX) {
     val bitmap by produceState(url?.let { thumbs.get(it) }, url) {
         if (url == null || value != null) return@produceState
         val bytes = MetadataSearch.download(url) ?: return@produceState
@@ -35,7 +36,7 @@ fun RemoteImage(url: String?, modifier: Modifier) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             var sample = 1
-            while (bounds.outWidth / (sample * 2) >= THUMB_PX) sample *= 2
+            while (bounds.outWidth / (sample * 2) >= maxPx) sample *= 2
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
                 ?.asImageBitmap()
         }?.also { thumbs.put(url, it) }

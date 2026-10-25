@@ -15,6 +15,7 @@ A small offline music player for Android. Jetpack Compose + Material 3 Expressiv
 - Edits tags and covers, in the app or in the file; deletes tracks from the device
 - Expanding player, frosted glass, wallpaper / album art / custom color themes
 - A Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts, monospace included
+- Remote for [Pier.doon for Windows](https://github.com/kural3/Pierdoon4Desktop) over Wi-Fi: the computer's playback in the app's own player, its library, and downloads sent to it
 - Updates itself from GitHub releases
 - Tries to go easy on the battery
 

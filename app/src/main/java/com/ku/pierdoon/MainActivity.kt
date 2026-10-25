@@ -1,5 +1,7 @@
 package com.ku.pierdoon
 
+import android.view.KeyEvent
+import com.ku.pierdoon.remote.PcRemote
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -26,6 +28,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SettingsStore.init(this)
+        PcRemote.init(this)
         CoverStore.init(this)
         Updater.init(this)
         Downloader.init(this)
@@ -50,16 +53,30 @@ class MainActivity : ComponentActivity() {
         installFrameRateBooster(findViewById(android.R.id.content))
     }
 
+    /** With the computer in the player, the volume keys set its volume (the phone plays nothing then). */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (PcRemote.inPlayer && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            PcRemote.stepVolume(up = keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
     }
 
-    /** "Share → Pier.doon" downloads the link; the downloads notification opens their page. */
+    /** "Share → Pier.doon" downloads the link, here or on the paired computer; the downloads notification opens their page. */
     private fun handleIntent(intent: Intent?) {
         when (intent?.action) {
             Intent.ACTION_SEND -> {
                 val url = intent.getStringExtra(Intent.EXTRA_TEXT)?.let(::findUrl) ?: return
+                // With a computer paired the app first asks which of the two downloads it.
+                if (PcRemote.paired.value != null) {
+                    PcRemote.shareRequest.value = url
+                    return
+                }
                 Downloader.enqueue(url, SettingsStore.settings.value.downloadFormat)
                 Downloader.openRequest.value = true
             }

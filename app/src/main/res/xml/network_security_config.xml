@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The computer remote talks plain HTTP to Pier.doon on a computer in the local network: its
+    address isn't known in advance and it has no certificate. Everything else the app reaches
+    (LRCLIB, Deezer, GitHub…) is HTTPS anyway.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,5 +1,19 @@
 package com.ku.pierdoon.ui
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.AnimatedContentTransitionScope
+import com.ku.pierdoon.ui.player.PlayerDevices
+import com.ku.pierdoon.ui.remote.PcPlayback
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import com.ku.pierdoon.ui.components.LocalRemoteCovers
+import com.ku.pierdoon.ui.remote.rememberPcPlayback
+import com.ku.pierdoon.remote.PcRemote
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
@@ -130,6 +144,7 @@ import com.ku.pierdoon.ui.library.PlaylistsScreen
 import com.ku.pierdoon.ui.library.SongActionTarget
 import com.ku.pierdoon.ui.library.SongActionsSheet
 import com.ku.pierdoon.ui.settings.SettingsScreen
+import com.ku.pierdoon.ui.remote.PcRemoteScreen
 import com.ku.pierdoon.ui.navigation.MotionSpecs
 import com.ku.pierdoon.ui.navigation.NavDirection
 import com.ku.pierdoon.ui.navigation.Navigator
@@ -199,11 +214,30 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var showQueue by rememberSaveable { mutableStateOf(false) }
-    // Lyrics are fetched only while actually on screen.
-    LaunchedEffect(expanded, showLyrics) { vm.setLyricsVisible(expanded && showLyrics) }
 
+    // The paired computer's playback takes the player over while it's the active one: playing
+    // something on the computer hands it over (and pauses the phone), playing here takes it back.
+    // The open player keeps an eye on the computer even while showing the phone: its switch says
+    // what plays there.
+    val pc = rememberPcPlayback(lyricsVisible = expanded && showLyrics, peek = expanded)
+    val pcActive by PcRemote.active.collectAsStateWithLifecycle()
+    val pcPaired by PcRemote.paired.collectAsStateWithLifecycle()
+    val pcState by PcRemote.state.collectAsStateWithLifecycle()
+    val pcConnection by PcRemote.connection.collectAsStateWithLifecycle()
+    // Still drawn while the player animates back to the phone, when pc is already null.
+    val lastPc = remember { arrayOfNulls<PcPlayback>(1) }
+    if (pc != null) lastPc[0] = pc
+    SideEffect { PcRemote.inPlayer = pc != null }
+    LaunchedEffect(player.isPlaying) { if (player.isPlaying) PcRemote.setActive(false) }
+    LaunchedEffect(pcActive) { if (pcActive && vm.player.value.isPlaying) vm.togglePlay() }
+    val pcCovers = remember { { id: Long, size: Int -> PcRemote.coverUrl(id, size) } }
+
+    // Lyrics are fetched only while actually on screen.
+    LaunchedEffect(expanded, showLyrics, pc == null) { vm.setLyricsVisible(expanded && showLyrics && pc == null) }
+
+    val shownNowPlaying = pc?.nowPlaying ?: nowPlaying
     val sheet = rememberExpandingPlayerState()
-    ExpandingPlayerEffect(sheet, expanded && nowPlaying != null)
+    ExpandingPlayerEffect(sheet, expanded && shownNowPlaying != null)
     // Predictive back on the open player: it shrinks under the finger, then folds into the mini player.
     PredictiveBackHandler(enabled = expanded && !showLyrics && !showQueue) { events ->
         try {
@@ -230,12 +264,32 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             nav.push(Route.Downloads)
         }
     }
+    // With a computer paired, a shared link asks first which of the two should download it.
+    val shared by PcRemote.shareRequest.collectAsStateWithLifecycle()
+    shared?.let { url ->
+        ShareTargetDialog(
+            pcName = pcPaired?.name.orEmpty(),
+            onPhone = {
+                PcRemote.shareRequest.value = null
+                Downloader.enqueue(url, settings.downloadFormat)
+                Downloader.openRequest.value = true
+            },
+            onPc = {
+                PcRemote.shareRequest.value = null
+                PcRemote.pendingDownload.value = url
+                expanded = false
+                nav.push(Route.Computer)
+            },
+            onDismiss = { PcRemote.shareRequest.value = null },
+        )
+    }
 
     var songAction by remember { mutableStateOf<SongActionTarget?>(null) }
     var playlistAction by remember { mutableStateOf<Playlist?>(null) }
     var coverSheetFor by remember { mutableStateOf<Long?>(null) }
     var dialog by remember { mutableStateOf<PlaylistDialog?>(null) }
 
+    val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     // The system asks before the files go; saved, so a recreated activity still cleans up after it.
     var deletingSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     var afterDelete by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -317,28 +371,38 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                     .onSizeChanged { chromeHeightPx = it.height },
             ) {
                 AnimatedVisibility(
-                    visible = player.nowPlaying != null,
+                    visible = player.nowPlaying != null || pc != null,
                     enter = slideInVertically(spatialOffset) { it } + fadeIn(effects),
                     exit = slideOutVertically(spatialOffset) { it } + fadeOut(effects),
                 ) {
-                    nowPlaying?.let { np ->
-                        MiniPlayer(
-                            nowPlaying = np,
-                            isPlaying = player.isPlaying,
-                            position = { position.value },
-                            durationMs = player.durationMs,
-                            onTogglePlay = vm::togglePlay,
-                            onNext = vm::next,
-                            onExpand = { expanded = true },
-                            backdrop = backdrop,
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp)
-                                .padding(bottom = 8.dp)
-                                .fillMaxWidth()
-                                .onGloballyPositioned { sheet.onMiniBounds(it.boundsInRoot()) }
-                                .graphicsLayer { alpha = (1f - sheet.progress.value / MINI_HANDOFF).coerceIn(0f, 1f) },
-                            dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
-                        )
+                    AnimatedContent(
+                        targetState = pc != null,
+                        transitionSpec = { playerSwitch(effects, spatialF) },
+                        label = "miniSource",
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 8.dp)
+                            .fillMaxWidth()
+                            .onGloballyPositioned { sheet.onMiniBounds(it.boundsInRoot()) }
+                            .graphicsLayer { alpha = (1f - sheet.progress.value / MINI_HANDOFF).coerceIn(0f, 1f) },
+                    ) { onPc ->
+                        val shownPc = if (onPc) pc ?: lastPc[0] else null
+                        val np = shownPc?.nowPlaying ?: nowPlaying ?: return@AnimatedContent
+                        CompositionLocalProvider(LocalRemoteCovers provides if (shownPc != null) pcCovers else null) {
+                            MiniPlayer(
+                                nowPlaying = np,
+                                isPlaying = shownPc?.state?.isPlaying ?: player.isPlaying,
+                                position = { shownPc?.position ?: position.value },
+                                durationMs = shownPc?.state?.durationMs ?: player.durationMs,
+                                onTogglePlay = if (shownPc != null) PcRemote::toggle else vm::togglePlay,
+                                onNext = if (shownPc != null) PcRemote::next else vm::next,
+                                sourceName = shownPc?.name,
+                                onExpand = { expanded = true },
+                                backdrop = backdrop,
+                                modifier = Modifier.fillMaxWidth(),
+                                dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
+                            )
+                        }
                     }
                 }
                 GlassNavigationBar(nav = nav, backdrop = backdrop, floating = settings.floatingNav)
@@ -346,8 +410,72 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
         }
 
         FrameRateBoost(active = sheet.isMoving)
-        nowPlaying?.let { np ->
-                ExpandingPlayerSheet(sheet) { contentModifier ->
+        val devices = pcPaired?.let { paired ->
+            val online = pcConnection == PcRemote.Connection.Connected
+            PlayerDevices(
+                pcName = paired.name,
+                onPc = pc != null,
+                phoneTrack = nowPlaying?.let { listOf(it.title, it.artist).filter(String::isNotBlank).joinToString(" · ") },
+                pcTrack = pcState.song?.takeIf { online }?.let { listOf(it.title, it.artist).filter(String::isNotBlank).joinToString(" · ") },
+                pcOnline = online,
+                onSwitch = PcRemote::setActive,
+                onOpenComputer = {
+                    expanded = false
+                    nav.push(Route.Computer)
+                },
+            )
+        }
+        if (shownNowPlaying != null) {
+            ExpandingPlayerSheet(sheet) { contentModifier ->
+                AnimatedContent(
+                    targetState = pc != null,
+                    transitionSpec = { playerSwitch(effects, spatialF) },
+                    label = "playerSource",
+                ) { onPc ->
+                    val pc = if (onPc) pc ?: lastPc[0] else null
+                    if (pc != null) {
+                        val np = pc.nowPlaying
+                        CompositionLocalProvider(LocalRemoteCovers provides pcCovers) {
+                        FullPlayer(
+                            nowPlaying = np,
+                            state = pc.state,
+                            position = { pc.position },
+                            lyrics = pc.lyrics,
+                            showLyrics = showLyrics,
+                            queue = pc.queue,
+                            showQueue = showQueue,
+                            isFavorite = pc.favorite,
+                            onToggleFavorite = { PcRemote.toggleFavorite(np.songId) },
+                            onToggleLyrics = { showLyrics = !showLyrics; showQueue = false },
+                            onToggleQueue = { showQueue = !showQueue; showLyrics = false },
+                            onPlayQueueEntry = PcRemote::playQueueEntry,
+                            onRemoveQueueEntry = PcRemote::removeQueueEntry,
+                            onMoveQueueEntry = PcRemote::moveQueueEntry,
+                            // The phone's song actions (playlists, edit, delete) are about its own files.
+                            onSongLongPress = { },
+                            onRetryLyrics = { },
+                            lyricsOffsetMs = pc.lyricsOffsetMs,
+                            onShiftLyrics = PcRemote::shiftLyrics,
+                            onResetLyricsOffset = PcRemote::resetLyricsOffset,
+                            onTogglePlay = PcRemote::toggle,
+                            onPrevious = PcRemote::previous,
+                            onNext = PcRemote::next,
+                            onSeek = PcRemote::seek,
+                            onToggleShuffle = PcRemote::toggleShuffle,
+                            onCycleRepeat = PcRemote::cycleRepeat,
+                            onOpenArtist = {
+                                expanded = false
+                                nav.push(Route.Computer)
+                            },
+                            onCollapse = { expanded = false },
+                            modifier = contentModifier,
+                            dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
+                            devices = devices,
+                        )
+                        }
+                        return@AnimatedContent
+                    }
+                    val np = nowPlaying ?: return@AnimatedContent
                     FullPlayer(
                         nowPlaying = np,
                         state = player,
@@ -382,8 +510,10 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                         onCollapse = { expanded = false },
                         modifier = contentModifier,
                         dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
+                        devices = devices,
                     )
                 }
+            }
         }
     }
 
@@ -558,10 +688,12 @@ private fun Screens(
                     onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
                     bottomInset = bottomInset,
                 )
+                Route.Computer -> PcRemoteScreen(onBack = { nav.pop() }, bottomInset = bottomInset)
                 Route.Settings, is Route.SettingsPage -> {
                     SettingsScreen(
                         section = (route as? Route.SettingsPage)?.section,
                         onOpen = { nav.push(Route.SettingsPage(it)) },
+                        onOpenComputer = { nav.push(Route.Computer) },
                         onBack = { nav.pop() },
                         settings = settings,
                         onUpdate = SettingsStore::update,
@@ -884,4 +1016,47 @@ private fun rememberLastNonNull(value: NowPlaying?): NowPlaying? {
     val holder = remember { arrayOfNulls<NowPlaying>(1) }
     if (value != null) holder[0] = value
     return holder[0]
+}
+
+/** Phone ⇄ computer in the player: the new one fades and grows in over the old. */
+private fun AnimatedContentTransitionScope<Boolean>.playerSwitch(
+    effects: FiniteAnimationSpec<Float>,
+    spatial: FiniteAnimationSpec<Float>,
+): ContentTransform =
+    (fadeIn(effects) + scaleIn(spatial, initialScale = 0.94f))
+        .togetherWith(fadeOut(effects) + scaleOut(spatial, targetScale = 1.04f))
+        .using(SizeTransform(clip = false))
+
+/** "Share → Pier.doon" with a computer paired: download here or there. */
+@Composable
+private fun ShareTargetDialog(pcName: String, onPhone: () -> Unit, onPc: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(PlayerIcons.Download, contentDescription = null) },
+        title = { Text(stringResource(R.string.share_where)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    Triple(PlayerIcons.Smartphone, stringResource(R.string.share_phone), onPhone),
+                    Triple(PlayerIcons.Desktop, stringResource(R.string.share_pc, pcName), onPc),
+                ).forEach { (icon, label, onClick) ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .clickable(onClick = onClick)
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
+                    ) {
+                        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(14.dp))
+                        Text(label, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }

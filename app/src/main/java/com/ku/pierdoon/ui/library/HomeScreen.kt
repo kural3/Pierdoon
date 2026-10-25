@@ -53,6 +53,7 @@ import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.PlayerIcons
+import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.animatePressAsState
 import com.ku.pierdoon.ui.components.scaleBy
 import com.ku.pierdoon.ui.navigation.Route
@@ -76,14 +77,27 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize(),
     ) {
         item(key = "greeting") {
-            Text(
-                text = stringResource(greetingRes()),
-                style = MaterialTheme.typography.displaySmallEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .statusBarsPadding()
-                    .padding(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 20.dp),
-            )
+                    .padding(start = 24.dp, end = 12.dp, top = 32.dp, bottom = 20.dp),
+            ) {
+                Text(
+                    text = stringResource(greetingRes()),
+                    style = MaterialTheme.typography.displaySmallEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                ExpressiveIconButton(
+                    onClick = { onOpen(Route.Computer) },
+                    icon = PlayerIcons.Desktop,
+                    contentDescription = stringResource(R.string.pc_open),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
         }
         item(key = "quick") {
             Row(

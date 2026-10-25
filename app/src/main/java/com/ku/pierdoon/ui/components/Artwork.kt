@@ -1,5 +1,7 @@
 package com.ku.pierdoon.ui.components
 
+import androidx.compose.ui.draw.blur
+import androidx.compose.runtime.staticCompositionLocalOf
 import android.content.ContentUris
 import android.content.Context
 import android.graphics.Bitmap
@@ -220,6 +222,12 @@ object ArtworkCache {
     }
 }
 
+/**
+ * Where covers come from when the player shows another device (the paired computer): the
+ * address of a track's cover by id and pixel size, or null for the phone's own artwork.
+ */
+val LocalRemoteCovers = staticCompositionLocalOf<((songId: Long, sizePx: Int) -> String?)?> { null }
+
 @Composable
 fun Artwork(
     songId: Long,
@@ -228,6 +236,10 @@ fun Artwork(
     large: Boolean = false,
     placeholderIconSize: Dp = 24.dp,
 ) {
+    LocalRemoteCovers.current?.let { covers ->
+        val size = if (large) REMOTE_LARGE_PX else REMOTE_SMALL_PX
+        return RemoteImage(covers(songId, size), modifier, maxPx = size)
+    }
     val context = LocalContext.current.applicationContext
     val cover = CoverStore.songVersion(songId)
     val revision = ArtworkCache.albumRevision(albumId)
@@ -286,6 +298,10 @@ private val Vibrant = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturat
 /** Full-bleed frosted album art. A static image: zero per-frame cost once drawn. */
 @Composable
 fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
+    LocalRemoteCovers.current?.let { covers ->
+        // A small copy, blurred by the GPU: the phone has no file to pre-blur.
+        return RemoteImage(covers(songId, REMOTE_SMALL_PX), modifier.blur(48.dp), maxPx = REMOTE_SMALL_PX)
+    }
     val context = LocalContext.current.applicationContext
     val cover = CoverStore.songVersion(songId)
     val revision = ArtworkCache.albumRevision(albumId)
@@ -312,3 +328,6 @@ fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
         }
     }
 }
+
+private const val REMOTE_SMALL_PX = 160
+private const val REMOTE_LARGE_PX = 720

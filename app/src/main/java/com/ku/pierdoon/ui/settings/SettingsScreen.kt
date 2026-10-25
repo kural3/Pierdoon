@@ -52,6 +52,8 @@ import com.ku.pierdoon.data.ThemeMode
 import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
+import com.ku.pierdoon.remote.PcRemote
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ku.pierdoon.ui.library.AppScaffold
 import com.ku.pierdoon.ui.library.listBottomPadding
 import com.ku.pierdoon.ui.theme.typographyFor
@@ -81,6 +83,7 @@ private typealias Update = ((AppSettings) -> AppSettings) -> Unit
 fun SettingsScreen(
     section: SettingsSection?,
     onOpen: (SettingsSection) -> Unit,
+    onOpenComputer: () -> Unit,
     onBack: () -> Unit,
     settings: AppSettings,
     onUpdate: Update,
@@ -122,7 +125,7 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             when (section) {
-                null -> sectionList(onOpen, trackCount, updateStatus, version)
+                null -> sectionList(onOpen, onOpenComputer, trackCount, updateStatus, version)
                 SettingsSection.Appearance -> appearance(settings, onUpdate)
                 SettingsSection.Feedback -> feedback(settings, onUpdate)
                 SettingsSection.Playback -> playback(settings, onUpdate)
@@ -154,6 +157,7 @@ private fun SettingsSection.icon(): ImageVector = when (this) {
 
 private fun LazyListScope.sectionList(
     onOpen: (SettingsSection) -> Unit,
+    onOpenComputer: () -> Unit,
     trackCount: Int,
     updateStatus: String,
     version: String,
@@ -178,6 +182,20 @@ private fun LazyListScope.sectionList(
                     )
                 }
             }
+        }
+    }
+    item(key = "computer") {
+        val paired by PcRemote.paired.collectAsStateWithLifecycle()
+        Group(null) {
+            listOf<@Composable (Shape) -> Unit>({ shape ->
+                SectionItem(
+                    shape = shape,
+                    icon = PlayerIcons.Desktop,
+                    title = stringResource(R.string.pc_open),
+                    summary = paired?.name ?: stringResource(R.string.pc_summary_none),
+                    onClick = onOpenComputer,
+                )
+            })
         }
     }
     item(key = "about") {

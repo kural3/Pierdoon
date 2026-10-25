@@ -1,5 +1,14 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.components.MenuAction
+import com.ku.pierdoon.ui.components.AppMenu
+import androidx.compose.runtime.Immutable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.displayCutoutPadding
 import com.ku.pierdoon.playback.SleepTimer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -153,6 +162,8 @@ fun FullPlayer(
     modifier: Modifier = Modifier,
     /** The expanding sheet owns the vertical drag (swipe down shrinks the player back). */
     dragModifier: Modifier = Modifier,
+    /** The phone and the paired computer, to switch the player between; null without a computer. */
+    devices: PlayerDevices? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     // Nothing style: flat black page, no frosted art, no immersive lyrics.
@@ -212,21 +223,12 @@ fun FullPlayer(
             )
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .systemBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            val spatialSize = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-            val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-            val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-            AnimatedVisibility(
-                visible = !immersive,
-                enter = expandVertically(spatialSize) + fadeIn(fade),
-                exit = shrinkVertically(spatialSize) + fadeOut(fade),
-            ) {
+        val spatialSize = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
+        val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+        val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+        val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+
+        val header: @Composable () -> Unit = {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 ExpressiveIconButton(
                     onClick = onCollapse,
@@ -249,27 +251,33 @@ fun FullPlayer(
                         color = colors.onSurface,
                         textAlign = TextAlign.Center,
                     )
-                    sleepTimerLabel(sleepTimer)?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = colors.primary,
-                            textAlign = TextAlign.Center,
-                        )
+                    if (devices != null) {
+                        DeviceSwitch(devices, glassButton)
+                    } else {
+                        sleepTimerLabel(sleepTimer)?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.primary,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
-                SleepTimerButton(active = sleepTimer != null, onClick = { showSleepSheet = true }, glass = glassButton)
-                Spacer(Modifier.width(8.dp))
+                // The sleep timer stops the phone's player; it has nothing to do with the computer.
+                if (devices?.onPc != true) {
+                    SleepTimerButton(active = sleepTimer != null, onClick = { showSleepSheet = true }, glass = glassButton)
+                    Spacer(Modifier.width(8.dp))
+                }
                 FavoriteButton(
                     isFavorite = isFavorite,
                     onClick = onToggleFavorite,
                     containerColor = glassButton,
                 )
             }
-            }
+        }
 
-            val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-            val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+        val panel: @Composable (Modifier) -> Unit = { panelModifier ->
             AnimatedContent(
                 targetState = when {
                     showQueue -> PlayerPanel.Queue
@@ -277,168 +285,210 @@ fun FullPlayer(
                     else -> PlayerPanel.Art
                 },
                 transitionSpec = {
-                    (fadeIn(effects) + scaleIn(spatialF, initialScale = 0.92f))
-                        .togetherWith(fadeOut(effects) + scaleOut(spatialF, targetScale = 0.92f))
+                    (fadeIn(fade) + scaleIn(spatialF, initialScale = 0.92f))
+                        .togetherWith(fadeOut(fade) + scaleOut(spatialF, targetScale = 0.92f))
                 },
                 label = "artOrLyrics",
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-            ) { panel ->
-                when (panel) {
-                PlayerPanel.Lyrics -> {
-                    LyricsPanel(
-                        state = lyrics,
-                        position = position,
-                        onSeek = onSeek,
-                        onRetry = onRetryLyrics,
-                        offsetMs = lyricsOffsetMs,
-                        onShift = onShiftLyrics,
-                        onResetOffset = onResetLyricsOffset,
-                        modifier = Modifier.fillMaxSize(),
+                modifier = panelModifier,
+            ) { p ->
+                when (p) {
+                    PlayerPanel.Lyrics -> {
+                        LyricsPanel(
+                            state = lyrics,
+                            position = position,
+                            onSeek = onSeek,
+                            onRetry = onRetryLyrics,
+                            offsetMs = lyricsOffsetMs,
+                            onShift = onShiftLyrics,
+                            onResetOffset = onResetLyricsOffset,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    PlayerPanel.Queue -> {
+                        QueuePanel(
+                            queue = queue,
+                            onPlay = onPlayQueueEntry,
+                            onRemove = onRemoveQueueEntry,
+                            onMove = onMoveQueueEntry,
+                            onLongPress = onSongLongPress,
+                            // The column's side padding is for the art; rows bring their own inset.
+                            modifier = Modifier.horizontalBleed(12.dp),
+                        )
+                    }
+                    PlayerPanel.Art -> {
+                        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            PlayerArtwork(
+                                nowPlaying = nowPlaying,
+                                isPlaying = state.isPlaying,
+                                position = position,
+                                durationMs = state.durationMs,
+                                onTap = onTogglePlay,
+                                onSeek = onSeek,
+                                modifier = Modifier
+                                    .widthIn(max = minOf(maxWidth, maxHeight))
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Title, seek bar, transport and the row of toggles. [short] squeezes them into a
+        // landscape phone's height.
+        val controls: @Composable (short: Boolean) -> Unit = { short ->
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(if (short) 4.dp else 12.dp))
+                Column(Modifier.fillMaxWidth()) {
+                    key(nowPlaying.songId) {
+                        Text(
+                            text = nowPlaying.title,
+                            style = if (short) MaterialTheme.typography.headlineSmallEmphasized
+                            else MaterialTheme.typography.headlineMediumEmphasized,
+                            color = colors.onSurface,
+                            maxLines = 1,
+                            modifier = Modifier.basicMarquee(iterations = 2),
+                        )
+                    }
+                    val artist = nowPlaying.artist
+                    Text(
+                        text = artist.ifEmpty { stringResource(R.string.unknown_artist) },
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            // Pulled back by its own padding so the text still lines up with the title.
+                            .offset(x = (-6).dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(
+                                enabled = artist.isNotEmpty(),
+                                onClickLabel = stringResource(R.string.open_artist),
+                            ) { onOpenArtist(artist) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }
-                PlayerPanel.Queue -> {
-                    QueuePanel(
-                        queue = queue,
-                        onPlay = onPlayQueueEntry,
-                        onRemove = onRemoveQueueEntry,
-                        onMove = onMoveQueueEntry,
-                        onLongPress = onSongLongPress,
-                        // The column's side padding is for the art; rows bring their own inset.
-                        modifier = Modifier.horizontalBleed(12.dp),
+
+                Spacer(Modifier.height(if (short) 8.dp else 16.dp))
+                WavySeekBar(
+                    position = position,
+                    durationMs = state.durationMs,
+                    isPlaying = state.isPlaying,
+                    onSeek = onSeek,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(if (short) 8.dp else 16.dp))
+                PlayerControls(
+                    isPlaying = state.isPlaying,
+                    onPrevious = onPrevious,
+                    onTogglePlay = onTogglePlay,
+                    onNext = onNext,
+                    sideColor = glassButton,
+                    // The outer height wins over the group's own.
+                    modifier = Modifier.fillMaxWidth().then(if (short) Modifier.height(68.dp) else Modifier),
+                )
+                Spacer(Modifier.height(if (short) 12.dp else 20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    val toggleSize = if (short) Modifier.size(width = 64.dp, height = 44.dp) else Modifier.size(width = 72.dp, height = 56.dp)
+                    ExpressiveToggleButton(
+                        checked = state.shuffle,
+                        onClick = onToggleShuffle,
+                        icon = PlayerIcons.Shuffle,
+                        contentDescription = stringResource(R.string.shuffle),
+                        uncheckedColor = glassButton,
+                        modifier = toggleSize,
+                    )
+                    ExpressiveToggleButton(
+                        checked = showLyrics,
+                        onClick = onToggleLyrics,
+                        icon = PlayerIcons.Lyrics,
+                        contentDescription = stringResource(R.string.lyrics),
+                        uncheckedColor = glassButton,
+                        modifier = toggleSize,
+                    )
+                    ExpressiveToggleButton(
+                        checked = showQueue,
+                        onClick = onToggleQueue,
+                        icon = PlayerIcons.Queue,
+                        contentDescription = stringResource(R.string.queue),
+                        uncheckedColor = glassButton,
+                        modifier = toggleSize,
+                    )
+                    ExpressiveToggleButton(
+                        checked = state.repeatMode != Player.REPEAT_MODE_OFF,
+                        onClick = onCycleRepeat,
+                        icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
+                        contentDescription = stringResource(R.string.repeat),
+                        uncheckedColor = glassButton,
+                        modifier = toggleSize,
                     )
                 }
-                PlayerPanel.Art -> {
-                    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        PlayerArtwork(
+                Spacer(Modifier.height(if (short) 0.dp else 8.dp))
+            }
+        }
+
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .displayCutoutPadding()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+        ) {
+            if (maxWidth > maxHeight) {
+                val short = maxHeight < SHORT_HEIGHT
+                // Landscape: the art (or lyrics, or the queue) on the left, everything else on the right.
+                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                    panel(Modifier.weight(1f).fillMaxHeight())
+                    Spacer(Modifier.width(32.dp))
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        header()
+                        controls(short)
+                    }
+                }
+                return@BoxWithConstraints
+            }
+            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                AnimatedVisibility(
+                    visible = !immersive,
+                    enter = expandVertically(spatialSize) + fadeIn(fade),
+                    exit = shrinkVertically(spatialSize) + fadeOut(fade),
+                ) {
+                    header()
+                }
+
+                panel(Modifier.weight(1f).fillMaxWidth())
+
+                // Height change animates on a spring, so the lyrics above grow/shrink smoothly.
+                AnimatedContent(
+                    targetState = immersive,
+                    transitionSpec = {
+                        (fadeIn(fade) + slideInVertically(spatialOffset) { it / 3 })
+                            .togetherWith(fadeOut(fade) + slideOutVertically(spatialOffset) { it / 3 })
+                            .using(SizeTransform(clip = false) { _, _ -> spatialSize })
+                    },
+                    label = "immersiveControls",
+                ) { compact ->
+                    if (compact) {
+                        CompactControls(
                             nowPlaying = nowPlaying,
                             isPlaying = state.isPlaying,
                             position = position,
                             durationMs = state.durationMs,
-                            onTap = onTogglePlay,
-                            onSeek = onSeek,
-                            modifier = Modifier
-                                .widthIn(max = minOf(maxWidth, maxHeight))
-                                .fillMaxWidth()
-                                .aspectRatio(1f),
+                            onPrevious = onPrevious,
+                            onTogglePlay = onTogglePlay,
+                            onNext = onNext,
+                            glassButton = glassButton,
+                            onShowControls = { touchTick++ },
                         )
-                    }
-                }
-                }
-            }
-
-            // Height change animates on a spring, so the lyrics above grow/shrink smoothly.
-            AnimatedContent(
-                targetState = immersive,
-                transitionSpec = {
-                    (fadeIn(fade) + slideInVertically(spatialOffset) { it / 3 })
-                        .togetherWith(fadeOut(fade) + slideOutVertically(spatialOffset) { it / 3 })
-                        .using(SizeTransform(clip = false) { _, _ -> spatialSize })
-                },
-                label = "immersiveControls",
-            ) { compact ->
-                if (compact) {
-                    CompactControls(
-                        nowPlaying = nowPlaying,
-                        isPlaying = state.isPlaying,
-                        position = position,
-                        durationMs = state.durationMs,
-                        onPrevious = onPrevious,
-                        onTogglePlay = onTogglePlay,
-                        onNext = onNext,
-                        glassButton = glassButton,
-                        onShowControls = { touchTick++ },
-                    )
-                } else {
-                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(Modifier.height(12.dp))
-                    Column(Modifier.fillMaxWidth()) {
-                        key(nowPlaying.songId) {
-                            Text(
-                                text = nowPlaying.title,
-                                style = MaterialTheme.typography.headlineMediumEmphasized,
-                                color = colors.onSurface,
-                                maxLines = 1,
-                                modifier = Modifier.basicMarquee(iterations = 2),
-                            )
-                        }
-                        val artist = nowPlaying.artist
-                        Text(
-                            text = artist.ifEmpty { stringResource(R.string.unknown_artist) },
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                // Pulled back by its own padding so the text still lines up with the title.
-                                .offset(x = (-6).dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(
-                                    enabled = artist.isNotEmpty(),
-                                    onClickLabel = stringResource(R.string.open_artist),
-                                ) { onOpenArtist(artist) }
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-                    WavySeekBar(
-                        position = position,
-                        durationMs = state.durationMs,
-                        isPlaying = state.isPlaying,
-                        onSeek = onSeek,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    PlayerControls(
-                        isPlaying = state.isPlaying,
-                        onPrevious = onPrevious,
-                        onTogglePlay = onTogglePlay,
-                        onNext = onNext,
-                        sideColor = glassButton,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(20.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        val toggleSize = Modifier.size(width = 72.dp, height = 56.dp)
-                        ExpressiveToggleButton(
-                            checked = state.shuffle,
-                            onClick = onToggleShuffle,
-                            icon = PlayerIcons.Shuffle,
-                            contentDescription = stringResource(R.string.shuffle),
-                            uncheckedColor = glassButton,
-                            modifier = toggleSize,
-                        )
-                        ExpressiveToggleButton(
-                            checked = showLyrics,
-                            onClick = onToggleLyrics,
-                            icon = PlayerIcons.Lyrics,
-                            contentDescription = stringResource(R.string.lyrics),
-                            uncheckedColor = glassButton,
-                            modifier = toggleSize,
-                        )
-                        ExpressiveToggleButton(
-                            checked = showQueue,
-                            onClick = onToggleQueue,
-                            icon = PlayerIcons.Queue,
-                            contentDescription = stringResource(R.string.queue),
-                            uncheckedColor = glassButton,
-                            modifier = toggleSize,
-                        )
-                        ExpressiveToggleButton(
-                            checked = state.repeatMode != Player.REPEAT_MODE_OFF,
-                            onClick = onCycleRepeat,
-                            icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
-                            contentDescription = stringResource(R.string.repeat),
-                            uncheckedColor = glassButton,
-                            modifier = toggleSize,
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
+                    } else {
+                        controls(false)
                     }
                 }
             }
@@ -447,6 +497,112 @@ fun FullPlayer(
 }
 
 private const val IMMERSIVE_DELAY_MS = 5_000L
+
+/** Below this a landscape player trims its spacing and buttons. */
+private val SHORT_HEIGHT = 420.dp
+
+/** Where the player plays: the phone itself or the paired computer. */
+@Immutable
+class PlayerDevices(
+    val pcName: String,
+    /** The player shows the computer. */
+    val onPc: Boolean,
+    /** What each side has on, to tell them apart in the menu; null when it has nothing to play. */
+    val phoneTrack: String?,
+    val pcTrack: String?,
+    val pcOnline: Boolean,
+    val onSwitch: (toPc: Boolean) -> Unit,
+    val onOpenComputer: () -> Unit,
+)
+
+/** Under the header: the device playing, as a pill that opens the choice between the two. */
+@Composable
+private fun DeviceSwitch(devices: PlayerDevices, glass: Color) {
+    var menu by remember { mutableStateOf(false) }
+    val turn by animateFloatAsState(if (menu) 180f else 0f, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "deviceArrow")
+    val colors = MaterialTheme.colorScheme
+    val phoneName = stringResource(R.string.player_device_phone)
+    val nothing = stringResource(R.string.player_device_idle)
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .clip(CircleShape)
+                .background(glass)
+                .clickable(onClickLabel = stringResource(R.string.player_device_switch)) { menu = true }
+                .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                .animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()),
+        ) {
+            val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+            val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+            val slide = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+            AnimatedContent(
+                targetState = devices.onPc,
+                transitionSpec = {
+                    // The computer comes from below, the phone from above.
+                    val dir = if (targetState) 1 else -1
+                    (fadeIn(fadeInSpec) + slideInVertically(slide) { it * dir })
+                        .togetherWith(fadeOut(fadeOutSpec) + slideOutVertically(slide) { -it * dir })
+                        .using(SizeTransform(clip = false))
+                },
+                label = "device",
+            ) { onPc ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (onPc) PlayerIcons.Desktop else PlayerIcons.Smartphone,
+                        contentDescription = null,
+                        tint = colors.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (onPc) devices.pcName else phoneName,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 160.dp),
+                    )
+                }
+            }
+            Icon(
+                PlayerIcons.ExpandMore,
+                contentDescription = null,
+                tint = colors.onSurfaceVariant,
+                modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = turn },
+            )
+        }
+        AppMenu(
+            expanded = menu,
+            onDismiss = { menu = false },
+            groups = listOf(
+                listOf(
+                    MenuAction(
+                        label = phoneName,
+                        icon = PlayerIcons.Smartphone,
+                        supporting = devices.phoneTrack ?: nothing,
+                        selected = !devices.onPc,
+                        enabled = devices.onPc && devices.phoneTrack != null,
+                    ) { devices.onSwitch(false) },
+                    MenuAction(
+                        label = devices.pcName,
+                        icon = PlayerIcons.Desktop,
+                        supporting = when {
+                            !devices.pcOnline -> stringResource(R.string.player_device_offline)
+                            else -> devices.pcTrack ?: nothing
+                        },
+                        selected = devices.onPc,
+                        enabled = !devices.onPc && devices.pcTrack != null,
+                    ) { devices.onSwitch(true) },
+                ),
+                listOf(
+                    MenuAction(stringResource(R.string.pc_open), PlayerIcons.Library, onClick = devices.onOpenComputer),
+                ),
+            ),
+        )
+    }
+}
 
 /** Immersive-lyrics bar: thin progress, track info and small transport buttons. */
 @Composable

@@ -23,6 +23,7 @@ sealed interface Route {
     data class EditSong(val songId: Long) : Route { override val key = "edit:$songId" }
     data object Downloads : Route { override val key = "downloads" }
     data object Search : Route { override val key = "search" }
+    data object Computer : Route { override val key = "computer" }
     data class SettingsPage(val section: SettingsSection) : Route { override val key = "settings:${section.name}" }
 
     companion object {
@@ -36,6 +37,7 @@ sealed interface Route {
             key == Favorites.key -> Favorites
             key == Downloads.key -> Downloads
             key == Search.key -> Search
+            key == Computer.key -> Computer
             key.startsWith("settings:") -> SettingsSection.entries.firstOrNull { it.name == key.removePrefix("settings:") }
                 ?.let(::SettingsPage) ?: Settings
             else -> tabs.firstOrNull { it.key == key } ?: Home
