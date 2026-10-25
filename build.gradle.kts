@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.ku.pierdoon"
-version = "1.0.3"
+version = "1.0.4"
 
 // FFmpeg (decoding every format, remuxing downloads) is pulled in for Windows x64 only:
 // the -platform artifacts would bring every OS and CPU along, some 300 MB.
@@ -55,8 +55,9 @@ compose.desktop {
             packageVersion = project.version.toString()
             description = "Offline music player"
             vendor = "kural3"
-            // jdk.accessibility: Compose talks to Windows accessibility through it; jdk.charsets: legacy tag encodings.
-            modules("java.instrument", "java.management", "jdk.unsupported", "java.logging", "java.naming", "jdk.accessibility", "jdk.charsets")
+            // jdk.accessibility: Compose talks to Windows accessibility through it; jdk.charsets: legacy tag encodings;
+            // jdk.httpserver: the phone connection.
+            modules("java.instrument", "java.management", "jdk.unsupported", "java.logging", "java.naming", "jdk.accessibility", "jdk.charsets", "jdk.httpserver")
             windows {
                 menu = true
                 shortcut = true

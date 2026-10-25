@@ -4,10 +4,12 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -38,6 +40,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import com.ku.pierdoon.resources.Res
@@ -95,6 +98,7 @@ fun LibraryScreen(
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val effects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val effectsSize = MaterialTheme.motionScheme.fastSpatialSpec<IntSize>()
 
     val sortLabels = listOf(
         SongSort.Title to Res.string.sort_title,
@@ -114,84 +118,73 @@ fun LibraryScreen(
             else -> stringResource(Res.string.artists_count, collections.artists.size)
         },
         belowTitle = {
-            // Search and downloads; while picking tracks the same row holds the selection tools.
-            AnimatedContent(
-                targetState = selection.active,
-                transitionSpec = { fadeIn(effects).togetherWith(fadeOut(effects)) },
-                label = "libraryTools",
-            ) { selecting ->
+            // Search and downloads have tabs of their own; while picking tracks, the selection
+            // tools take a row above the sections.
+            AnimatedVisibility(
+                visible = selection.active,
+                enter = expandVertically(effectsSize) + fadeIn(effects),
+                exit = shrinkVertically(effectsSize) + fadeOut(effects),
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                 ) {
-                    val toolColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                    if (selecting) {
-                        ExpressiveIconButton(
-                            onClick = selection::clear,
-                            icon = PlayerIcons.Close,
-                            contentDescription = stringResource(Res.string.cancel),
-                            containerColor = toolColor,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(56.dp),
-                        )
-                        Text(
-                            stringResource(Res.string.selected_count, selection.ids.size),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).padding(start = 4.dp),
-                        )
-                        SelectionActions(
-                            selection = selection,
-                            all = sorted,
-                            onBulk = { picked -> onBulk(picked, selection::clear) },
-                            onDelete = onDelete?.let { delete -> { picked -> delete(picked, selection::clear) } },
-                        )
-                    } else {
-                        SearchCapsule(
-                            text = stringResource(Res.string.search_short),
-                            onClick = { onOpen(Route.Search) },
-                            modifier = Modifier.weight(1f),
-                        )
-                        ExpressiveIconButton(
-                            onClick = { onOpen(Route.Downloads) },
-                            icon = PlayerIcons.Download,
-                            contentDescription = stringResource(Res.string.downloads),
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(56.dp),
-                        )
-                        if (section == 0 && songs.isNotEmpty()) {
-                            OverflowMenu(
-                                listOf(
-                                    listOf(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() }),
-                                    sortLabels.map { (s, label) ->
-                                        MenuEntry(label, selected = s == sort) { onSort(s, sortDescending) }
-                                    },
-                                    listOf(
-                                        MenuEntry(descendingLabel, PlayerIcons.Sort, checked = sortDescending) {
-                                            onSort(sort, !sortDescending)
-                                        },
-                                    ),
-                                ),
-                                containerColor = toolColor,
-                                size = 56.dp,
-                            )
-                        }
-                    }
+                    ExpressiveIconButton(
+                        onClick = selection::clear,
+                        icon = PlayerIcons.Close,
+                        contentDescription = stringResource(Res.string.cancel),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(56.dp),
+                    )
+                    Text(
+                        stringResource(Res.string.selected_count, selection.ids.size),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    )
+                    SelectionActions(
+                        selection = selection,
+                        all = sorted,
+                        onBulk = { picked -> onBulk(picked, selection::clear) },
+                        onDelete = onDelete?.let { delete -> { picked -> delete(picked, selection::clear) } },
+                    )
                 }
             }
-            ConnectedChoice(
-                options = listOf(
-                    stringResource(Res.string.nav_songs),
-                    stringResource(Res.string.nav_albums),
-                    stringResource(Res.string.nav_artists),
-                ),
-                selected = section,
-                onSelect = { section = it },
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-            )
+            ) {
+                ConnectedChoice(
+                    options = listOf(
+                        stringResource(Res.string.nav_songs),
+                        stringResource(Res.string.nav_albums),
+                        stringResource(Res.string.nav_artists),
+                    ),
+                    selected = section,
+                    onSelect = { section = it },
+                    modifier = Modifier.weight(1f),
+                )
+                if (section == 0 && songs.isNotEmpty() && !selection.active) {
+                    OverflowMenu(
+                        listOf(
+                            listOf(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() }),
+                            sortLabels.map { (s, label) ->
+                                MenuEntry(label, selected = s == sort) { onSort(s, sortDescending) }
+                            },
+                            listOf(
+                                MenuEntry(descendingLabel, PlayerIcons.Sort, checked = sortDescending) {
+                                    onSort(sort, !sortDescending)
+                                },
+                            ),
+                        ),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    )
+                }
+            }
         },
         floatingActionButton = {
             AnimatedVisibility(
