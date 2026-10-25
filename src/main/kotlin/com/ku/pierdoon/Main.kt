@@ -102,6 +102,7 @@ fun main(args: Array<String>) {
                 placement = if (windowPrefs.getBoolean("maximized", false)) WindowPlacement.Maximized else WindowPlacement.Floating,
             )
             val nav = remember { Navigator(listOf(Route.Home)) }
+            saveWindowOnQuit = { saveWindow(windowPrefs, state) }
             val icon = painterResource(Res.drawable.pierdoon)
 
             Tray(
@@ -188,7 +189,6 @@ private fun globalShortcut(e: androidx.compose.ui.input.key.KeyEvent, vm: MainVi
     e.isCtrlPressed && e.key == Key.DirectionUp -> { vm.setVolume(SettingsStore.settings.value.volume + 0.05f); true }
     e.isCtrlPressed && e.key == Key.DirectionDown -> { vm.setVolume(SettingsStore.settings.value.volume - 0.05f); true }
     e.isAltPressed && e.key == Key.DirectionLeft -> BackDispatcher.dispatch()
-    e.key == Key.MediaPlayPause -> { vm.togglePlay(); true }
     else -> false
 }
 
@@ -224,7 +224,11 @@ private fun saveWindow(prefs: Prefs, state: androidx.compose.ui.window.WindowSta
     }
 }
 
+/** Set by the window: quitting from the tray or for an update keeps its size and place too. */
+private var saveWindowOnQuit: (() -> Unit)? = null
+
 private fun quit(vm: MainViewModel) {
+    runCatching { saveWindowOnQuit?.invoke() }
     vm.dispose()
     PlaybackController.shutdown()
     SingleInstance.release()

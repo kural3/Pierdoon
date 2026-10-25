@@ -1,6 +1,7 @@
 package com.ku.pierdoon.playback
 
 import com.ku.pierdoon.platform.AppDirs
+import com.ku.pierdoon.platform.recoverAtomicWrite
 import com.ku.pierdoon.platform.writeAtomically
 import org.json.JSONArray
 import org.json.JSONObject
@@ -43,7 +44,7 @@ class QueueStore {
     private val file = File(AppDirs.files, "queue.json")
 
     fun read(): SavedQueue? {
-        if (!file.exists()) return null
+        if (!recoverAtomicWrite(file)) return null
         return runCatching {
             val o = JSONObject(file.readText())
             val ids = o.getJSONArray("ids").let { arr -> List(arr.length()) { arr.getLong(it) } }
@@ -66,13 +67,6 @@ class QueueStore {
             .put("position", q.positionMs)
             .put("shuffle", q.shuffle)
             .put("repeat", q.repeatMode)
-        runCatching {
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(o.toString())
-            if (!tmp.renameTo(file)) {
-                file.delete()
-                tmp.renameTo(file)
-            }
-        }
+        writeAtomically(file, o.toString())
     }
 }

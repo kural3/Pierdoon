@@ -3,6 +3,8 @@ package com.ku.pierdoon.data
 import org.json.JSONObject
 import java.io.File
 import com.ku.pierdoon.platform.AppDirs
+import com.ku.pierdoon.platform.recoverAtomicWrite
+import com.ku.pierdoon.platform.writeAtomically
 
 /** Tags the user changed "in the app": null fields keep what the file says. */
 data class TagOverride(
@@ -48,7 +50,7 @@ class TagOverrides private constructor() {
 
     private fun read(): MutableMap<Long, TagOverride> {
         val out = HashMap<Long, TagOverride>()
-        if (!file.exists()) return out
+        if (!recoverAtomicWrite(file)) return out
         runCatching {
             val o = JSONObject(file.readText())
             o.keys().forEach { k ->
@@ -68,14 +70,7 @@ class TagOverrides private constructor() {
                 t.album?.let { put("album", it) }
             })
         }
-        runCatching {
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(o.toString())
-            if (!tmp.renameTo(file)) {
-                file.delete()
-                tmp.renameTo(file)
-            }
-        }
+        writeAtomically(file, o.toString())
     }
 
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key)) getString(key) else null

@@ -1,6 +1,8 @@
 package com.ku.pierdoon.playback
 
 import com.ku.pierdoon.data.Song
+import com.ku.pierdoon.platform.ErrorLog
+import java.util.concurrent.CompletableFuture
 
 /** One entry of the queue: a song and the key that identifies this entry while it moves. */
 data class MediaItem(val song: Song, val queueKey: Long = Song.newQueueKey()) {
@@ -158,6 +160,12 @@ class Player {
                 emit(Event.State, Event.IsPlaying)
             }
         }
+
+        override fun onOutputUnavailable() {
+            ErrorLog.record("audio output", IllegalStateException("No audio output could be opened"))
+            playWhenReadyInternal(false)
+            emit(Event.IsPlaying)
+        }
     })
 
     private var errorStreak = 0
@@ -201,11 +209,13 @@ class Player {
     fun play() { playWhenReady = true }
     fun pause() { playWhenReady = false }
 
-    fun stop() {
+    /** @return completes once the engine has closed the file, so it can be rewritten or moved. */
+    fun stop(): CompletableFuture<Unit> {
         lastPositionMs = currentPosition
         pendingStartMs = lastPositionMs
-        stopEngine()
+        val closed = stopEngine()
         emit(Event.State, Event.IsPlaying)
+        return closed
     }
 
     fun addMediaItem(item: MediaItem) = addMediaItems(items.size, listOf(item))
@@ -392,13 +402,14 @@ class Player {
         engine.setNext(items[n].song.file, token)
     }
 
-    private fun stopEngine() {
-        engine.stop()
+    private fun stopEngine(): CompletableFuture<Unit> {
+        val closed = engine.stop()
         loadedToken = -1
         nextToken = -1
         nextIndex = -1
         playbackState = STATE_IDLE
         playWhenReadyInternal(false)
+        return closed
     }
 
     private fun emit(vararg events: Event) {

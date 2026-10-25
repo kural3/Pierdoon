@@ -5,6 +5,7 @@ import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.FrameGrabber
 import java.io.File
 import java.nio.ShortBuffer
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import javax.sound.sampled.AudioFormat
@@ -36,6 +37,9 @@ class AudioEngine(private val listener: Listener) {
 
         /** [token] couldn't be opened or decoded; playback stopped. */
         fun onError(token: Long, error: Throwable)
+
+        /** No audio output could be opened; playback paused where it was. */
+        fun onOutputUnavailable()
     }
 
     private sealed interface Command {
@@ -44,7 +48,8 @@ class AudioEngine(private val listener: Listener) {
         data class Seek(val ms: Long) : Command
         data object Play : Command
         data object Pause : Command
-        data object Stop : Command
+        /** [done] completes once the file is closed, so it can be rewritten or moved. */
+        class Stop(val done: CompletableFuture<Unit>) : Command
         data class Device(val name: String?) : Command
         data object Quit : Command
     }
@@ -86,7 +91,11 @@ class AudioEngine(private val listener: Listener) {
     fun seek(ms: Long) = commands.put(Command.Seek(ms))
     fun play() { isPlaying = true; commands.put(Command.Play) }
     fun pause() { isPlaying = false; commands.put(Command.Pause) }
-    fun stop() { isPlaying = false; commands.put(Command.Stop) }
+    /** @return completes once the decoder has let go of the file. */
+    fun stop(): CompletableFuture<Unit> {
+        isPlaying = false
+        return CompletableFuture<Unit>().also { commands.put(Command.Stop(it)) }
+    }
     fun setDevice(name: String?) = commands.put(Command.Device(name))
     fun release() = commands.put(Command.Quit)
 
@@ -153,27 +162,29 @@ class AudioEngine(private val listener: Listener) {
             }
             Command.Play -> {
                 playing = true
-                if (decoder == null && endedToken >= 0) Unit
                 ensureLine()?.start()
             }
             Command.Pause -> {
                 playing = false
                 line?.stop()
             }
-            Command.Stop -> {
+            is Command.Stop -> {
                 playing = false
                 flushLine()
                 closeDecoder()
                 next = null
                 synchronized(lock) { marks.clear() }
+                cmd.done.complete(Unit)
             }
             is Command.Device -> if (cmd.name != deviceName) {
                 deviceName = cmd.name
                 val wasRunning = line?.isRunning == true
+                // Taken while the old line still says how much of its buffer was heard.
+                val heard = position()
                 line?.run { stop(); flush(); close() }
                 line = null
                 // What was buffered is lost: carry on from where the listener was.
-                position()?.let { (token, ms) ->
+                heard?.let { (token, ms) ->
                     if (token == decoderToken) decoder?.let { d -> runCatching { d.timestamp = ms * 1000 } }
                     synchronized(lock) { marks.clear(); marks += Mark(framesWritten, token, ms) }
                 }
@@ -237,7 +248,15 @@ class AudioEngine(private val listener: Listener) {
             pendingMark = false
         }
 
-        val l = ensureLine() ?: return frames
+        val l = ensureLine() ?: run {
+            // Decoding on without anywhere to play would race through the queue in silence.
+            synchronized(lock) { marks.clear(); marks += Mark(framesWritten, decoderToken, mediaMs) }
+            runCatching { d.timestamp = mediaMs * 1000 }
+            playing = false
+            isPlaying = false
+            post { listener.onOutputUnavailable() }
+            return frames
+        }
         var offset = 0
         while (offset < samples) {
             val n = minOf(samples - offset, chunk.size / 2)

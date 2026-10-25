@@ -172,7 +172,7 @@ fun DownloadScreen(onBack: (() -> Unit)?, onPlay: (Long) -> Unit, bottomInset: D
                                         if (link.isEmpty()) {
                                             IconButton(onClick = {
                                                 val text = Files.clipboardText()
-                                                text?.let { findUrl(it.toString()) }?.let { link = it }
+                                                text?.let { findUrl(it) }?.let { link = it }
                                             }) {
                                                 Icon(PlayerIcons.Paste, contentDescription = stringResource(Res.string.download_paste))
                                             }
