@@ -200,6 +200,14 @@ object ArtworkCache {
 
     private fun decodeFile(file: File): SkImage? = runCatching { Images.decode(file.readBytes()) }.getOrNull()
 
+    /** The cover as stored (custom, embedded or the folder's picture), undecoded. Blocking. */
+    fun coverBytes(songId: Long, albumId: Long): ByteArray? = runCatching {
+        CoverStore.songFile(songId)?.let { return@runCatching it.readBytes() }
+        val path = synchronized(albumFiles) { albumFiles[albumId] } ?: return@runCatching null
+        val audio = File(path)
+        MediaProbe.embeddedCover(audio) ?: folderCover(audio.parentFile)?.readBytes()
+    }.getOrNull()
+
     private fun decodeAlbum(albumId: Long): SkImage? {
         val path = synchronized(albumFiles) { albumFiles[albumId] } ?: return null
         val audio = File(path)

@@ -37,6 +37,8 @@ import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.DigestInputStream
+import java.security.MessageDigest
 
 /** What the user asked for. Neither is converted: both are the site's own audio, as is. */
 enum class DownloadFormat {
@@ -302,25 +304,46 @@ object Downloader {
         refreshVersion()
     }
 
+    /**
+     * Checked against the release's SHA2-256SUMS before it is ever run. Later updates are
+     * yt-dlp's own (-U), which checks the same list.
+     */
     private fun fetchYtDlp() {
         val tmp = File(ytDlp.parentFile, "yt-dlp.exe.part")
-        val conn = URL(YT_DLP_URL).openConnection() as HttpURLConnection
+        val digest = MessageDigest.getInstance("SHA-256")
+        try {
+            val expected = httpGet(YT_DLP_SUMS_URL) { it.readBytes().toString(Charsets.UTF_8) }
+                .lineSequence()
+                .map { it.trim().split(Regex("""\s+""")) }
+                .firstOrNull { it.size == 2 && it[1].removePrefix("*") == "yt-dlp.exe" }
+                ?.first()?.lowercase()
+                ?: throw DownloadException(FailReason.Network, "No checksum for yt-dlp.exe")
+            httpGet(YT_DLP_URL) { input ->
+                DigestInputStream(input, digest).use { d -> tmp.outputStream().use { d.copyTo(it) } }
+            }
+            val actual = digest.digest().joinToString("") { "%02x".format(it) }
+            if (actual != expected) throw DownloadException(FailReason.Network, "yt-dlp.exe checksum mismatch")
+        } catch (e: Exception) {
+            tmp.delete()
+            throw if (e is DownloadException) e else DownloadException(FailReason.Network, e.message)
+        }
+        if (!tmp.renameTo(ytDlp)) {
+            tmp.copyTo(ytDlp, overwrite = true)
+            tmp.delete()
+        }
+    }
+
+    private fun <T> httpGet(url: String, read: (java.io.InputStream) -> T): T {
+        val conn = URL(url).openConnection() as HttpURLConnection
         try {
             conn.instanceFollowRedirects = true
             conn.connectTimeout = 15_000
             conn.readTimeout = 30_000
             conn.setRequestProperty("User-Agent", USER_AGENT)
             if (conn.responseCode !in 200..299) throw DownloadException(FailReason.Network, "HTTP ${conn.responseCode}")
-            conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
-        } catch (e: IOException) {
-            tmp.delete()
-            throw DownloadException(FailReason.Network, e.message)
+            return conn.inputStream.use(read)
         } finally {
             conn.disconnect()
-        }
-        if (!tmp.renameTo(ytDlp)) {
-            tmp.copyTo(ytDlp, overwrite = true)
-            tmp.delete()
         }
     }
 
@@ -459,6 +482,7 @@ object Downloader {
     private const val UPDATE_EVERY_MS = 24 * 60 * 60 * 1000L
     private const val SEARCH_RESULTS = 15
     private const val YT_DLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+    private const val YT_DLP_SUMS_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS"
     private val PROGRESS = Regex("""^\[download]\s+([\d.]+)%""")
     private val AUDIO = setOf("m4a", "mp3", "opus", "ogg", "flac", "wav", "aac", "webm", "mka")
 }

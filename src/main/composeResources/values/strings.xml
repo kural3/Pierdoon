@@ -282,6 +282,7 @@
     <string name="close_to_tray_desc">Закрытие окна не останавливает музыку</string>
     <string name="tray_show">Открыть Pier.doon</string>
     <string name="tray_quit">Выход</string>
+    <string name="output_unavailable">Звук некуда выводить: проверьте наушники или колонки</string>
     <string name="choose_image">Выберите изображение</string>
     <string name="choose_folder">Выберите папку с музыкой</string>
     <string name="settings_desktop">Окно и папки</string>

@@ -5,7 +5,13 @@ import com.ku.pierdoon.data.download.DownloadFormat
 import com.ku.pierdoon.data.metadata.SaveTarget
 import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.platform.Prefs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -67,9 +73,14 @@ data class AppSettings(
 
 /**
  * App-wide settings, shared by the UI and the player. Backed by a small properties file.
+ *
+ * Writes are put off briefly: dragging the volume or the rail's edge changes a setting every
+ * frame, and one write when the hand stops is enough.
  */
 object SettingsStore {
     private var prefs: Prefs? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var pendingWrite: Job? = null
     private val _settings = MutableStateFlow(AppSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
@@ -109,10 +120,27 @@ object SettingsStore {
         )
     }
 
+    @Synchronized
     fun update(transform: (AppSettings) -> AppSettings) {
         val s = transform(_settings.value)
         if (s == _settings.value) return
         _settings.value = s
+        pendingWrite?.cancel()
+        pendingWrite = scope.launch {
+            delay(WRITE_DELAY_MS)
+            write(_settings.value)
+        }
+    }
+
+    /** Writes a change still waiting; for quitting. */
+    @Synchronized
+    fun flush() {
+        if (pendingWrite?.isActive != true) return
+        pendingWrite?.cancel()
+        write(_settings.value)
+    }
+
+    private fun write(s: AppSettings) {
         prefs?.edit {
             putString(K_THEME, s.theme.name)
             putString(K_SOURCE, s.colorSource.name)
@@ -144,6 +172,8 @@ object SettingsStore {
 
     private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
         name?.let { n -> enumValues<E>().firstOrNull { it.name == n } } ?: default
+
+    private const val WRITE_DELAY_MS = 500L
 
     /** Not a character a Windows path can hold. */
     private const val FOLDER_SEPARATOR = "|"

@@ -165,10 +165,14 @@ class Player {
             ErrorLog.record("audio output", IllegalStateException("No audio output could be opened"))
             playWhenReadyInternal(false)
             emit(Event.IsPlaying)
+            onOutputUnavailable?.invoke()
         }
     })
 
     private var errorStreak = 0
+
+    /** Called when playback paused because no audio output could be opened. */
+    var onOutputUnavailable: (() -> Unit)? = null
 
     /** Called when the player paused itself at the end of an item ([pauseAtEndOfMediaItems]). */
     var onPausedAtEnd: (() -> Unit)? = null
@@ -257,13 +261,15 @@ class Player {
         if (from !in items.indices || to !in items.indices || from == to) return
         val item = items.removeAt(from)
         items.add(to, item)
-        currentMediaItemIndex = when (currentMediaItemIndex) {
+        fun moved(i: Int) = when (i) {
             from -> to
-            in (from + 1)..to -> currentMediaItemIndex - 1
-            in to until from -> currentMediaItemIndex + 1
-            else -> currentMediaItemIndex
+            in (from + 1)..to -> i - 1
+            in to until from -> i + 1
+            else -> i
         }
-        if (shuffleModeEnabled) reshuffle(keepFirst = currentMediaItemIndex)
+        currentMediaItemIndex = moved(currentMediaItemIndex)
+        // The play order stays as it was; only the positions it points at shift.
+        if (shuffleModeEnabled) shuffleOrder = IntArray(shuffleOrder.size) { moved(shuffleOrder[it]) }
         updateNext()
         emit(Event.Timeline)
     }
