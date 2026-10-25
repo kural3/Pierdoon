@@ -15,6 +15,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import com.ku.pierdoon.platform.AppDirs
+import com.ku.pierdoon.platform.recoverAtomicWrite
+import com.ku.pierdoon.platform.writeAtomically
 
 @Immutable
 data class Playlist(
@@ -157,7 +159,7 @@ class UserLibrary private constructor() {
     }
 
     private fun read(): UserData {
-        if (!file.exists()) return UserData(loaded = true)
+        if (!recoverAtomicWrite(file)) return UserData(loaded = true)
         return runCatching {
             val o = JSONObject(file.readText())
             val playlists = o.optJSONArray("playlists")?.let { arr ->
@@ -193,14 +195,7 @@ class UserLibrary private constructor() {
             })
             .put("favorites", JSONArray(d.favorites.toList()))
             .put("recent", JSONArray(d.recent))
-        runCatching {
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(o.toString())
-            if (!tmp.renameTo(file)) {
-                file.delete()
-                tmp.renameTo(file)
-            }
-        }
+        writeAtomically(file, o.toString())
     }
 
     private fun JSONArray.toLongList(): List<Long> = List(length()) { getLong(it) }

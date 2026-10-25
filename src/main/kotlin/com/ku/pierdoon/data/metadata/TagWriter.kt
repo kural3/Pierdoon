@@ -42,11 +42,11 @@ object TagWriter {
         val ext = original.extension.lowercase()
         val work = File(AppDirs.cache, "tag-edit").apply { mkdirs() }
         val temp = File(work, "edit.$ext")
+        // Next to the original first, so the final step is a rename on the same drive.
+        val staged = File(original.parentFile, "." + original.name + ".pierdoon")
         try {
             original.copyTo(temp, overwrite = true)
             tagFile(temp, title, artist, album, cover, removeCover)
-            // Next to the original first, so the final step is a rename on the same drive.
-            val staged = File(original.parentFile, "." + original.name + ".pierdoon")
             temp.copyTo(staged, overwrite = true)
             Files.move(staged.toPath(), original.toPath(), StandardCopyOption.REPLACE_EXISTING)
             true
@@ -55,6 +55,8 @@ object TagWriter {
             false
         } finally {
             work.listFiles()?.forEach { it.delete() }
+            // Left behind only when the move failed; it mustn't litter the music folder.
+            staged.delete()
         }
     }
 

@@ -10,7 +10,7 @@ import java.util.Properties
 class Prefs(name: String) {
     private val file = File(AppDirs.files, "$name.properties")
     private val props = Properties().apply {
-        if (file.exists()) runCatching { file.reader(Charsets.UTF_8).use { load(it) } }
+        if (recoverAtomicWrite(file)) runCatching { file.reader(Charsets.UTF_8).use { load(it) } }
     }
 
     @Synchronized fun getString(key: String, default: String?): String? = props.getProperty(key) ?: default

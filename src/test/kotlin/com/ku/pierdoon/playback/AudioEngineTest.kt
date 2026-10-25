@@ -25,6 +25,7 @@ class AudioEngineTest {
             override fun onTrackStarted(token: Long) = started(token)
             override fun onEnded(token: Long) = ended(token)
             override fun onError(token: Long, error: Throwable) = error(error)
+            override fun onOutputUnavailable() = error(IllegalStateException("No audio output"))
         }).apply { volume = 0f }
 
     @Test
@@ -51,6 +52,24 @@ class AudioEngineTest {
         Thread.sleep(700)
         assertTrue("moved while paused", e.position()!!.second - paused < 100)
         e.release()
+    }
+
+    @Test
+    fun stopLetsGoOfTheFile() {
+        assumeTrue(music.isNotEmpty() && AudioSystem.getMixerInfo().isNotEmpty())
+        // A copy: Windows refuses to delete a file that is still open, which is what's checked.
+        val copy = music.first().copyTo(File.createTempFile("engine", "." + music.first().extension), overwrite = true)
+        val startedLatch = CountDownLatch(1)
+        val e = engine(started = { startedLatch.countDown() })
+        try {
+            e.load(copy, token = 1, startMs = 0, play = true)
+            assertTrue("never started", startedLatch.await(10, TimeUnit.SECONDS))
+            e.stop().get(2, TimeUnit.SECONDS)
+            assertTrue("file still held after stop", copy.delete())
+        } finally {
+            e.release()
+            copy.delete()
+        }
     }
 
     @Test

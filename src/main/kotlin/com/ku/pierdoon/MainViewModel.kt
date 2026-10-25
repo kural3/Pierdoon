@@ -57,8 +57,10 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 sealed interface LyricsState {
     data object Idle : LyricsState
@@ -468,7 +470,7 @@ class MainViewModel {
         // The decoder holds the file open while it plays; rewriting it underneath breaks playback.
         val c = controller.takeIf { it.currentMediaItem?.song?.id == song.id }
         val resume = c?.let { Triple(it.currentMediaItemIndex, it.currentPosition, it.playWhenReady) }
-        c?.stop()
+        c?.stop()?.let { awaitClosed(it) }
         val ok = TagWriter.write(
             song,
             title = edit.title.trim(),
@@ -499,7 +501,7 @@ class MainViewModel {
     suspend fun deleteSongs(songs: List<Song>): Int {
         // A playing file can't be moved while the decoder has it open.
         val playing = controller.currentMediaItem?.song?.id
-        if (songs.any { it.id == playing }) controller.stop()
+        if (songs.any { it.id == playing }) awaitClosed(controller.stop())
         val deleted = withContext(Dispatchers.IO) {
             songs.filter { s ->
                 runCatching {
@@ -510,6 +512,11 @@ class MainViewModel {
         }
         deleted.forEach { onSongDeleted(it.id) }
         return deleted.size
+    }
+
+    /** Windows won't replace or move a file the decoder still has open: wait for it to let go. */
+    private suspend fun awaitClosed(closed: java.util.concurrent.CompletableFuture<Unit>) {
+        withTimeoutOrNull(CLOSE_TIMEOUT_MS) { closed.await() }
     }
 
     /** The file is gone: forget everything the app kept about it. */
@@ -613,6 +620,7 @@ class MainViewModel {
         const val POSITION_TICK_MS = 500L
         const val STOP_TIMEOUT_MS = 1_000L
         const val FOCUS_RESCAN_MS = 30_000L
+        const val CLOSE_TIMEOUT_MS = 2_000L
         const val COVER_PICKS = "cover-picks"
         val QUEUE_EVENTS = setOf(
             Player.Event.Timeline,

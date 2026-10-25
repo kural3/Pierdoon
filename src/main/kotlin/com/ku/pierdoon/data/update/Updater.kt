@@ -54,7 +54,7 @@ sealed interface UpdateState {
  * The installer is downloaded on request, started, and the app quits so it can be replaced.
  */
 object Updater {
-    /** Desktop releases carry an .msi, Android ones only an .apk, so both can share one page. */
+    /** Only releases with an .msi attached count. */
     private const val RELEASES = "https://api.github.com/repos/kural3/Pierdoon4Desktop/releases?per_page=15"
     private const val CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
     private const val K_LAST_CHECK = "last_check"
