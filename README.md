@@ -21,6 +21,7 @@ Download `Pier.doon-<version>.msi` from [Releases](https://github.com/kural3/Pie
 - Any format FFmpeg reads (MP3, M4A/AAC, FLAC, Opus, Ogg, WAV, WMA, APE, WavPack…), gapless between tracks, output device choice, skip silence
 - Synced lyrics from [LRCLIB](https://lrclib.net) with a per-track sync offset
 - Sleep timer, media keys and the Windows media overlay (title, cover, controls), tray icon (closing the window keeps the music playing), one instance at a time
+- Discord status ("Listening to Pier.doon": track, artist, time bar, cover), switched on in Settings → Телефон и Discord
 - Remote control from the Pier.doon Android app over Wi-Fi: player, queue, lyrics, covers, library (Settings → Телефон и Discord; protocol in [docs/remote-api.md](docs/remote-api.md))
 
 **Desktop layout**
