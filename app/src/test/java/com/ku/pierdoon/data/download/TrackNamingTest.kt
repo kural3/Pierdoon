@@ -49,4 +49,34 @@ class TrackNamingTest {
         assertEquals("AC_DC - Back In Black", safeFileName("AC/DC - Back In Black"))
         assertEquals("track", safeFileName("  "))
     }
+
+    @Test
+    fun singleTrackLinksSkipThePlaylistCheck() {
+        listOf(
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123",
+            "https://music.youtube.com/watch?v=abc",
+            "https://m.youtube.com/shorts/abc",
+            "https://soundcloud.com/artist/track-name",
+            "https://artist.bandcamp.com/track/song",
+        ).forEach { assertEquals(it, true, looksLikeSingleTrack(it)) }
+        listOf(
+            "https://www.youtube.com/playlist?list=PL123",
+            "https://www.youtube.com/@channel",
+            "https://soundcloud.com/artist/sets/album",
+            "https://soundcloud.com/artist",
+            "https://soundcloud.com/artist/tracks",
+            "https://on.soundcloud.com/abc",
+            "https://artist.bandcamp.com/album/record",
+            "https://vimeo.com/123",
+            "not a url",
+        ).forEach { assertEquals(it, false, looksLikeSingleTrack(it)) }
+    }
+
+    @Test
+    fun albumPlaylistsLoseTheirPrefix() {
+        assertEquals("Discovery", playlistName("Album - Discovery"))
+        assertEquals("Mix", playlistName("Mix"))
+        assertNull(playlistName(" "))
+    }
 }

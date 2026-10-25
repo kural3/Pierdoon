@@ -80,6 +80,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -102,14 +103,17 @@ import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.ArtworkCache
-import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.FrameRateBoost
 import com.ku.pierdoon.ui.components.HighFrameRate
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.components.backdropSource
 import com.ku.pierdoon.ui.components.glass
 import com.ku.pierdoon.ui.components.rememberBackdrop
+import com.ku.pierdoon.ui.library.BulkActionsSheet
+import com.ku.pierdoon.ui.library.BulkTarget
 import com.ku.pierdoon.ui.library.CollectionScreen
+import com.ku.pierdoon.ui.library.MenuEntry
+import com.ku.pierdoon.ui.library.SearchScreen
 import com.ku.pierdoon.ui.library.ConfirmDeleteDialog
 import com.ku.pierdoon.ui.library.FavoritesCover
 import com.ku.pierdoon.ui.library.FillBox
@@ -150,7 +154,7 @@ private fun Context.hasAudioPermission() =
     ContextCompat.checkSelfPermission(this, audioPermission) == PackageManager.PERMISSION_GRANTED
 
 private sealed interface PlaylistDialog {
-    data class Create(val songId: Long?) : PlaylistDialog
+    data class Create(val songIds: List<Long>) : PlaylistDialog
     data class Rename(val playlist: Playlist) : PlaylistDialog
     data class Delete(val playlist: Playlist) : PlaylistDialog
 }
@@ -232,17 +236,35 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     var coverSheetFor by remember { mutableStateOf<Long?>(null) }
     var dialog by remember { mutableStateOf<PlaylistDialog?>(null) }
 
-    // The system asks before the file goes; saved, so a recreated activity still cleans up after it.
-    var deletingSongId by rememberSaveable { mutableStateOf<Long?>(null) }
+    // The system asks before the files go; saved, so a recreated activity still cleans up after it.
+    var deletingSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
+    var afterDelete by remember { mutableStateOf<(() -> Unit)?>(null) }
     val deletedText = stringResource(R.string.deleted)
+    val resources = LocalResources.current
     val deleteConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
-        val id = deletingSongId
-        deletingSongId = null
-        if (r.resultCode == Activity.RESULT_OK && id != null) {
-            vm.onSongDeleted(id)
-            Toast.makeText(context, deletedText, Toast.LENGTH_SHORT).show()
+        val ids = deletingSongIds
+        deletingSongIds = null
+        if (r.resultCode == Activity.RESULT_OK && ids != null) {
+            ids.forEach(vm::onSongDeleted)
+            afterDelete?.invoke()
+            val text = if (ids.size == 1) deletedText else resources.getQuantityString(R.plurals.deleted_count, ids.size, ids.size)
+            Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
         }
+        afterDelete = null
     }
+    // Below Android 11 an app can only ask to delete its own files.
+    val deleteSongs: ((List<Song>, () -> Unit) -> Unit)? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        { songs, done ->
+            vm.deleteRequest(songs)?.let { request ->
+                deletingSongIds = songs.map { it.id }.toLongArray()
+                afterDelete = done
+                deleteConsent.launch(IntentSenderRequest.Builder(request).build())
+            }
+        }
+    } else {
+        null
+    }
+    var bulk by remember { mutableStateOf<BulkTarget?>(null) }
 
     // Lists reserve exactly the height of the floating chrome below them.
     var chromeHeightPx by remember { mutableIntStateOf(0) }
@@ -275,8 +297,10 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                     bottomInset = bottomInset,
                     backEnabled = !expanded,
                     onSongLongPress = { song, playlistId -> songAction = SongActionTarget(song, playlistId) },
+                    onBulk = { songs, playlistId, done -> bulk = BulkTarget(songs, playlistId, done) },
+                    onDeleteSongs = deleteSongs,
                     onPlaylistLongPress = { playlistAction = it },
-                    onCreatePlaylist = { dialog = PlaylistDialog.Create(null) },
+                    onCreatePlaylist = { dialog = PlaylistDialog.Create(emptyList()) },
                     onRenamePlaylist = { dialog = PlaylistDialog.Rename(it) },
                     onDeletePlaylist = { dialog = PlaylistDialog.Delete(it) },
                     onPlaylistCover = { coverSheetFor = it.id },
@@ -373,22 +397,29 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             onAddToQueue = { vm.addToQueue(target.song) },
             onToggleFavorite = { vm.toggleFavorite(target.song.id) },
             onAddToPlaylist = { id -> vm.addToPlaylist(id, target.song.id) },
-            onCreatePlaylist = { dialog = PlaylistDialog.Create(target.song.id) },
+            onCreatePlaylist = { dialog = PlaylistDialog.Create(listOf(target.song.id)) },
             onRemoveFromPlaylist = { target.playlistId?.let { vm.removeFromPlaylist(it, target.song.id) } },
             onEdit = {
                 expanded = false
                 nav.push(Route.EditSong(target.song.id))
             },
-            onDelete = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                {
-                    vm.deleteRequest(target.song)?.let { request ->
-                        deletingSongId = target.song.id
-                        deleteConsent.launch(IntentSenderRequest.Builder(request).build())
-                    }
-                }
-            } else {
-                null
-            },
+            onDelete = deleteSongs?.let { delete -> { delete(listOf(target.song)) {} } },
+        )
+    }
+    bulk?.let { target ->
+        val ids = target.songs.map { it.id }
+        BulkActionsSheet(
+            target = target,
+            playlists = userData.playlists,
+            onDismiss = { bulk = null },
+            onPlay = { vm.playSongs(target.songs, 0) },
+            onPlayNext = { vm.playNext(target.songs) },
+            onAddToQueue = { vm.addToQueue(target.songs) },
+            onAddFavorites = { vm.addFavorites(ids) },
+            onAddToPlaylist = { id -> vm.addToPlaylist(id, ids) },
+            onCreatePlaylist = { dialog = PlaylistDialog.Create(ids) },
+            onRemoveFromPlaylist = { target.playlistId?.let { vm.removeFromPlaylist(it, ids.toSet()) } },
+            onDelete = deleteSongs?.let { delete -> { delete(target.songs, target.onDone) } },
         )
     }
     playlistAction?.let { p ->
@@ -420,7 +451,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             confirmLabel = stringResource(R.string.create),
             onDismiss = { dialog = null },
             onConfirm = { name ->
-                vm.createPlaylist(name, listOfNotNull(d.songId))
+                vm.createPlaylist(name, d.songIds)
                 dialog = null
             },
         )
@@ -457,6 +488,8 @@ private fun Screens(
     bottomInset: androidx.compose.ui.unit.Dp,
     backEnabled: Boolean,
     onSongLongPress: (Song, Long?) -> Unit,
+    onBulk: (List<Song>, Long?, () -> Unit) -> Unit,
+    onDeleteSongs: ((List<Song>, () -> Unit) -> Unit)?,
     onPlaylistLongPress: (Playlist) -> Unit,
     onCreatePlaylist: () -> Unit,
     onRenamePlaylist: (Playlist) -> Unit,
@@ -464,6 +497,7 @@ private fun Screens(
     onPlaylistCover: (Playlist) -> Unit,
 ) {
     val collections by vm.collections.collectAsStateWithLifecycle()
+    val settings by SettingsStore.settings.collectAsStateWithLifecycle()
     val stateHolder = rememberSaveableStateHolder()
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
@@ -502,6 +536,21 @@ private fun Screens(
                     onShuffleAll = vm::shuffleAll,
                     onSongLongPress = { onSongLongPress(it, null) },
                     onOpen = nav::push,
+                    sort = settings.songSort,
+                    sortDescending = settings.songSortDescending,
+                    onSort = { sort, desc -> SettingsStore.update { it.copy(songSort = sort, songSortDescending = desc) } },
+                    onBulk = { picked, done -> onBulk(picked, null, done) },
+                    onDelete = onDeleteSongs,
+                    bottomInset = bottomInset,
+                )
+                Route.Search -> SearchScreen(
+                    songs = songs,
+                    collections = collections,
+                    currentSongId = currentSongId,
+                    onBack = { nav.pop() },
+                    onPlay = onPlay,
+                    onSongLongPress = { onSongLongPress(it, null) },
+                    onOpen = nav::push,
                     bottomInset = bottomInset,
                 )
                 Route.Downloads -> DownloadScreen(
@@ -510,7 +559,6 @@ private fun Screens(
                     bottomInset = bottomInset,
                 )
                 Route.Settings -> {
-                    val settings by SettingsStore.settings.collectAsStateWithLifecycle()
                     SettingsScreen(
                         settings = settings,
                         onUpdate = SettingsStore::update,
@@ -549,6 +597,8 @@ private fun Screens(
                         onPlay = onPlay,
                         onShuffle = onShuffle,
                         onSongLongPress = { onSongLongPress(it, null) },
+                        onBulk = { picked, done -> onBulk(picked, null, done) },
+                        onDelete = onDeleteSongs,
                         bottomInset = bottomInset,
                     )
                 }
@@ -568,6 +618,8 @@ private fun Screens(
                         onPlay = onPlay,
                         onShuffle = onShuffle,
                         onSongLongPress = { onSongLongPress(it, null) },
+                        onBulk = { picked, done -> onBulk(picked, null, done) },
+                        onDelete = onDeleteSongs,
                         bottomInset = bottomInset,
                     )
                 }
@@ -586,35 +638,18 @@ private fun Screens(
                         onPlay = onPlay,
                         onShuffle = onShuffle,
                         onSongLongPress = { onSongLongPress(it, playlist?.id) },
+                        onBulk = { picked, done -> onBulk(picked, playlist?.id, done) },
+                        onDelete = onDeleteSongs,
                         bottomInset = bottomInset,
                         emptyText = stringResource(R.string.empty_playlist),
-                        actions = {
-                            if (playlist != null) {
-                                ExpressiveIconButton(
-                                    onClick = { onPlaylistCover(playlist) },
-                                    icon = PlayerIcons.Image,
-                                    contentDescription = stringResource(R.string.cover),
-                                    containerColor = Color.Transparent,
-                                    contentColor = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(48.dp),
-                                )
-                                ExpressiveIconButton(
-                                    onClick = { onRenamePlaylist(playlist) },
-                                    icon = PlayerIcons.Edit,
-                                    contentDescription = stringResource(R.string.rename),
-                                    containerColor = Color.Transparent,
-                                    contentColor = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(48.dp),
-                                )
-                                ExpressiveIconButton(
-                                    onClick = { onDeletePlaylist(playlist) },
-                                    icon = PlayerIcons.Delete,
-                                    contentDescription = stringResource(R.string.delete),
-                                    containerColor = Color.Transparent,
-                                    contentColor = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(48.dp),
-                                )
-                            }
+                        menu = if (playlist != null) {
+                            listOf(
+                                MenuEntry(stringResource(R.string.cover), PlayerIcons.Image) { onPlaylistCover(playlist) },
+                                MenuEntry(stringResource(R.string.rename), PlayerIcons.Edit) { onRenamePlaylist(playlist) },
+                                MenuEntry(stringResource(R.string.delete), PlayerIcons.Delete) { onDeletePlaylist(playlist) },
+                            )
+                        } else {
+                            emptyList()
                         },
                     )
                 }
@@ -639,6 +674,8 @@ private fun Screens(
                         onPlay = onPlay,
                         onShuffle = onShuffle,
                         onSongLongPress = { onSongLongPress(it, null) },
+                        onBulk = { picked, done -> onBulk(picked, null, done) },
+                        onDelete = onDeleteSongs,
                         bottomInset = bottomInset,
                     )
                 }

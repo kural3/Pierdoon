@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import com.ku.pierdoon.R
+import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.data.Song
 
 /** Album / artist / playlist / favourites: header with cover and actions, then the tracks. */
@@ -24,10 +25,38 @@ fun CollectionScreen(
     onShuffle: (List<Song>) -> Unit,
     onSongLongPress: (Song) -> Unit,
     bottomInset: Dp,
+    onBulk: (List<Song>, () -> Unit) -> Unit,
+    /** Null where the system can't ask for consent to delete (below Android 11). */
+    onDelete: ((List<Song>, () -> Unit) -> Unit)?,
     emptyText: String? = null,
-    actions: @Composable () -> Unit = {},
+    /** Extra ⋮ entries after "Select" (a playlist's cover, rename, delete). */
+    menu: List<MenuEntry> = emptyList(),
 ) {
-    AppScaffold(title = title, onBack = onBack, actions = actions) { inner ->
+    val selection = rememberSongSelection()
+    SelectionBackHandler(selection)
+    val selectLabel = stringResource(R.string.select)
+    AppScaffold(
+        title = selectionTitle(selection, title),
+        onBack = if (selection.active) selection::clear else onBack,
+        actions = {
+            if (selection.active) {
+                SelectionActions(
+                    selection = selection,
+                    all = songs,
+                    onBulk = { picked -> onBulk(picked, selection::clear) },
+                    onDelete = onDelete?.let { delete -> { picked -> delete(picked, selection::clear) } },
+                )
+            } else if (songs.isNotEmpty() || menu.isNotEmpty()) {
+                OverflowMenu(
+                    buildList {
+                        if (songs.isNotEmpty()) add(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() })
+                        if (songs.isNotEmpty() && menu.isNotEmpty()) add(null)
+                        addAll(menu)
+                    }
+                )
+            }
+        },
+    ) { inner ->
         LazyColumn(
             contentPadding = PaddingValues(top = inner.calculateTopPadding(), bottom = listBottomPadding(bottomInset)),
             modifier = Modifier.fillMaxSize(),
@@ -45,11 +74,13 @@ fun CollectionScreen(
                 item(key = "empty") { EmptyMessage(emptyText) }
             }
             itemsIndexed(songs, key = { _, s -> s.id }, contentType = { _, _ -> "song" }) { index, song ->
+                val selecting = selection.active
                 SongRow(
                     song = song,
                     isCurrent = song.id == currentSongId,
-                    onClick = { onPlay(songs, index) },
-                    onLongClick = { onSongLongPress(song) },
+                    onClick = { if (selecting) selection.toggle(song.id) else onPlay(songs, index) },
+                    onLongClick = { if (selecting) selection.toggle(song.id) else onSongLongPress(song) },
+                    selected = if (selecting) song.id in selection.ids else null,
                 )
             }
         }

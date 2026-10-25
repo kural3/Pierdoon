@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.playback.SleepTimer
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -154,6 +157,9 @@ fun FullPlayer(
 
     // Matte-glass tints over the frosted art: translucent containers pick up its colour.
     val glassButton = colors.surfaceContainerHighest.copy(alpha = 0.45f)
+    val sleepTimer by SleepTimer.state.collectAsStateWithLifecycle()
+    var showSleepSheet by remember { mutableStateOf(false) }
+    if (showSleepSheet) SleepTimerSheet(sleepTimer, onDismiss = { showSleepSheet = false })
 
     // Immersive lyrics: after a few idle seconds with lyrics open, the chrome steps aside and
     // the controls fold into a compact bar so the lyrics get the screen. Before that, touches
@@ -225,19 +231,30 @@ fun FullPlayer(
                     contentColor = colors.onSurface,
                     modifier = Modifier.size(48.dp),
                 )
-                Text(
-                    text = stringResource(
-                        when {
-                            showQueue -> R.string.queue
-                            showLyrics -> R.string.lyrics
-                            else -> R.string.now_playing
-                        }
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.onSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = stringResource(
+                            when {
+                                showQueue -> R.string.queue
+                                showLyrics -> R.string.lyrics
+                                else -> R.string.now_playing
+                            }
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    sleepTimerLabel(sleepTimer)?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.primary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                SleepTimerButton(active = sleepTimer != null, onClick = { showSleepSheet = true }, glass = glassButton)
+                Spacer(Modifier.width(8.dp))
                 FavoriteButton(
                     isFavorite = isFavorite,
                     onClick = onToggleFavorite,

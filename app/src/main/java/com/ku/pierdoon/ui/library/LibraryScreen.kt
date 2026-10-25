@@ -17,13 +17,12 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.size
-import androidx.compose.ui.graphics.Color
-import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -38,6 +37,9 @@ import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.R
 import com.ku.pierdoon.data.MusicCollections
 import com.ku.pierdoon.data.Song
+import com.ku.pierdoon.data.SongSort
+import com.ku.pierdoon.data.sortSongs
+import androidx.compose.runtime.LaunchedEffect
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.FrameRateBoost
 import com.ku.pierdoon.ui.components.PlayerIcons
@@ -56,34 +58,81 @@ fun LibraryScreen(
     onShuffleAll: () -> Unit,
     onSongLongPress: (Song) -> Unit,
     onOpen: (Route) -> Unit,
+    sort: SongSort,
+    sortDescending: Boolean,
+    onSort: (SongSort, Boolean) -> Unit,
+    onBulk: (List<Song>, () -> Unit) -> Unit,
+    /** Null where the system can't ask for consent to delete (below Android 11). */
+    onDelete: ((List<Song>, () -> Unit) -> Unit)?,
     bottomInset: Dp,
 ) {
     val haptics = LocalHapticFeedback.current
     var section by rememberSaveable { mutableIntStateOf(0) }
+    val sorted = remember(songs, sort, sortDescending) { sortSongs(songs, sort, sortDescending) }
+    val selection = rememberSongSelection()
+    SelectionBackHandler(selection)
+    // The selection belongs to the track list; other sections and a changed library end it.
+    LaunchedEffect(section) { if (section != 0) selection.clear() }
     val sectionState = rememberSaveableStateHolder()
     val songsListState = rememberLazyListState()
+    // A new order starts from the top; the list would otherwise hold on to the row that was first.
+    var shownSort by rememberSaveable { mutableStateOf(sort to sortDescending) }
+    LaunchedEffect(sort, sortDescending) {
+        if (shownSort != sort to sortDescending) {
+            shownSort = sort to sortDescending
+            songsListState.scrollToItem(0)
+        }
+    }
     val fabExpanded by remember { derivedStateOf { songsListState.firstVisibleItemIndex == 0 } }
 
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val effects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
 
+    val sortLabels = listOf(
+        SongSort.Title to R.string.sort_title,
+        SongSort.Artist to R.string.sort_artist,
+        SongSort.Album to R.string.sort_album,
+        SongSort.DateAdded to R.string.sort_date_added,
+        SongSort.Duration to R.string.sort_duration,
+    ).map { (s, res) -> s to stringResource(res) }
+    val selectLabel = stringResource(R.string.select)
+    val descendingLabel = stringResource(R.string.sort_descending)
+
     AppScaffold(
-        title = stringResource(R.string.nav_library),
+        title = selectionTitle(selection, stringResource(R.string.nav_library)),
+        onBack = if (selection.active) selection::clear else null,
         subtitle = when (section) {
             0 -> stringResource(R.string.tracks_count, songs.size)
             1 -> stringResource(R.string.albums_count, collections.albums.size)
             else -> stringResource(R.string.artists_count, collections.artists.size)
         },
         actions = {
-            ExpressiveIconButton(
-                onClick = { onOpen(Route.Downloads) },
-                icon = PlayerIcons.Download,
-                contentDescription = stringResource(R.string.downloads),
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(end = 4.dp).size(48.dp),
-            )
+            if (selection.active) {
+                SelectionActions(
+                    selection = selection,
+                    all = sorted,
+                    onBulk = { picked -> onBulk(picked, selection::clear) },
+                    onDelete = onDelete?.let { delete -> { picked -> delete(picked, selection::clear) } },
+                )
+            } else {
+                TopBarIcon(PlayerIcons.Search, stringResource(R.string.search_library)) { onOpen(Route.Search) }
+                TopBarIcon(PlayerIcons.Download, stringResource(R.string.downloads)) { onOpen(Route.Downloads) }
+                if (section == 0 && songs.isNotEmpty()) {
+                    OverflowMenu(
+                        listOf(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() }, null) +
+                            sortLabels.map { (s, label) ->
+                                MenuEntry(label, checked = s == sort) { onSort(s, sortDescending) }
+                            } +
+                            listOf(
+                                null,
+                                MenuEntry(descendingLabel, PlayerIcons.Sort, checked = sortDescending) {
+                                    onSort(sort, !sortDescending)
+                                },
+                            )
+                    )
+                }
+            }
         },
         belowTitle = {
             ConnectedChoice(
@@ -99,7 +148,7 @@ fun LibraryScreen(
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = section == 0 && songs.isNotEmpty(),
+                visible = section == 0 && songs.isNotEmpty() && !selection.active,
                 enter = scaleIn(spatialF, initialScale = 0.6f) + fadeIn(effects),
                 exit = scaleOut(spatialF, targetScale = 0.6f) + fadeOut(effects),
                 modifier = Modifier.padding(bottom = bottomInset),
@@ -131,7 +180,7 @@ fun LibraryScreen(
             // Each section keeps its own scroll position across switches.
             sectionState.SaveableStateProvider(s) {
                 when (s) {
-                    0 -> SongsList(songs, currentSongId, onPlay, onSongLongPress, top, bottomInset, songsListState)
+                    0 -> SongsList(sorted, currentSongId, onPlay, onSongLongPress, top, bottomInset, songsListState, selection)
                     1 -> AlbumsGrid(collections.albums, onOpen, top, bottomInset)
                     else -> ArtistsList(collections.artists, onOpen, top, bottomInset)
                 }

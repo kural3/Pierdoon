@@ -50,7 +50,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -58,6 +57,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ku.pierdoon.R
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.download.DownloadFormat
+import com.ku.pierdoon.data.download.DownloadGroup
+import com.ku.pierdoon.data.download.SearchHit
+import com.ku.pierdoon.data.download.SearchSource
+import com.ku.pierdoon.ui.components.RemoteImage
+import com.ku.pierdoon.ui.formatDuration
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import com.ku.pierdoon.data.download.DownloadStatus
 import com.ku.pierdoon.data.download.DownloadTask
 import com.ku.pierdoon.data.download.Downloader
@@ -83,16 +94,39 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
     val version by Downloader.engineVersion.collectAsStateWithLifecycle()
     val engineUpdate by Downloader.engineUpdate.collectAsStateWithLifecycle()
     var link by rememberSaveable { mutableStateOf("") }
+    var source by rememberSaveable { mutableStateOf(SearchSource.YouTube) }
+    var search by remember { mutableStateOf<SearchState>(SearchState.Idle) }
+    val scope = rememberCoroutineScope()
+    var searchJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(Unit) { Downloader.warmUp() }
 
     val url = findUrl(link)
+    fun runSearch() {
+        val query = link.trim().takeIf { it.isNotEmpty() } ?: return
+        searchJob?.cancel()
+        search = SearchState.Loading
+        searchJob = scope.launch {
+            search = try {
+                SearchState.Found(Downloader.search(query, source))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SearchState.Failed
+            }
+        }
+    }
+    // A link downloads; anything else is looked up on the chosen site.
     fun start() {
-        val u = url ?: return
+        if (link.isBlank()) return
         focus.clearFocus()
         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-        Downloader.enqueue(u, settings.downloadFormat)
-        link = ""
+        if (url != null) {
+            Downloader.enqueue(url, settings.downloadFormat)
+            link = ""
+        } else {
+            runSearch()
+        }
     }
 
     AppScaffold(title = stringResource(R.string.downloads), onBack = onBack) { inner ->
@@ -118,7 +152,7 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
             }
 
             item(key = "link") {
-                Group(stringResource(R.string.download_link)) {
+                Group(stringResource(R.string.download_what)) {
                     listOf<@Composable (Shape) -> Unit>({ shape ->
                         ItemContainer(shape) {
                             Row(
@@ -146,22 +180,79 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
                                             }
                                         }
                                     },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-                                    keyboardActions = KeyboardActions(onGo = { start() }),
+                                    keyboardOptions = KeyboardOptions(imeAction = if (url != null) ImeAction.Go else ImeAction.Search),
+                                    keyboardActions = KeyboardActions(onGo = { start() }, onSearch = { start() }),
                                     modifier = Modifier.weight(1f),
                                 )
                                 Spacer(Modifier.width(8.dp))
+                                val ready = link.isNotBlank()
                                 ExpressiveIconButton(
                                     onClick = ::start,
-                                    icon = PlayerIcons.Download,
-                                    contentDescription = stringResource(R.string.download_start),
-                                    containerColor = if (url != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                    contentColor = if (url != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    icon = if (url != null || !ready) PlayerIcons.Download else PlayerIcons.Search,
+                                    contentDescription = stringResource(if (url != null) R.string.download_start else R.string.download_search),
+                                    containerColor = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    contentColor = if (ready) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 8.dp).size(56.dp),
+                                )
+                            }
+                            AnimatedVisibility(
+                                visible = url == null,
+                                enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()) +
+                                    expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec()),
+                                exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()) +
+                                    shrinkVertically(MaterialTheme.motionScheme.fastSpatialSpec()),
+                            ) {
+                                ConnectedChoice(
+                                    options = listOf(
+                                        stringResource(R.string.download_source_youtube),
+                                        stringResource(R.string.download_source_soundcloud),
+                                    ),
+                                    selected = source.ordinal,
+                                    onSelect = { i ->
+                                        source = SearchSource.entries[i]
+                                        if (search != SearchState.Idle) runSearch()
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                                 )
                             }
                         }
                     })
+                }
+            }
+
+            if (search != SearchState.Idle) {
+                item(key = "results") {
+                    Group(stringResource(R.string.download_results)) {
+                        when (val st = search) {
+                            SearchState.Loading -> listOf<@Composable (Shape) -> Unit>({ shape ->
+                                SearchNote(shape, stringResource(R.string.download_searching), loading = true)
+                            })
+                            SearchState.Failed -> listOf<@Composable (Shape) -> Unit>({ shape ->
+                                SearchNote(shape, stringResource(R.string.download_search_failed))
+                            })
+                            is SearchState.Found -> if (st.hits.isEmpty()) {
+                                listOf<@Composable (Shape) -> Unit>({ shape ->
+                                    SearchNote(shape, stringResource(R.string.download_search_empty))
+                                })
+                            } else {
+                                st.hits.map<SearchHit, @Composable (Shape) -> Unit> { hit ->
+                                    { shape ->
+                                        HitRow(
+                                            hit = hit,
+                                            shape = shape,
+                                            queued = tasks.any { it.url == hit.url },
+                                            onDownload = {
+                                                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                                                Downloader.enqueue(hit.url, settings.downloadFormat, hit.title, hit.artist.ifBlank { null })
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                            SearchState.Idle -> emptyList()
+                        }
+                    }
                 }
             }
 
@@ -205,15 +296,22 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
             if (tasks.isNotEmpty()) {
                 item(key = "queue") {
                     Group(stringResource(R.string.download_queue)) {
-                        tasks.asReversed().map<DownloadTask, @Composable (Shape) -> Unit> { task ->
-                            { shape ->
-                                TaskRow(
-                                    task = task,
-                                    shape = shape,
-                                    onPlay = onPlay,
-                                    onRemove = { Downloader.remove(task.id) },
-                                    onRetry = { Downloader.retry(task.id) },
-                                )
+                        // Newest first, but a playlist's own tracks keep their order under its header.
+                        queueRuns(tasks).asReversed().flatMap { run ->
+                            val group = run.first().group
+                            val header = group?.let { g ->
+                                listOf<@Composable (Shape) -> Unit>({ shape -> GroupHeader(g, run, shape) })
+                            }.orEmpty()
+                            header + run.map<DownloadTask, @Composable (Shape) -> Unit> { task ->
+                                { shape ->
+                                    TaskRow(
+                                        task = task,
+                                        shape = shape,
+                                        onPlay = onPlay,
+                                        onRemove = { Downloader.remove(task.id) },
+                                        onRetry = { Downloader.retry(task.id) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -262,6 +360,110 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+private sealed interface SearchState {
+    data object Idle : SearchState
+    data object Loading : SearchState
+    data object Failed : SearchState
+    data class Found(val hits: List<SearchHit>) : SearchState
+}
+
+/** Consecutive tasks of one playlist stay together; every other task is a run of its own. */
+private fun queueRuns(tasks: List<DownloadTask>): List<List<DownloadTask>> {
+    val runs = mutableListOf<MutableList<DownloadTask>>()
+    for (t in tasks) {
+        val last = runs.lastOrNull()
+        if (t.group != null && last != null && last.first().group?.id == t.group.id) last += t else runs += mutableListOf(t)
+    }
+    return runs
+}
+
+@Composable
+private fun SearchNote(shape: Shape, text: String, loading: Boolean = false) {
+    ItemContainer(shape) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (loading) {
+                Spacer(Modifier.height(8.dp))
+                LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+@Composable
+private fun HitRow(hit: SearchHit, shape: Shape, queued: Boolean, onDownload: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    ItemContainer(shape) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !queued, onClick = onDownload)
+                .padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+        ) {
+            RemoteImage(hit.thumbnail, Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)))
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(hit.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val details = listOfNotNull(
+                    hit.artist.ifBlank { null },
+                    hit.durationSec?.let { formatDuration(it * 1000L) },
+                    if (queued) stringResource(R.string.download_in_queue) else null,
+                ).joinToString(" · ")
+                if (details.isNotEmpty()) {
+                    Text(details, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            ExpressiveIconButton(
+                onClick = { if (!queued) onDownload() },
+                icon = if (queued) PlayerIcons.Check else PlayerIcons.Download,
+                contentDescription = stringResource(if (queued) R.string.download_in_queue else R.string.download_start),
+                containerColor = if (queued) colors.secondaryContainer else Color.Transparent,
+                contentColor = if (queued) colors.onSecondaryContainer else colors.onSurfaceVariant,
+                modifier = Modifier.size(44.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GroupHeader(group: DownloadGroup, tasks: List<DownloadTask>, shape: Shape) {
+    val colors = MaterialTheme.colorScheme
+    val done = tasks.count { it.status is DownloadStatus.Done }
+    val finished = tasks.none { it.active }
+    ItemContainer(shape) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+        ) {
+            Box(
+                Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(colors.tertiaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(PlayerIcons.Playlist, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    stringResource(R.string.download_group, group.name),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(
+                        if (finished && done > 0) R.string.download_group_done else R.string.download_group_progress,
+                        done,
+                        tasks.size,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
             }
         }
     }
@@ -374,6 +576,7 @@ private fun statusText(task: DownloadTask): String {
                 when (s.reason) {
                     FailReason.Unsupported -> R.string.download_fail_unsupported
                     FailReason.Unavailable -> R.string.download_fail_unavailable
+                    FailReason.Drm -> R.string.download_fail_drm
                     FailReason.NoAudio -> R.string.download_fail_no_audio
                     FailReason.Network -> R.string.download_fail_network
                     FailReason.Save -> R.string.download_fail_save

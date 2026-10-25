@@ -1,9 +1,7 @@
 package com.ku.pierdoon.ui.edit
 
 import android.app.Activity
-import android.graphics.BitmapFactory
 import android.os.Build
-import android.util.LruCache
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -16,7 +14,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -57,10 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -78,7 +72,6 @@ import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.metadata.CoverEdit
 import com.ku.pierdoon.data.metadata.MetadataCandidate
-import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.SaveTarget
 import com.ku.pierdoon.data.metadata.TrackEdit
 import com.ku.pierdoon.ui.components.Artwork
@@ -87,6 +80,7 @@ import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.FileArtwork
 import com.ku.pierdoon.ui.components.PlayerIcons
+import com.ku.pierdoon.ui.components.RemoteImage
 import com.ku.pierdoon.ui.components.animatePressAsState
 import com.ku.pierdoon.ui.components.scaleBy
 import com.ku.pierdoon.ui.formatDuration
@@ -95,7 +89,6 @@ import com.ku.pierdoon.ui.library.listBottomPadding
 import com.ku.pierdoon.ui.settings.Group
 import com.ku.pierdoon.ui.settings.ItemContainer
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -565,39 +558,3 @@ private fun ResultRow(c: MetadataCandidate, selected: Boolean, shape: androidx.c
     }
 }
 
-/** Search thumbnails stay around while the user goes through results. */
-private val thumbs = LruCache<String, ImageBitmap>(48)
-
-@Composable
-private fun RemoteImage(url: String?, modifier: Modifier) {
-    val bitmap by produceState(url?.let { thumbs.get(it) }, url) {
-        if (url == null || value != null) return@produceState
-        val bytes = MetadataSearch.download(url) ?: return@produceState
-        value = withContext(Dispatchers.Default) {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            var sample = 1
-            while (bounds.outWidth / (sample * 2) >= THUMB_PX) sample *= 2
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
-                ?.asImageBitmap()
-        }?.also { thumbs.put(url, it) }
-    }
-    Box(modifier.background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-        Crossfade(bitmap, animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(), label = "thumb") { image ->
-            if (image != null) {
-                Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        PlayerIcons.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-private const val THUMB_PX = 160

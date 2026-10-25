@@ -22,10 +22,12 @@ import com.ku.pierdoon.data.COVER_MAX_PX
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.TagOverride
 import com.ku.pierdoon.data.TagOverrides
+import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.TagWriter
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
+import com.yausername.youtubedl_android.YoutubeDLResponse
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,7 +60,7 @@ enum class DownloadFormat {
     Opus,
 }
 
-enum class FailReason { Unsupported, Unavailable, NoAudio, Network, Save, Other }
+enum class FailReason { Unsupported, Unavailable, Drm, NoAudio, Network, Save, Other }
 
 sealed interface DownloadStatus {
     data object Queued : DownloadStatus
@@ -84,9 +86,20 @@ data class DownloadTask(
     val title: String? = null,
     val artist: String? = null,
     val status: DownloadStatus = DownloadStatus.Queued,
+    /** Set on the tracks of a playlist or album link; they end up in a Pier.doon playlist together. */
+    val group: DownloadGroup? = null,
 ) {
     val active: Boolean get() = status !is DownloadStatus.Done && status !is DownloadStatus.Failed
 }
+
+@Immutable
+data class DownloadGroup(val id: Long, val name: String)
+
+enum class SearchSource(internal val prefix: String) { YouTube("ytsearch"), SoundCloud("scsearch") }
+
+/** One search result: enough to recognise the track, and the link to download it. */
+@Immutable
+data class SearchHit(val url: String, val title: String, val artist: String, val durationSec: Int?, val thumbnail: String?)
 
 sealed interface EngineUpdate {
     data object Idle : EngineUpdate
@@ -128,6 +141,9 @@ object Downloader {
     /** Set by a link shared into the app; the UI opens the downloads page and clears it. */
     val openRequest = MutableStateFlow(false)
 
+    /** Playlists made for finished groups, so a track retried later joins its playlist. */
+    private val groupPlaylists = mutableMapOf<Long, Long>()
+
     @Synchronized
     fun init(context: Context) {
         if (::app.isInitialized) return
@@ -141,9 +157,9 @@ object Downloader {
         if (supported) scope.launch { runCatching { ensureEngine(update = false) } }
     }
 
-    fun enqueue(url: String, format: DownloadFormat) {
+    fun enqueue(url: String, format: DownloadFormat, title: String? = null, artist: String? = null) {
         if (!supported) return
-        val task = synchronized(this) { DownloadTask(nextId++, url.trim(), format) }
+        val task = synchronized(this) { DownloadTask(nextId++, url.trim(), format, title, artist) }
         _tasks.update { it + task }
         ContextCompat.startForegroundService(app, Intent(app, DownloadService::class.java))
         wake.trySend(Unit)
@@ -151,8 +167,32 @@ object Downloader {
 
     /** Stops [id] if it's running and takes it off the list. */
     fun remove(id: Long) {
+        val group = _tasks.value.firstOrNull { it.id == id }?.group
         _tasks.update { list -> list.filterNot { it.id == id } }
         synchronized(this) { running?.takeIf { it.first == id }?.second?.cancel() }
+        // The cancelled track may have been the last one the group was waiting for.
+        group?.let { scope.launch { finishGroup(it) } }
+    }
+
+    /**
+     * Up to [SEARCH_RESULTS] tracks for [query]. Throws when yt-dlp can't reach the site.
+     * SoundCloud's 30-second previews of paid tracks are left out: that's all a download would get.
+     */
+    suspend fun search(query: String, source: SearchSource): List<SearchHit> = withContext(Dispatchers.IO) {
+        ensureEngine(update = true)
+        val request = YoutubeDLRequest("${source.prefix}$SEARCH_RESULTS:${query.trim()}").apply {
+            addOption("--flat-playlist")
+            addOption("-J")
+        }
+        val out = execute(request, "pierdoon-search-${System.nanoTime()}").out
+        val entries = JSONObject(out).optJSONArray("entries") ?: return@withContext emptyList()
+        List(entries.length()) { entries.optJSONObject(it) }.mapNotNull { e ->
+            val url = e?.str("url") ?: return@mapNotNull null
+            val duration = e.optDouble("duration").takeIf { !it.isNaN() }
+            if (source == SearchSource.SoundCloud && duration == 30.0) return@mapNotNull null
+            val name = trackName(e.str("title"), null, null, e.str("uploader") ?: e.str("channel"))
+            SearchHit(url, name.title, name.artist, duration?.toInt(), e.thumbnail())
+        }
     }
 
     fun retry(id: Long) {
@@ -191,7 +231,48 @@ object Downloader {
             synchronized(this) { running = next.id to job }
             job.join()
             synchronized(this) { running = null }
+            next.group?.let { finishGroup(it) }
         }
+    }
+
+    /** Once nothing in [group] is left to download, its finished tracks become a playlist, in order. */
+    private fun finishGroup(group: DownloadGroup) {
+        val members = _tasks.value.filter { it.group?.id == group.id }
+        val songIds = members.mapNotNull { (it.status as? DownloadStatus.Done)?.songId }
+        val library = UserLibrary.get(app)
+        synchronized(groupPlaylists) {
+            val existing = groupPlaylists[group.id]
+            when {
+                existing != null -> library.addToPlaylist(existing, songIds)
+                members.none { it.active } && songIds.isNotEmpty() ->
+                    groupPlaylists[group.id] = library.createPlaylist(group.name, songIds)
+            }
+        }
+    }
+
+    /** A playlist or album link: its tracks take [task]'s place in the queue. False if it's a single track. */
+    private suspend fun expand(task: DownloadTask): Boolean {
+        val request = YoutubeDLRequest(task.url).apply {
+            addOption("--flat-playlist")
+            addOption("--no-playlist")
+            addOption("-J")
+        }
+        val info = JSONObject(execute(request, "pierdoon-${task.id}").out)
+        if (info.str("_type") != "playlist") return false
+        val entries = info.optJSONArray("entries")
+        // Channel pages list their tabs as playlists of their own; only tracks are taken.
+        val tracks = List(entries?.length() ?: 0) { entries!!.optJSONObject(it) }
+            .filter { it != null && it.str("url") != null && it.str("_type") != "playlist" }
+        if (tracks.isEmpty()) throw DownloadException(FailReason.Unavailable, null)
+        val group = DownloadGroup(task.id, playlistName(info.str("title")) ?: task.url)
+        val expanded = synchronized(this) {
+            tracks.map { e ->
+                val name = trackName(e.str("title"), null, null, e.str("uploader") ?: e.str("channel"))
+                DownloadTask(nextId++, e.str("url")!!, task.format, name.title.ifBlank { null }, name.artist.ifBlank { null }, group = group)
+            }
+        }
+        _tasks.update { list -> list.flatMap { if (it.id == task.id) expanded else listOf(it) } }
+        return true
     }
 
     private fun set(id: Long, transform: (DownloadTask) -> DownloadTask) =
@@ -203,6 +284,7 @@ object Downloader {
         try {
             set(task.id) { it.copy(status = DownloadStatus.Preparing) }
             ensureEngine(update = true)
+            if (task.group == null && !looksLikeSingleTrack(task.url) && expand(task)) return
             val info = fetch(task, work)
             set(task.id) { it.copy(status = DownloadStatus.Saving) }
             val songId = save(task, info, work)
@@ -257,27 +339,39 @@ object Downloader {
             addOption("-f", formatSelector(task.format))
             addOption("-o", File(work, "%(id)s.%(ext)s").path)
         }
-        val processId = "pierdoon-${task.id}"
+        execute(request, "pierdoon-${task.id}") { progress, line ->
+            if (!line.startsWith("[download]")) return@execute
+            set(task.id) {
+                it.copy(status = DownloadStatus.Downloading(if (progress > 0f) (progress / 100f).coerceIn(0f, 1f) else null))
+            }
+            // The .info.json is written before the audio: show the name as soon as it's known.
+            if (tasks.value.firstOrNull { it.id == task.id }?.title == null) readInfo(work)?.let { showName(task.id, it) }
+        }
+        val info = readInfo(work) ?: throw DownloadException(FailReason.Other, null)
+        showName(task.id, info)
+        return info
+    }
+
+    /** Runs yt-dlp; a cancelled coroutine kills the Python process instead of waiting for it. */
+    private suspend fun execute(
+        request: YoutubeDLRequest,
+        processId: String,
+        onLine: ((Float, String) -> Unit)? = null,
+    ): YoutubeDLResponse {
         val stop = coroutineContext.job.invokeOnCompletion { cause ->
             if (cause is CancellationException) YoutubeDL.destroyProcessById(processId)
         }
         try {
-            runInterruptible {
-                YoutubeDL.execute(request, processId) { progress, _, line ->
-                    if (!line.startsWith("[download]")) return@execute
-                    set(task.id) {
-                        it.copy(status = DownloadStatus.Downloading(if (progress > 0f) (progress / 100f).coerceIn(0f, 1f) else null))
-                    }
-                    // The .info.json is written before the audio: show the name as soon as it's known.
-                    if (tasks.value.firstOrNull { it.id == task.id }?.title == null) readInfo(work)?.let { showName(task.id, it) }
+            return runInterruptible {
+                if (onLine == null) {
+                    YoutubeDL.execute(request, processId)
+                } else {
+                    YoutubeDL.execute(request, processId) { progress, _, line -> onLine(progress, line) }
                 }
             }
         } finally {
             stop.dispose()
         }
-        val info = readInfo(work) ?: throw DownloadException(FailReason.Other, null)
-        showName(task.id, info)
-        return info
     }
 
     private fun readInfo(work: File): JSONObject? =
@@ -354,6 +448,7 @@ object Downloader {
     private const val FOLDER = "Pier.doon"
     private const val K_CHECKED = "ytdlp_checked"
     private const val UPDATE_EVERY_MS = 24 * 60 * 60 * 1000L
+    private const val SEARCH_RESULTS = 15
     private val MIME = mapOf(
         "m4a" to "audio/mp4",
         "mp3" to "audio/mpeg",
@@ -375,6 +470,15 @@ private fun formatSelector(format: DownloadFormat) = when (format) {
 private fun JSONObject.str(key: String): String? =
     if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
 
+/** The smallest picture still sharp in a list row; sites without sizes get their last (usually biggest) one. */
+private fun JSONObject.thumbnail(): String? {
+    val all = optJSONArray("thumbnails")?.let { a -> List(a.length()) { a.optJSONObject(it) }.filterNotNull() }.orEmpty()
+        .filter { it.str("url") != null }
+    val sized = all.filter { it.optInt("width") > 0 }.sortedBy { it.optInt("width") }
+    return (sized.firstOrNull { it.optInt("width") >= 160 } ?: sized.lastOrNull() ?: all.lastOrNull())?.str("url")
+        ?: str("thumbnail")
+}
+
 private fun JSONObject.trackName(): TrackName {
     val artists = optJSONArray("artists")?.let { a -> List(a.length()) { a.optString(it) }.filter { it.isNotBlank() } }
     return trackName(
@@ -390,6 +494,7 @@ private fun classify(message: String?): FailReason {
     val m = message.orEmpty()
     return when {
         "Unsupported URL" in m || "is not a valid URL" in m -> FailReason.Unsupported
+        "DRM" in m -> FailReason.Drm
         "Requested format is not available" in m -> FailReason.NoAudio
         "Unable to download" in m || "Errno" in m || "timed out" in m || "getaddrinfo" in m -> FailReason.Network
         "unavailable" in m || "Private video" in m || "removed" in m || "Sign in" in m -> FailReason.Unavailable

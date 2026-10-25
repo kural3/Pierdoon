@@ -47,6 +47,8 @@ import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.PlayerIcons
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.Icon
 import com.ku.pierdoon.ui.components.animatePressAsState
 import com.ku.pierdoon.ui.components.morphClip
 import com.ku.pierdoon.ui.components.scaleBy
@@ -67,13 +69,19 @@ fun SongRow(
     modifier: Modifier = Modifier,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    /** Non-null in selection mode: whether this row is ticked. */
+    selected: Boolean? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val colors = MaterialTheme.colorScheme
     val source = remember { MutableInteractionSource() }
     val scale = animatePressAsState(source, 0.95f)
     val container by animateColorAsState(
-        targetValue = if (isCurrent) colors.secondaryContainer else Color.Transparent,
+        targetValue = when {
+            selected == true -> colors.primaryContainer
+            isCurrent -> colors.secondaryContainer
+            else -> Color.Transparent
+        },
         animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "rowContainer",
     )
@@ -108,17 +116,37 @@ fun SongRow(
             leading()
             Spacer(Modifier.width(12.dp))
         }
-        Artwork(
-            songId = song.id,
-            albumId = song.albumId,
-            modifier = Modifier.size(52.dp).morphClip(RowMorph, morph),
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Artwork(
+                songId = song.id,
+                albumId = song.albumId,
+                modifier = Modifier.size(52.dp).morphClip(RowMorph, morph),
+            )
+            androidx.compose.animation.AnimatedVisibility(
+                visible = selected == true,
+                enter = androidx.compose.animation.scaleIn(MaterialTheme.motionScheme.fastSpatialSpec()) +
+                    androidx.compose.animation.fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()),
+                exit = androidx.compose.animation.scaleOut(MaterialTheme.motionScheme.fastSpatialSpec()) +
+                    androidx.compose.animation.fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+            ) {
+                Box(
+                    Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(colors.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(PlayerIcons.Check, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(28.dp))
+                }
+            }
+        }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = song.title,
                 style = if (isCurrent) MaterialTheme.typography.titleMediumEmphasized else MaterialTheme.typography.titleMedium,
-                color = if (isCurrent) colors.onSecondaryContainer else colors.onSurface,
+                color = when {
+                    selected == true -> colors.onPrimaryContainer
+                    isCurrent -> colors.onSecondaryContainer
+                    else -> colors.onSurface
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

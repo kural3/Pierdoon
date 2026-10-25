@@ -96,16 +96,25 @@ class UserLibrary private constructor(context: Context) {
 
     fun deletePlaylist(id: Long) = mutate { d -> d.copy(playlists = d.playlists.filterNot { it.id == id }) }
 
-    fun addToPlaylist(id: Long, songId: Long) = mutate { d ->
-        d.copy(playlists = d.playlists.map {
-            if (it.id == id && songId !in it.songIds) it.copy(songIds = it.songIds + songId) else it
+    fun addToPlaylist(id: Long, songId: Long) = addToPlaylist(id, listOf(songId))
+
+    /** Appends [songIds] in order, skipping ones already there. */
+    fun addToPlaylist(id: Long, songIds: List<Long>) = mutate { d ->
+        d.copy(playlists = d.playlists.map { p ->
+            if (p.id == id) p.copy(songIds = p.songIds + songIds.filter { it !in p.songIds }.distinct()) else p
         })
     }
 
-    fun removeFromPlaylist(id: Long, songId: Long) = mutate { d ->
-        d.copy(playlists = d.playlists.map {
-            if (it.id == id) it.copy(songIds = it.songIds - songId) else it
+    fun removeFromPlaylist(id: Long, songId: Long) = removeFromPlaylist(id, setOf(songId))
+
+    fun removeFromPlaylist(id: Long, songIds: Set<Long>) = mutate { d ->
+        d.copy(playlists = d.playlists.map { p ->
+            if (p.id == id) p.copy(songIds = p.songIds.filterNot { it in songIds }) else p
         })
+    }
+
+    fun addFavorites(songIds: List<Long>) = mutate { d ->
+        d.copy(favorites = d.favorites + songIds.filter { it !in d.favorites }.distinct())
     }
 
     fun toggleFavorite(songId: Long) = mutate { d ->

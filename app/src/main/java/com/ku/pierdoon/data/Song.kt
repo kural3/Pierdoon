@@ -58,9 +58,10 @@ data class Song(
         /** Metadata extra: stable identity of a queue entry while it moves around. */
         const val QUEUE_KEY = "com.ku.pierdoon.queue_key"
         const val ALBUM_ID = "com.ku.pierdoon.album_id"
-        private val nextQueueKey = AtomicLong(SystemClock.elapsedRealtimeNanos())
+        // Lazy, so plain JVM tests can make songs without the Android runtime.
+        private val nextQueueKey by lazy { AtomicLong(SystemClock.elapsedRealtimeNanos()) }
 
-        val ALBUM_ART_URI: Uri = "content://media/external/audio/albumart".toUri()
+        val ALBUM_ART_URI: Uri by lazy { "content://media/external/audio/albumart".toUri() }
 
         fun uriFor(mediaId: String): Uri? = mediaId.toLongOrNull()?.let {
             ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it)

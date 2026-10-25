@@ -334,6 +334,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         c.addMediaItem(song.toMediaItem())
     }
 
+    /** Several tracks right after the current one, in the order given. */
+    fun playNext(songs: List<Song>) {
+        val c = controller ?: return
+        if (songs.isEmpty()) return
+        if (c.mediaItemCount == 0) return playSongs(songs, 0)
+        c.addMediaItems(c.currentMediaItemIndex + 1, songs.map { it.toMediaItem() })
+    }
+
+    fun addToQueue(songs: List<Song>) {
+        val c = controller ?: return
+        if (songs.isEmpty()) return
+        if (c.mediaItemCount == 0) return playSongs(songs, 0)
+        c.addMediaItems(songs.map { it.toMediaItem() })
+    }
+
+    fun addFavorites(songIds: List<Long>) = userLibrary.addFavorites(songIds)
+    fun addToPlaylist(id: Long, songIds: List<Long>) = userLibrary.addToPlaylist(id, songIds)
+    fun removeFromPlaylist(id: Long, songIds: Set<Long>) = userLibrary.removeFromPlaylist(id, songIds)
+
     fun toggleFavorite(songId: Long) = userLibrary.toggleFavorite(songId)
     fun createPlaylist(name: String, initialSongs: List<Long> = emptyList()) =
         userLibrary.createPlaylist(name, initialSongs)
@@ -522,9 +541,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * Android 11+ asks the user before an app may delete someone else's file (the system dialog
      * is the confirmation); null below that, where deleting would need write access to storage.
      */
-    fun deleteRequest(song: Song): IntentSender? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            MediaStore.createDeleteRequest(getApplication<Application>().contentResolver, listOf(song.uri)).intentSender
+    /** One system consent for all of [songs]; null below Android 11, where apps can't ask for it. */
+    fun deleteRequest(songs: List<Song>): IntentSender? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && songs.isNotEmpty()) {
+            MediaStore.createDeleteRequest(getApplication<Application>().contentResolver, songs.map { it.uri }).intentSender
         } else {
             null
         }

@@ -37,6 +37,30 @@ internal fun cleanTitle(title: String): String =
 /** The first web link in shared text ("Check this out https://youtu.be/…"). */
 fun findUrl(text: String): String? = URL.find(text)?.value?.trimEnd('.', ',', ')', '!', '?')
 
+/**
+ * Links that are surely one track, so there's no need to ask yt-dlp first whether they're a
+ * playlist or an album. Anything else is looked at before downloading.
+ */
+internal fun looksLikeSingleTrack(url: String): Boolean {
+    val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+    val host = uri.host?.lowercase()?.removePrefix("www.")?.removePrefix("m.")?.removePrefix("music.") ?: return false
+    val path = uri.path.orEmpty()
+    val segments = path.split('/').filter { it.isNotEmpty() }
+    return when {
+        host == "youtu.be" -> true
+        host == "youtube.com" -> path.startsWith("/watch") || path.startsWith("/shorts/") || path.startsWith("/live/")
+        host == "soundcloud.com" -> segments.size == 2 && segments[1] !in SOUNDCLOUD_LISTS
+        host.endsWith("bandcamp.com") -> path.startsWith("/track/")
+        else -> false
+    }
+}
+
+/** "Album - Name" is how YouTube Music titles an album's playlist. */
+internal fun playlistName(title: String?): String? =
+    title?.removePrefix("Album - ")?.trim()?.takeIf { it.isNotEmpty() }
+
+private val SOUNDCLOUD_LISTS = setOf("sets", "tracks", "albums", "likes", "reposts", "popular-tracks", "followers", "following")
+
 /** A file name every filesystem accepts, short enough to leave room for "(1)" and the extension. */
 internal fun safeFileName(name: String): String =
     name.replace(Regex("""[\\/:*?"<>|\u0000-\u001f]"""), "_").trim().trimStart('.').take(120).ifBlank { "track" }

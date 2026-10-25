@@ -70,6 +70,7 @@ fun SongsList(
     topPadding: Dp,
     bottomInset: Dp,
     listState: LazyListState = rememberLazyListState(),
+    selection: SongSelection? = null,
 ) {
     if (songs.isEmpty()) {
         FillBox { EmptyMessage(stringResource(R.string.empty_library)) }
@@ -81,11 +82,13 @@ fun SongsList(
         modifier = Modifier.fillMaxSize(),
     ) {
         itemsIndexed(songs, key = { _, s -> s.id }, contentType = { _, _ -> "song" }) { index, song ->
+            val selecting = selection?.takeIf { it.active }
             SongRow(
                 song = song,
                 isCurrent = song.id == currentSongId,
-                onClick = { onPlay(songs, index) },
-                onLongClick = { onSongLongPress(song) },
+                onClick = { if (selecting != null) selecting.toggle(song.id) else onPlay(songs, index) },
+                onLongClick = { if (selecting != null) selecting.toggle(song.id) else onSongLongPress(song) },
+                selected = selecting?.let { song.id in it.ids },
             )
         }
     }

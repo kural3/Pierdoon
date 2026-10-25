@@ -43,6 +43,8 @@ data class AppSettings(
     /** Look for a new release on GitHub now and then (at most twice a day). */
     val checkUpdates: Boolean = true,
     val downloadFormat: DownloadFormat = DownloadFormat.M4a,
+    val songSort: SongSort = SongSort.Title,
+    val songSortDescending: Boolean = false,
 )
 
 /**
@@ -82,6 +84,8 @@ object SettingsStore {
             checkUpdates = p.getBoolean(K_UPDATES, d.checkUpdates),
             downloadFormat = runCatching { DownloadFormat.valueOf(p.getString(K_DOWNLOAD_FORMAT, d.downloadFormat.name)!!) }
                 .getOrDefault(d.downloadFormat),
+            songSort = runCatching { SongSort.valueOf(p.getString(K_SONG_SORT, d.songSort.name)!!) }.getOrDefault(d.songSort),
+            songSortDescending = p.getBoolean(K_SONG_SORT_DESC, d.songSortDescending),
         )
     }
 
@@ -106,6 +110,8 @@ object SettingsStore {
             putString(K_EDIT_TARGET, s.editTarget.name)
             putBoolean(K_UPDATES, s.checkUpdates)
             putString(K_DOWNLOAD_FORMAT, s.downloadFormat.name)
+            putString(K_SONG_SORT, s.songSort.name)
+            putBoolean(K_SONG_SORT_DESC, s.songSortDescending)
         }
     }
 
@@ -126,4 +132,6 @@ object SettingsStore {
     private const val K_EDIT_TARGET = "edit_target"
     private const val K_UPDATES = "check_updates"
     private const val K_DOWNLOAD_FORMAT = "download_format"
+    private const val K_SONG_SORT = "song_sort"
+    private const val K_SONG_SORT_DESC = "song_sort_desc"
 }

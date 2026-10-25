@@ -37,6 +37,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -90,6 +91,14 @@ class PlaybackService : MediaSessionService() {
                 mediaItem?.mediaId?.toLongOrNull()?.let(library::recordPlayed)
             }
 
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM &&
+                    SleepTimer.state.value == SleepTimerState.EndOfTrack
+                ) {
+                    SleepTimer.fired()
+                }
+            }
+
             override fun onEvents(player: Player, events: Player.Events) {
                 if (events.containsAny(*QUEUE_EVENTS)) scheduleSave(player)
                 if (events.containsAny(Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED, Player.EVENT_REPEAT_MODE_CHANGED)) {
@@ -122,6 +131,26 @@ class PlaybackService : MediaSessionService() {
                         )
                         .build()
                 }
+        }
+
+        scope.launch {
+            SleepTimer.state.collectLatest { timer ->
+                player.pauseAtEndOfMediaItems = timer == SleepTimerState.EndOfTrack
+                if (timer !is SleepTimerState.At) return@collectLatest
+                // The last seconds fade out instead of cutting off mid-phrase.
+                delay((timer.remainingMs - SLEEP_FADE_MS).coerceAtLeast(0))
+                val steps = 20
+                try {
+                    for (i in steps downTo 1) {
+                        player.volume = i / steps.toFloat()
+                        delay(SLEEP_FADE_MS / steps)
+                    }
+                    player.pause()
+                    SleepTimer.fired()
+                } finally {
+                    player.volume = 1f
+                }
+            }
         }
 
         val openApp = PendingIntent.getActivity(
@@ -290,6 +319,7 @@ class PlaybackService : MediaSessionService() {
 
     private companion object {
         const val SAVE_DELAY_MS = 1_000L
+        const val SLEEP_FADE_MS = 10_000L
         val TOGGLE_SHUFFLE = SessionCommand("com.ku.pierdoon.TOGGLE_SHUFFLE", Bundle.EMPTY)
         val CYCLE_REPEAT = SessionCommand("com.ku.pierdoon.CYCLE_REPEAT", Bundle.EMPTY)
         val QUEUE_EVENTS = intArrayOf(
