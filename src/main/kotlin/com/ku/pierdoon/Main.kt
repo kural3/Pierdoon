@@ -44,7 +44,9 @@ import com.ku.pierdoon.data.download.findUrl
 import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.platform.Prefs
 import com.ku.pierdoon.platform.WinShell
+import com.ku.pierdoon.playback.DiscordPresence
 import com.ku.pierdoon.playback.PlaybackController
+import com.ku.pierdoon.remote.RemoteServer
 import com.ku.pierdoon.resources.Res
 import com.ku.pierdoon.resources.app_name
 import com.ku.pierdoon.resources.pierdoon
@@ -74,11 +76,13 @@ fun main(args: Array<String>) {
     CoverStore.init()
     Downloader.init()
     PlaybackController.start()
+    DiscordPresence.start()
     handleArgs(args)
 
     val windowPrefs = Prefs("window")
     val vm = MainViewModel()
     Updater.onQuitForUpdate = { quit(vm) }
+    RemoteServer.bind(vm)
 
     application(exitProcessOnExit = false) {
         // A crash inside the UI is written down before Compose shows its error dialog.
@@ -231,6 +235,8 @@ private var saveWindowOnQuit: (() -> Unit)? = null
 private fun quit(vm: MainViewModel) {
     runCatching { saveWindowOnQuit?.invoke() }
     SettingsStore.flush()
+    RemoteServer.stop()
+    DiscordPresence.shutdown()
     vm.dispose()
     PlaybackController.shutdown()
     SingleInstance.release()

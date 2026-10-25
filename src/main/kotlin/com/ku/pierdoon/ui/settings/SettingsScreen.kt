@@ -35,6 +35,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
@@ -60,6 +61,10 @@ import com.ku.pierdoon.data.NAV_MAX_WIDTH
 import com.ku.pierdoon.data.NAV_MIN_WIDTH
 import com.ku.pierdoon.data.ThemeMode
 import com.ku.pierdoon.data.update.UpdateState
+import com.ku.pierdoon.playback.DiscordPresence
+import com.ku.pierdoon.remote.RemoteServer
+import com.ku.pierdoon.remote.RemoteStatus
+import androidx.compose.foundation.text.selection.SelectionContainer
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.library.AppScaffold
@@ -79,7 +84,7 @@ internal fun groupShape(index: Int, count: Int): Shape {
 }
 
 /** A page of settings, opened from the list on the Settings tab. */
-enum class SettingsSection { Appearance, Playback, Lyrics, Library, Window, Updates }
+enum class SettingsSection { Appearance, Playback, Lyrics, Library, Window, Connections, Updates }
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
 
@@ -117,6 +122,8 @@ fun SettingsScreen(
         UpdateState.Idle -> stringResource(Res.string.update_current, version)
     }
 
+    val remote by RemoteServer.status.collectAsState()
+
     AppScaffold(
         title = stringResource(section?.title() ?: Res.string.nav_settings),
         onBack = if (section != null) onBack else null,
@@ -138,6 +145,7 @@ fun SettingsScreen(
                 SettingsSection.Playback -> playback(settings, onUpdate)
                 SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
                 SettingsSection.Library -> library(settings, trackCount, onRescan, onAddFolder, onRemoveFolder)
+                SettingsSection.Connections -> connections(settings, onUpdate, remote)
                 SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
             }
         }
@@ -150,6 +158,7 @@ private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Playback -> Res.string.settings_playback
     SettingsSection.Lyrics -> Res.string.settings_lyrics
     SettingsSection.Library -> Res.string.settings_library
+    SettingsSection.Connections -> Res.string.settings_connections
     SettingsSection.Updates -> Res.string.settings_updates
 }
 
@@ -159,6 +168,7 @@ private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Playback -> PlayerIcons.Play
     SettingsSection.Lyrics -> PlayerIcons.Lyrics
     SettingsSection.Library -> PlayerIcons.Library
+    SettingsSection.Connections -> PlayerIcons.Phone
     SettingsSection.Updates -> PlayerIcons.Refresh
 }
 
@@ -182,6 +192,7 @@ private fun LazyListScope.sectionList(
                             SettingsSection.Playback -> stringResource(Res.string.settings_playback_summary)
                             SettingsSection.Lyrics -> stringResource(Res.string.settings_lyrics_summary)
                             SettingsSection.Library -> stringResource(Res.string.tracks_count, trackCount)
+                            SettingsSection.Connections -> stringResource(Res.string.settings_connections_summary)
                             SettingsSection.Updates -> updateStatus
                         },
                         onClick = { onOpen(s) },
@@ -578,6 +589,126 @@ private fun ChoiceItem(shape: Shape, title: String, selected: Boolean, onClick: 
             if (selected) {
                 Spacer(Modifier.width(16.dp))
                 Icon(PlayerIcons.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+private fun LazyListScope.connections(settings: AppSettings, onUpdate: Update, remote: RemoteStatus) {
+    item(key = "remote") {
+        Group(null) {
+            listOf<@Composable (Shape) -> Unit>(
+                { shape ->
+                    SwitchItem(
+                        shape = shape,
+                        title = stringResource(Res.string.remote_control),
+                        subtitle = remote.error?.let { stringResource(Res.string.remote_error, it) }
+                            ?: stringResource(Res.string.remote_control_desc),
+                        checked = settings.remoteControl,
+                        onChange = { v -> onUpdate { it.copy(remoteControl = v) } },
+                    )
+                },
+            )
+        }
+    }
+    if (remote.running) {
+        item(key = "remote_pair") {
+            Group(null) {
+                listOf<@Composable (Shape) -> Unit>(
+                    { shape ->
+                        ValueItem(
+                            shape = shape,
+                            title = stringResource(Res.string.remote_pair_title),
+                            value = remote.pairingCode.chunked(3).joinToString(" "),
+                            subtitle = stringResource(Res.string.remote_pair_desc),
+                        )
+                    },
+                    { shape ->
+                        ValueItem(
+                            shape = shape,
+                            title = stringResource(Res.string.remote_address),
+                            value = remote.addresses.joinToString("\n") { "$it:${remote.port}" }
+                                .ifEmpty { stringResource(Res.string.remote_address_none) },
+                            subtitle = null,
+                        )
+                    },
+                )
+            }
+        }
+    }
+    item(key = "remote_devices") {
+        Group(stringResource(Res.string.remote_devices)) {
+            if (remote.devices.isEmpty()) {
+                listOf<@Composable (Shape) -> Unit>(
+                    { shape ->
+                        ItemContainer(shape) {
+                            Text(
+                                stringResource(Res.string.remote_devices_none),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                            )
+                        }
+                    },
+                )
+            } else {
+                remote.devices.map { device ->
+                    { shape: Shape -> DeviceItem(shape, device.name) { RemoteServer.forget(device) } }
+                }
+            }
+        }
+    }
+    if (DiscordPresence.available) item(key = "discord") {
+        Group(null) {
+            listOf<@Composable (Shape) -> Unit>(
+                { shape ->
+                    SwitchItem(
+                        shape = shape,
+                        title = stringResource(Res.string.discord_presence),
+                        subtitle = stringResource(Res.string.discord_presence_desc),
+                        checked = settings.discordPresence,
+                        onChange = { v -> onUpdate { it.copy(discordPresence = v) } },
+                    )
+                },
+            )
+        }
+    }
+}
+
+/** A setting that is read, not changed: a code, an address. */
+@Composable
+private fun ValueItem(shape: Shape, title: String, value: String, subtitle: String?) {
+    ItemContainer(shape) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SelectionContainer {
+                Text(value, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+            }
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceItem(shape: Shape, name: String, onForget: () -> Unit) {
+    ItemContainer(shape) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        ) {
+            Icon(PlayerIcons.Phone, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(16.dp))
+            Text(
+                name,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+            )
+            IconButton(onClick = onForget) {
+                Icon(PlayerIcons.Close, contentDescription = stringResource(Res.string.remote_forget))
             }
         }
     }

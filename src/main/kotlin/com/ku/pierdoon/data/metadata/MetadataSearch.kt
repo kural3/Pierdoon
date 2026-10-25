@@ -34,7 +34,8 @@ data class MetadataCandidate(
  * 1000 px covers) and MusicBrainz with Cover Art Archive (precise for official releases).
  * Both are asked at once; one failing doesn't spoil the other's results.
  *
- * Only ever runs when the user taps "search": nothing here is automatic.
+ * Runs when the user taps "search", and for [coverUrl] only while the Discord status the user
+ * switched on needs a picture.
  */
 object MetadataSearch {
 
@@ -71,6 +72,23 @@ object MetadataSearch {
     suspend fun download(url: String): ByteArray? = withContext(Dispatchers.IO) {
         runCatching { httpGet(url, accept = "image/*")?.let { it.inputStream.use { s -> s.readBytes() } } }.getOrNull()
     }
+
+    /**
+     * A public link to [title]'s cover, for places that can only show pictures from the web
+     * (the Discord status). Only a confident match: the same title by the same artist. Blocking.
+     */
+    fun coverUrl(title: String, artist: String): String? = runCatching {
+        fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+        val t = norm(title)
+        val a = norm(artist)
+        deezer("$artist $title".trim()).firstOrNull { c ->
+            val ct = norm(c.title)
+            val ca = norm(c.artist)
+            val sameArtist = a.isNotEmpty() && ca.isNotEmpty() && (ca.contains(a) || a.contains(ca))
+            val sameTitle = t.isNotEmpty() && (ct.contains(t) || t.contains(ct))
+            sameTitle && (sameArtist || a.isEmpty())
+        }?.thumbUrl
+    }.getOrNull()
 
     private fun deezer(query: String): List<MetadataCandidate> {
         val body = httpGetText("https://api.deezer.com/search?q=${enc(query)}&limit=$LIMIT") ?: return emptyList()

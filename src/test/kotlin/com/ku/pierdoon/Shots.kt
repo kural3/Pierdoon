@@ -56,6 +56,7 @@ fun main(args: Array<String>) {
             // Silent: a click that starts a track must not play through the speakers.
             SettingsStore.update { it.copy(muted = true) }
             val vm = MainViewModel()
+            com.ku.pierdoon.remote.RemoteServer.bind(vm)
             val nav = Navigator(listOf(Route.Home))
             val scene = ImageComposeScene(width, height, Density(1f), coroutineContext = Dispatchers.Main) {
                 val settings by SettingsStore.settings.collectAsState()

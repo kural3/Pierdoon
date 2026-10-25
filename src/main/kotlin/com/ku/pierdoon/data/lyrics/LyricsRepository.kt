@@ -73,7 +73,8 @@ class LyricsRepository {
         if (q.artist.isNotBlank() && q.album.isNotBlank() && durationSec > 0) {
             val url = "$API/get?track_name=${enc(title)}&artist_name=${enc(q.artist)}" +
                 "&album_name=${enc(q.album)}&duration=$durationSec"
-            httpGet(url)?.let { body -> return toLyrics(JSONObject(body)) }
+            // LRCLIB answers an unknown track here with a 503 now and then; the search below still runs.
+            runCatching { httpGet(url) }.getOrNull()?.let { body -> return toLyrics(JSONObject(body)) }
         }
 
         // 2) Fuzzy search, then pick the closest duration, preferring synced results.

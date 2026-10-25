@@ -69,6 +69,10 @@ data class AppSettings(
     val closeToTray: Boolean = true,
     /** Audio output by mixer name; null = the system default. */
     val outputDevice: String? = null,
+    /** The phone app may connect over the local network (see RemoteServer). */
+    val remoteControl: Boolean = false,
+    /** What's playing shows on the user's Discord profile. */
+    val discordPresence: Boolean = false,
 )
 
 /**
@@ -117,6 +121,8 @@ object SettingsStore {
             muted = p.getBoolean(K_MUTED, d.muted),
             closeToTray = p.getBoolean(K_TRAY, d.closeToTray),
             outputDevice = p.getString(K_OUTPUT, null),
+            remoteControl = p.getBoolean(K_REMOTE, d.remoteControl),
+            discordPresence = p.getBoolean(K_DISCORD, d.discordPresence),
         )
     }
 
@@ -167,6 +173,8 @@ object SettingsStore {
             putBoolean(K_MUTED, s.muted)
             putBoolean(K_TRAY, s.closeToTray)
             putString(K_OUTPUT, s.outputDevice)
+            putBoolean(K_REMOTE, s.remoteControl)
+            putBoolean(K_DISCORD, s.discordPresence)
         }
     }
 
@@ -203,4 +211,6 @@ object SettingsStore {
     private const val K_MUTED = "muted"
     private const val K_TRAY = "close_to_tray"
     private const val K_OUTPUT = "output_device"
+    private const val K_REMOTE = "remote_control"
+    private const val K_DISCORD = "discord_presence"
 }

@@ -170,6 +170,27 @@ class MainViewModel {
     ) { id, _ -> id?.let(lyricsOffsets::get) ?: 0L }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0L)
 
+    /** Lyrics of any track, not only the one on screen; for the phone. Null if unknown or failed. */
+    suspend fun lyricsFor(songId: Long): Lyrics? {
+        lyricsRepository.peek(songId)?.let { return it }
+        val song = songsById[songId] ?: return null
+        return try {
+            lyricsRepository.get(
+                LyricsQuery(song.id, song.title, song.artist, song.album, song.durationMs),
+                allowNetwork = networkAllowed(),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun lyricsOffsetFor(songId: Long): Long = lyricsOffsets.get(songId)
+
+    /** Changes whenever any track's lyrics offset does. */
+    val lyricsOffsetsVersion: StateFlow<Int> get() = lyricsOffsets.version
+
     fun shiftLyrics(deltaMs: Long) {
         _player.value.nowPlaying?.let { lyricsOffsets.shift(it.songId, deltaMs) }
     }
