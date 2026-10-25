@@ -1,4 +1,4 @@
-# Pier.doon
+<p align="center"><img src="docs/banner.svg" alt="Pier.doon, an offline music player for Android" width="100%"></p>
 
 A small offline music player for Android. Jetpack Compose + Material 3 Expressive.
 
