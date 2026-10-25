@@ -61,20 +61,7 @@ object TagWriter {
             resolver.openInputStream(song.uri)?.use { input -> temp.outputStream().use { input.copyTo(it) } }
                 ?: return@withContext false
 
-            val audio = AudioFileIO.read(temp)
-            val tag = audio.tagOrCreateAndSetDefault
-            tag.setField(FieldKey.TITLE, title)
-            tag.setField(FieldKey.ARTIST, artist)
-            tag.setField(FieldKey.ALBUM, album)
-            if (cover != null || removeCover) tag.deleteArtworkField()
-            if (cover != null) {
-                tag.setField(ArtworkFactory.getNew().apply {
-                    binaryData = cover
-                    mimeType = "image/jpeg"
-                    pictureType = FRONT_COVER
-                })
-            }
-            audio.commit()
+            tagFile(temp, title, artist, album, cover, removeCover)
 
             // "wt" truncates: the file becomes exactly the edited copy.
             resolver.openOutputStream(song.uri, "wt")?.use { out -> temp.inputStream().use { it.copyTo(out) } }
@@ -87,6 +74,36 @@ object TagWriter {
         } finally {
             work.listFiles()?.forEach { it.delete() }
         }
+    }
+
+    /** Sets the tags of a private [file] in place; jaudiotagger picks the format by its extension. */
+    fun tagFile(
+        file: File,
+        title: String,
+        artist: String,
+        album: String,
+        cover: ByteArray?,
+        removeCover: Boolean = false,
+    ) {
+        if (file.extension.equals("opus", ignoreCase = true)) {
+            OpusTags.write(file, title, artist, album, cover, removeCover)
+            return
+        }
+        val audio = AudioFileIO.read(file)
+        val tag = audio.tagOrCreateAndSetDefault
+        tag.setField(FieldKey.TITLE, title)
+        tag.setField(FieldKey.ARTIST, artist)
+        // jaudiotagger refuses empty values.
+        if (album.isBlank()) tag.deleteField(FieldKey.ALBUM) else tag.setField(FieldKey.ALBUM, album)
+        if (cover != null || removeCover) tag.deleteArtworkField()
+        if (cover != null) {
+            tag.setField(ArtworkFactory.getNew().apply {
+                binaryData = cover
+                mimeType = "image/jpeg"
+                pictureType = FRONT_COVER
+            })
+        }
+        audio.commit()
     }
 
     /** Lets MediaStore re-read the tags (and regenerate the thumbnail) right away. */

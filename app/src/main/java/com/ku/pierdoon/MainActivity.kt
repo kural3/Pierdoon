@@ -1,5 +1,6 @@
 package com.ku.pierdoon
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -10,6 +11,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ku.pierdoon.data.CoverStore
+import com.ku.pierdoon.data.download.DownloadService
+import com.ku.pierdoon.data.download.Downloader
+import com.ku.pierdoon.data.download.findUrl
 import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.UserLibrary
@@ -24,6 +28,9 @@ class MainActivity : ComponentActivity() {
         SettingsStore.init(this)
         CoverStore.init(this)
         Updater.init(this)
+        Downloader.init(this)
+        // Not again after rotation: the link was already taken.
+        if (savedInstanceState == null) handleIntent(intent)
         enableEdgeToEdge()
         setContent {
             val settings by SettingsStore.settings.collectAsStateWithLifecycle()
@@ -41,6 +48,23 @@ class MainActivity : ComponentActivity() {
             }
         }
         installFrameRateBooster(findViewById(android.R.id.content))
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    /** "Share → Pier.doon" downloads the link; the downloads notification opens their page. */
+    private fun handleIntent(intent: Intent?) {
+        when (intent?.action) {
+            Intent.ACTION_SEND -> {
+                val url = intent.getStringExtra(Intent.EXTRA_TEXT)?.let(::findUrl) ?: return
+                Downloader.enqueue(url, SettingsStore.settings.value.downloadFormat)
+                Downloader.openRequest.value = true
+            }
+            DownloadService.ACTION_OPEN_DOWNLOADS -> Downloader.openRequest.value = true
+        }
     }
 
     // Backgrounded apps can be killed at any time: don't leave edits waiting on a timer.

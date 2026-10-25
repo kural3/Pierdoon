@@ -25,6 +25,12 @@ android {
         versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // yt-dlp brings its own Python, ~15 MB per ABI; all four made a 68 MB APK.
+        // Every phone of the last years is arm64, so that's the only one included.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     signingConfigs {
@@ -64,6 +70,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    // youtubedl-android runs Python and QuickJS as executables from the native library folder,
+    // so they have to be extracted on install.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
     buildFeatures {
         compose = true
         // VERSION_NAME for the User-Agent and the updater.
@@ -93,6 +106,8 @@ dependencies {
     implementation(libs.androidx.media3.session)
     // Writing tags into audio files ("save to file" when editing a track).
     implementation(libs.jaudiotagger)
+    // Track downloads: yt-dlp with its Python runtime. No ffmpeg (35 MB): audio is saved as the site serves it.
+    implementation(libs.youtubedl)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

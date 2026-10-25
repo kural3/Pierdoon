@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.Immutable
 import androidx.core.content.edit
+import com.ku.pierdoon.data.download.DownloadFormat
 import com.ku.pierdoon.data.metadata.SaveTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,7 @@ data class AppSettings(
     val editTarget: SaveTarget = SaveTarget.App,
     /** Look for a new release on GitHub now and then (at most twice a day). */
     val checkUpdates: Boolean = true,
+    val downloadFormat: DownloadFormat = DownloadFormat.M4a,
 )
 
 /**
@@ -78,6 +80,8 @@ object SettingsStore {
             editTarget = runCatching { SaveTarget.valueOf(p.getString(K_EDIT_TARGET, d.editTarget.name)!!) }
                 .getOrDefault(d.editTarget),
             checkUpdates = p.getBoolean(K_UPDATES, d.checkUpdates),
+            downloadFormat = runCatching { DownloadFormat.valueOf(p.getString(K_DOWNLOAD_FORMAT, d.downloadFormat.name)!!) }
+                .getOrDefault(d.downloadFormat),
         )
     }
 
@@ -101,6 +105,7 @@ object SettingsStore {
             putBoolean(K_OFFLOAD, s.audioOffload)
             putString(K_EDIT_TARGET, s.editTarget.name)
             putBoolean(K_UPDATES, s.checkUpdates)
+            putString(K_DOWNLOAD_FORMAT, s.downloadFormat.name)
         }
     }
 
@@ -120,4 +125,5 @@ object SettingsStore {
     private const val K_OFFLOAD = "audio_offload"
     private const val K_EDIT_TARGET = "edit_target"
     private const val K_UPDATES = "check_updates"
+    private const val K_DOWNLOAD_FORMAT = "download_format"
 }

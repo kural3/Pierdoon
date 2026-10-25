@@ -16,6 +16,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Color
+import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -71,6 +74,16 @@ fun LibraryScreen(
             0 -> stringResource(R.string.tracks_count, songs.size)
             1 -> stringResource(R.string.albums_count, collections.albums.size)
             else -> stringResource(R.string.artists_count, collections.artists.size)
+        },
+        actions = {
+            ExpressiveIconButton(
+                onClick = { onOpen(Route.Downloads) },
+                icon = PlayerIcons.Download,
+                contentDescription = stringResource(R.string.downloads),
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(end = 4.dp).size(48.dp),
+            )
         },
         belowTitle = {
             ConnectedChoice(

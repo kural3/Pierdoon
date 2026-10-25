@@ -119,6 +119,8 @@ import com.ku.pierdoon.ui.library.PlaylistActionsSheet
 import com.ku.pierdoon.ui.library.PlaylistCover
 import com.ku.pierdoon.ui.library.PlaylistCoverSheet
 import com.ku.pierdoon.ui.edit.EditSongScreen
+import com.ku.pierdoon.ui.download.DownloadScreen
+import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.ui.update.UpdateDialog
 import com.ku.pierdoon.ui.library.PlaylistNameDialog
 import com.ku.pierdoon.ui.library.PlaylistsScreen
@@ -214,6 +216,16 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     // The open player's wave animates endlessly: leave those frames at the system default rate.
     HighFrameRate.suppressed = covered && player.isPlaying && settings.wavyProgress
 
+
+    // A link shared into the app (or the downloads notification) opens the downloads page.
+    val openDownloads by Downloader.openRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(openDownloads) {
+        if (openDownloads) {
+            Downloader.openRequest.value = false
+            expanded = false
+            nav.push(Route.Downloads)
+        }
+    }
 
     var songAction by remember { mutableStateOf<SongActionTarget?>(null) }
     var playlistAction by remember { mutableStateOf<Playlist?>(null) }
@@ -490,6 +502,11 @@ private fun Screens(
                     onShuffleAll = vm::shuffleAll,
                     onSongLongPress = { onSongLongPress(it, null) },
                     onOpen = nav::push,
+                    bottomInset = bottomInset,
+                )
+                Route.Downloads -> DownloadScreen(
+                    onBack = { nav.pop() },
+                    onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
                     bottomInset = bottomInset,
                 )
                 Route.Settings -> {
