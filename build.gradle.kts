@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.ku.pierdoon"
-version = "1.0.0"
+version = "1.0.2"
 
 // FFmpeg (decoding every format, remuxing downloads) is pulled in for Windows x64 only:
 // the -platform artifacts would bring every OS and CPU along, some 300 MB.
@@ -55,7 +55,8 @@ compose.desktop {
             packageVersion = project.version.toString()
             description = "Offline music player"
             vendor = "kural3"
-            modules("java.instrument", "java.management", "jdk.unsupported", "java.logging", "java.naming")
+            // jdk.accessibility: Compose talks to Windows accessibility through it; jdk.charsets: legacy tag encodings.
+            modules("java.instrument", "java.management", "jdk.unsupported", "java.logging", "java.naming", "jdk.accessibility", "jdk.charsets")
             windows {
                 menu = true
                 shortcut = true
@@ -74,6 +75,20 @@ compose.desktop {
 
 tasks.test {
     useJUnit()
+}
+
+// Renders the app off screen and saves screenshots, driven by a script of steps (see Shots.kt).
+// ./gradlew shots -PshotsScript=<file> -PshotsHome=<copy of the app data> -PshotsOut=<folder>
+tasks.register<JavaExec>("shots") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.ku.pierdoon.ShotsKt")
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
+    jvmArgs(
+        "-Dpierdoon.shots=1",
+        "-Dpierdoon.home=${findProperty("shotsHome") ?: layout.buildDirectory.dir("shots/home").get().asFile}",
+        "-Dfile.encoding=UTF-8", "-Xss4m", "--enable-native-access=ALL-UNNAMED",
+    )
+    args(findProperty("shotsScript") ?: "shots.txt", findProperty("shotsOut") ?: layout.buildDirectory.dir("shots").get().asFile)
 }
 
 // BuildConfig.VERSION_NAME for the User-Agent and the updater, as on Android.

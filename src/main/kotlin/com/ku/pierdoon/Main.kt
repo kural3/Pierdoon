@@ -1,5 +1,11 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.platform.ErrorLog
+import androidx.compose.ui.window.DefaultWindowExceptionHandlerFactory
+import androidx.compose.ui.window.WindowExceptionHandler
+import androidx.compose.ui.window.WindowExceptionHandlerFactory
+import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,6 +66,7 @@ import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalComposeUiApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun main(args: Array<String>) {
+    ErrorLog.install()
     // Only one Pier.doon at a time: a second launch hands its arguments over and quits.
     if (!SingleInstance.claim(args)) exitProcess(0)
 
@@ -74,68 +81,79 @@ fun main(args: Array<String>) {
     Updater.onQuitForUpdate = { quit(vm) }
 
     application(exitProcessOnExit = false) {
-        val settings by SettingsStore.settings.collectAsState()
-        var visible by remember { mutableStateOf(true) }
-        SingleInstance.onActivate = { visible = true; SingleInstance.bringToFront() }
-        val state = rememberWindowState(
-            size = DpSize(windowPrefs.getFloat("w", 1280f).dp, windowPrefs.getFloat("h", 820f).dp),
-            position = windowPrefs.getFloat("x", Float.NaN).takeUnless { it.isNaN() }
-                ?.let { x -> WindowPosition(x.dp, windowPrefs.getFloat("y", 0f).dp) }
-                ?: WindowPosition.PlatformDefault,
-            placement = if (windowPrefs.getBoolean("maximized", false)) WindowPlacement.Maximized else WindowPlacement.Floating,
-        )
-        val nav = remember { Navigator(listOf(Route.Home)) }
-        val icon = painterResource(Res.drawable.pierdoon)
-
-        Tray(
-            icon = icon,
-            tooltip = stringResource(Res.string.app_name),
-            onAction = { visible = true; SingleInstance.bringToFront() },
-            menu = {
-                Item(stringResource(Res.string.tray_show), onClick = { visible = true; SingleInstance.bringToFront() })
-                Separator()
-                Item(stringResource(Res.string.tray_quit), onClick = { quit(vm) })
+        // A crash inside the UI is written down before Compose shows its error dialog.
+        CompositionLocalProvider(
+            LocalWindowExceptionHandlerFactory provides WindowExceptionHandlerFactory { window ->
+                val shown = DefaultWindowExceptionHandlerFactory.exceptionHandler(window)
+                WindowExceptionHandler { e ->
+                    ErrorLog.record("UI", e)
+                    shown.onException(e)
+                }
             },
-        )
-
-        Window(
-            onCloseRequest = {
-                saveWindow(windowPrefs, state)
-                if (settings.closeToTray) visible = false else quit(vm)
-            },
-            visible = visible,
-            state = state,
-            title = stringResource(Res.string.app_name),
-            icon = icon,
-            onPreviewKeyEvent = { e -> e.type == KeyEventType.KeyDown && globalShortcut(e, vm, nav) },
-            onKeyEvent = { e -> e.type == KeyEventType.KeyDown && unhandledShortcut(e, vm) },
         ) {
-            LaunchedEffect(Unit) {
-                window.minimumSize = java.awt.Dimension(720, 560)
-                Files.owner = window
-                SingleInstance.window = window
-                window.addWindowFocusListener(object : java.awt.event.WindowAdapter() {
-                    override fun windowGainedFocus(e: java.awt.event.WindowEvent?) {
-                        SystemAccent.refresh()
-                        vm.onWindowFocused()
-                    }
-                })
-            }
-            PierdoonTheme(settings) {
-                val dark = settings.isDarkTheme()
-                LaunchedEffect(dark) { DarkTitleBar.apply(window, dark) }
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .onPointerEvent(PointerEventType.Press) { ev ->
-                            if (ev.button == PointerButton.Back) BackDispatcher.dispatch()
+            val settings by SettingsStore.settings.collectAsState()
+            var visible by remember { mutableStateOf(true) }
+            SingleInstance.onActivate = { visible = true; SingleInstance.bringToFront() }
+            val state = rememberWindowState(
+                size = DpSize(windowPrefs.getFloat("w", 1280f).dp, windowPrefs.getFloat("h", 820f).dp),
+                position = windowPrefs.getFloat("x", Float.NaN).takeUnless { it.isNaN() }
+                    ?.let { x -> WindowPosition(x.dp, windowPrefs.getFloat("y", 0f).dp) }
+                    ?: WindowPosition.PlatformDefault,
+                placement = if (windowPrefs.getBoolean("maximized", false)) WindowPlacement.Maximized else WindowPlacement.Floating,
+            )
+            val nav = remember { Navigator(listOf(Route.Home)) }
+            val icon = painterResource(Res.drawable.pierdoon)
+
+            Tray(
+                icon = icon,
+                tooltip = stringResource(Res.string.app_name),
+                onAction = { visible = true; SingleInstance.bringToFront() },
+                menu = {
+                    Item(stringResource(Res.string.tray_show), onClick = { visible = true; SingleInstance.bringToFront() })
+                    Separator()
+                    Item(stringResource(Res.string.tray_quit), onClick = { quit(vm) })
+                },
+            )
+
+            Window(
+                onCloseRequest = {
+                    saveWindow(windowPrefs, state)
+                    if (settings.closeToTray) visible = false else quit(vm)
+                },
+                visible = visible,
+                state = state,
+                title = stringResource(Res.string.app_name),
+                icon = icon,
+                onPreviewKeyEvent = { e -> e.type == KeyEventType.KeyDown && globalShortcut(e, vm, nav) },
+                onKeyEvent = { e -> e.type == KeyEventType.KeyDown && unhandledShortcut(e, vm) },
+            ) {
+                LaunchedEffect(Unit) {
+                    window.minimumSize = java.awt.Dimension(720, 560)
+                    Files.owner = window
+                    SingleInstance.window = window
+                    window.addWindowFocusListener(object : java.awt.event.WindowAdapter() {
+                        override fun windowGainedFocus(e: java.awt.event.WindowEvent?) {
+                            SystemAccent.refresh()
+                            vm.onWindowFocused()
                         }
-                        .dragAndDropTarget(
-                            shouldStartDragAndDrop = { true },
-                            target = remember { LinkDropTarget() },
-                        ),
-                ) {
-                    PierdoonApp(vm, nav)
+                    })
+                }
+                PierdoonTheme(settings) {
+                    val dark = settings.isDarkTheme()
+                    LaunchedEffect(dark) { DarkTitleBar.apply(window, dark) }
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .onPointerEvent(PointerEventType.Press) { ev ->
+                                if (ev.button == PointerButton.Back) BackDispatcher.dispatch()
+                            }
+                            .dragAndDropTarget(
+                                shouldStartDragAndDrop = { true },
+                                target = remember { LinkDropTarget() },
+                            ),
+                    ) {
+                        PierdoonApp(vm, nav)
+                    }
                 }
             }
         }

@@ -19,6 +19,11 @@ enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono }
 
 const val DEFAULT_SEED: Int = 0xFF6750A4.toInt()
 
+/** Narrowest navigation rail: a column of icons. */
+const val NAV_MIN_WIDTH = 88f
+/** Widest: the pills just fit the longest label. */
+const val NAV_MAX_WIDTH = 232f
+
 @Immutable
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.System,
@@ -30,8 +35,8 @@ data class AppSettings(
     val haptics: Boolean = false,
     val smoothAnimations: Boolean = true,
     val glass: Boolean = true,
-    /** Navigation rail with icons only instead of icons and labels. */
-    val floatingNav: Boolean = false,
+    /** Width of the navigation rail in dp, dragged by its edge: [NAV_MIN_WIDTH] shows icons only. */
+    val navWidth: Float = NAV_MAX_WIDTH,
     val wavyProgress: Boolean = true,
     /** Nothing-style look: monochrome with a red accent, dot-matrix headings, dotted progress. */
     val nothingStyle: Boolean = false,
@@ -82,7 +87,7 @@ object SettingsStore {
             haptics = p.getBoolean(K_HAPTICS, d.haptics),
             smoothAnimations = p.getBoolean(K_SMOOTH, d.smoothAnimations),
             glass = p.getBoolean(K_GLASS, d.glass),
-            floatingNav = p.getBoolean(K_FLOATING_NAV, d.floatingNav),
+            navWidth = p.getFloat(K_NAV_WIDTH, d.navWidth).coerceIn(NAV_MIN_WIDTH, NAV_MAX_WIDTH),
             wavyProgress = p.getBoolean(K_WAVY, d.wavyProgress),
             nothingStyle = p.getBoolean(K_NOTHING, d.nothingStyle),
             font = enumOr(p.getString(K_FONT, null), d.font),
@@ -116,7 +121,7 @@ object SettingsStore {
             putBoolean(K_HAPTICS, s.haptics)
             putBoolean(K_SMOOTH, s.smoothAnimations)
             putBoolean(K_GLASS, s.glass)
-            putBoolean(K_FLOATING_NAV, s.floatingNav)
+            putFloat(K_NAV_WIDTH, s.navWidth)
             putBoolean(K_WAVY, s.wavyProgress)
             putBoolean(K_NOTHING, s.nothingStyle)
             putString(K_FONT, s.font.name)
@@ -150,7 +155,7 @@ object SettingsStore {
     private const val K_HAPTICS = "haptics"
     private const val K_SMOOTH = "smooth_animations"
     private const val K_GLASS = "glass"
-    private const val K_FLOATING_NAV = "floating_nav"
+    private const val K_NAV_WIDTH = "nav_width"
     private const val K_WAVY = "wavy_progress"
     private const val K_NOTHING = "nothing_style"
     private const val K_FONT = "font"

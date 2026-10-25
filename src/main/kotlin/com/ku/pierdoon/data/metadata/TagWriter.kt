@@ -1,5 +1,6 @@
 package com.ku.pierdoon.data.metadata
 
+import com.ku.pierdoon.platform.MediaProbe
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.platform.AppDirs
 import kotlinx.coroutines.Dispatchers
@@ -10,8 +11,6 @@ import org.jaudiotagger.tag.images.ArtworkFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.util.logging.Level
-import java.util.logging.Logger
 
 /**
  * Writes title, artist, album and cover into the audio file itself.
@@ -20,14 +19,12 @@ import java.util.logging.Logger
  * so a writer that gives up half-way never damages the user's file.
  */
 object TagWriter {
+    init {
+        MediaProbe.quietTags // jaudiotagger's chatter off, as for reading.
+    }
 
     /** Containers jaudiotagger can write tags into. Raw .aac (ADTS) has no tag format at all. */
     private val WRITABLE = setOf("mp3", "m4a", "m4b", "mp4", "flac", "ogg", "opus", "wav", "aif", "aiff", "wma", "dsf")
-
-    init {
-        // It logs every frame it parses at INFO.
-        Logger.getLogger("org.jaudiotagger").level = Level.OFF
-    }
 
     fun canWrite(fileName: String?): Boolean =
         fileName?.substringAfterLast('.', "")?.lowercase() in WRITABLE

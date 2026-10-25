@@ -53,7 +53,7 @@
     <string name="settings_glass">Матовое стекло</string>
     <string name="settings_glass_desc">Размытие под плеером и панелями</string>
     <string name="settings_floating_nav">Компактная боковая панель</string>
-    <string name="settings_floating_nav_desc">Только значки, без подписей</string>
+    <string name="settings_floating_nav_desc">Только значки, без подписей. Ширину можно менять, потянув за край панели</string>
     <string name="settings_appearance_summary">Тема, шрифт, цвета, стиль Nothing</string>
     <string name="settings_feedback_summary">Плавность анимаций</string>
     <string name="settings_playback_summary">Устройство вывода, пропуск тишины</string>

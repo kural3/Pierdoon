@@ -11,11 +11,17 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -55,6 +62,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -68,6 +78,8 @@ import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.LibraryState
 import com.ku.pierdoon.MainViewModel
 import com.ku.pierdoon.data.ColorSource
+import com.ku.pierdoon.data.NAV_MAX_WIDTH
+import com.ku.pierdoon.data.NAV_MIN_WIDTH
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.SettingsStore
@@ -90,6 +102,7 @@ import com.ku.pierdoon.ui.desktop.BackHandler
 import com.ku.pierdoon.ui.desktop.Files
 import com.ku.pierdoon.ui.desktop.Toast
 import com.ku.pierdoon.ui.desktop.ToastHost
+import com.ku.pierdoon.ui.desktop.trackPointer
 import com.ku.pierdoon.ui.download.DownloadScreen
 import com.ku.pierdoon.ui.edit.EditSongScreen
 import com.ku.pierdoon.ui.library.BulkActionsSheet
@@ -114,6 +127,14 @@ import com.ku.pierdoon.ui.navigation.NavDirection
 import com.ku.pierdoon.ui.navigation.Navigator
 import com.ku.pierdoon.ui.navigation.Route
 import com.ku.pierdoon.ui.navigation.pageTransition
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import com.ku.pierdoon.ui.player.rememberExpandingPlayerState
+import com.ku.pierdoon.ui.player.expandingPlayerDrag
+import com.ku.pierdoon.ui.player.MINI_HANDOFF
+import com.ku.pierdoon.ui.player.ExpandingPlayerSheet
+import com.ku.pierdoon.ui.player.ExpandingPlayerEffect
 import com.ku.pierdoon.ui.player.LyricsPanel
 import com.ku.pierdoon.ui.player.NowPlayingScreen
 import com.ku.pierdoon.ui.player.PlayerBar
@@ -171,6 +192,11 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     }
 
     var expanded by rememberSaveable { mutableStateOf(false) }
+    // The open player grows out of the bar and shrinks back into it, as on the phone; the bar can
+    // also be dragged up (and the player down) with the mouse.
+    val sheet = rememberExpandingPlayerState()
+    ExpandingPlayerEffect(sheet, expanded && nowPlaying != null)
+    val covered by remember { derivedStateOf { sheet.progress.value >= 1f && !sheet.isMoving } }
     var sidePanel by rememberSaveable { mutableStateOf<SidePanel?>(null) }
     // Lyrics are fetched only while actually on screen: the side panel, or the open player's.
     val lyricsOnScreen = (sidePanel == SidePanel.Lyrics && !expanded) || (expanded && sidePanel != SidePanel.Queue)
@@ -206,15 +232,20 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val noFolders = settings.musicFolders.none { File(it).isDirectory }
     val chooseFolder = stringResource(Res.string.choose_folder)
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).trackPointer()) {
         Box(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = if (expanded) 0f else 1f }
+                .graphicsLayer { alpha = if (covered) 0f else 1f }
                 .backdropSource(backdrop)
         ) {
             Row(Modifier.fillMaxSize()) {
-                NavRail(nav = nav, compact = settings.floatingNav)
+                NavRail(
+                    nav = nav,
+                    width = settings.navWidth,
+                    onResize = { w -> SettingsStore.update { it.copy(navWidth = w) } },
+                    bottomInset = bottomInset,
+                )
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     when {
                         noFolders && (library as? LibraryState.Ready)?.songs.isNullOrEmpty() -> PermissionScreen(
@@ -277,7 +308,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
 
         if (ready) {
             AnimatedVisibility(
-                visible = player.nowPlaying != null && !expanded,
+                visible = player.nowPlaying != null,
                 enter = slideInVertically(spatialOffset) { it } + fadeIn(effects),
                 exit = slideOutVertically(spatialOffset) { it } + fadeOut(effects),
                 modifier = Modifier
@@ -309,17 +340,18 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                         onToggleMute = vm::toggleMute,
                         onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
                         onExpand = { expanded = true },
-                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                        modifier = Modifier
+                            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                            .onGloballyPositioned { sheet.onMiniBounds(it.boundsInRoot()) }
+                            // Hands over to the growing player in the first quarter of the way.
+                            .graphicsLayer { alpha = (1f - sheet.progress.value / MINI_HANDOFF).coerceIn(0f, 1f) }
+                            .expandingPlayerDrag(sheet, expanded) { expanded = it },
                     )
                 }
             }
         }
 
-        AnimatedVisibility(
-            visible = expanded && nowPlaying != null,
-            enter = fadeIn(effects) + scaleIn(MaterialTheme.motionScheme.defaultSpatialSpec(), initialScale = 0.96f),
-            exit = fadeOut(effects) + scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec(), targetScale = 0.96f),
-        ) {
+        ExpandingPlayerSheet(sheet) { contentModifier ->
             nowPlaying?.let { np ->
                 NowPlayingScreen(
                     nowPlaying = np,
@@ -356,6 +388,8 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                         nav.push(Route.ArtistDetail(name))
                     },
                     onCollapse = { expanded = false },
+                    modifier = contentModifier,
+                    dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
                 )
             }
         }
@@ -587,14 +621,14 @@ private fun Screens(
                     songs = songs,
                     collections = collections,
                     currentSongId = currentSongId,
-                    onBack = { nav.pop() },
+                    onBack = null,
                     onPlay = onPlay,
                     onSongLongPress = { onSongLongPress(it, null) },
                     onOpen = nav::push,
                     bottomInset = bottomInset,
                 )
                 Route.Downloads -> DownloadScreen(
-                    onBack = { nav.pop() },
+                    onBack = null,
                     onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
                     bottomInset = bottomInset,
                 )
@@ -753,37 +787,100 @@ private fun Screens(
 }
 
 /**
- * The phone's tab bar turned on its side: a column of pills, the selected one filled. With
- * "compact" set it shows icons only.
+ * The phone's tab bar turned on its side: a column of pills, the selected one filled. Its right
+ * edge drags it between a column of icons ([NAV_MIN_WIDTH]) and pills that just fit their labels
+ * ([NAV_MAX_WIDTH]); a double click on the edge jumps between the two.
  */
 @Composable
-private fun NavRail(nav: Navigator, compact: Boolean) {
+private fun NavRail(nav: Navigator, width: Float, onResize: (Float) -> Unit, bottomInset: Dp) {
     val colors = MaterialTheme.colorScheme
-    Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier
-            .fillMaxHeight()
-            .width(if (compact) 88.dp else 220.dp)
-            .padding(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 20.dp)) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(14.dp)).background(colors.primaryContainer),
+    val density = LocalDensity.current
+    val currentWidth by rememberUpdatedState(width)
+    val resize by rememberUpdatedState(onResize)
+    var dragged by remember { mutableStateOf<Float?>(null) }
+    val shown by animateDpAsState(
+        targetValue = (dragged ?: width).dp,
+        animationSpec = if (dragged != null) snap() else MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "railWidth",
+    )
+    val compact = shown < NAV_LABEL_WIDTH
+    val handle = remember { MutableInteractionSource() }
+    val hovered by handle.collectIsHoveredAsState()
+    val edge by animateColorAsState(
+        if (hovered || dragged != null) colors.outlineVariant else Color.Transparent,
+        MaterialTheme.motionScheme.defaultEffectsSpec(),
+        label = "railEdge",
+    )
+
+    Box(Modifier.fillMaxHeight().width(shown)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = bottomInset + 12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = if (compact) 0.dp else 12.dp, top = 8.dp, bottom = 20.dp),
             ) {
-                Icon(PlayerIcons.MusicNote, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(14.dp)).background(colors.primaryContainer),
+                ) {
+                    Icon(PlayerIcons.MusicNote, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                }
+                if (!compact) {
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        stringResource(Res.string.app_name),
+                        style = MaterialTheme.typography.titleLargeEmphasized,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                    )
+                }
             }
-            if (!compact) {
-                Spacer(Modifier.width(12.dp))
-                Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.titleLargeEmphasized)
+            Route.tabs.forEach { tab ->
+                RailItem(tab = tab, selected = nav.tab == tab, compact = compact) {
+                    nav.selectTab(tab)
+                }
+                if (tab == Route.Search) Spacer(Modifier.height(8.dp))
+                if (tab == Route.Downloads) Spacer(Modifier.weight(1f))
             }
         }
-        Route.tabs.forEach { tab ->
-            RailItem(tab = tab, selected = nav.tab == tab, compact = compact) {
-                nav.selectTab(tab)
-            }
-            if (tab == Route.Search) Spacer(Modifier.height(8.dp))
-            if (tab == Route.Downloads) Spacer(Modifier.weight(1f))
+        // The grab strip along the right edge; a thin line shows while it's hovered or dragged.
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .padding(bottom = bottomInset)
+                .width(10.dp)
+                .hoverable(handle)
+                .pointerHoverIcon(PointerIcon(java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)))
+                .pointerInput(Unit) {
+                    detectTapGestures(onDoubleTap = {
+                        resize(if (currentWidth > NAV_MIN_WIDTH) NAV_MIN_WIDTH else NAV_MAX_WIDTH)
+                    })
+                }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragged = shown.value },
+                        onDragEnd = {
+                            val w = dragged ?: return@detectHorizontalDragGestures
+                            // A rail too narrow for its labels collapses to the icons.
+                            resize(if (w < NAV_LABEL_WIDTH.value) NAV_MIN_WIDTH else w)
+                            dragged = null
+                        },
+                        onDragCancel = { dragged = null },
+                    ) { change, dx ->
+                        change.consume()
+                        dragged = ((dragged ?: shown.value) + dx / density.density).coerceIn(NAV_MIN_WIDTH, NAV_MAX_WIDTH)
+                    }
+                },
+        ) {
+            Box(Modifier.width(2.dp).fillMaxHeight(0.3f).clip(CircleShape).background(edge))
         }
     }
 }
@@ -802,9 +899,10 @@ private fun RailItem(tab: Route.Tab, selected: Boolean, compact: Boolean, onClic
     val label = stringResource(tab.label())
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        // Icons only: a round button rather than a squashed pill.
+        horizontalArrangement = if (compact) Arrangement.Center else Arrangement.Start,
         modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp)
+            .then(if (compact) Modifier.size(56.dp) else Modifier.fillMaxWidth().height(52.dp))
             .scaleBy(scale)
             .clip(RoundedCornerShape(50))
             .background(container)
@@ -813,7 +911,7 @@ private fun RailItem(tab: Route.Tab, selected: Boolean, compact: Boolean, onClic
                 onClick()
             }
             .semantics { this.selected = selected }
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = if (compact) 0.dp else 16.dp),
     ) {
         Icon(tab.icon(), contentDescription = if (compact) label else null, tint = content, modifier = Modifier.size(24.dp))
         if (!compact) {
@@ -830,6 +928,8 @@ private fun RailItem(tab: Route.Tab, selected: Boolean, compact: Boolean, onClic
 }
 
 private val SIDE_PANEL_WIDTH = 380.dp
+/** Narrower than this the rail hides its labels. */
+private val NAV_LABEL_WIDTH = 160.dp
 
 private fun Route.Tab.icon() = when (this) {
     Route.Home -> PlayerIcons.Home

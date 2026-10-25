@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.settings
 
+import com.ku.pierdoon.ui.library.CONTENT_MAX_WIDTH
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxHeight
 import com.ku.pierdoon.BuildConfig
 import com.ku.pierdoon.playback.AudioEngine
 import com.ku.pierdoon.ui.desktop.Files
@@ -53,6 +56,8 @@ import com.ku.pierdoon.resources.*
 import com.ku.pierdoon.data.AppFont
 import com.ku.pierdoon.data.AppSettings
 import com.ku.pierdoon.data.ColorSource
+import com.ku.pierdoon.data.NAV_MAX_WIDTH
+import com.ku.pierdoon.data.NAV_MIN_WIDTH
 import com.ku.pierdoon.data.ThemeMode
 import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.ui.components.ConnectedChoice
@@ -123,7 +128,8 @@ fun SettingsScreen(
                 top = inner.calculateTopPadding(),
                 bottom = listBottomPadding(bottomInset),
             ),
-            modifier = Modifier.fillMaxSize(),
+            // A readable width on a wide window, lined up under the title.
+            modifier = Modifier.fillMaxHeight().widthIn(max = CONTENT_MAX_WIDTH),
         ) {
             when (section) {
                 null -> sectionList(onOpen, trackCount, updateStatus, version)
@@ -292,8 +298,8 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         shape = shape,
                         title = stringResource(Res.string.settings_floating_nav),
                         subtitle = stringResource(Res.string.settings_floating_nav_desc),
-                        checked = settings.floatingNav,
-                        onChange = { v -> onUpdate { it.copy(floatingNav = v) } },
+                        checked = settings.navWidth <= NAV_MIN_WIDTH,
+                        onChange = { v -> onUpdate { it.copy(navWidth = if (v) NAV_MIN_WIDTH else NAV_MAX_WIDTH) } },
                     )
                 }
                 if (!settings.nothingStyle) add { shape ->

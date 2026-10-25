@@ -26,8 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.ripple
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -38,7 +36,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -116,7 +113,7 @@ fun HomeScreen(
 
         if (recent.isNotEmpty()) {
             item(key = "recentTitle") { SectionTitle(stringResource(Res.string.recently_played)) }
-            item(key = "recent") { RecentCarousel(recent, onPlay) }
+            item(key = "recent") { RecentRow(recent, onPlay) }
         }
         if (collections.recentlyAdded.isNotEmpty()) {
             item(key = "addedTitle") { SectionTitle(stringResource(Res.string.recently_added)) }
@@ -231,55 +228,47 @@ private fun QuickCard(
     }
 }
 
+/**
+ * Big covers of what was played last. A plain row rather than the phone's carousel: the carousel
+ * re-lays its items whenever its width changes, so opening the side panel made them jump.
+ */
 @Composable
-private fun RecentCarousel(songs: List<Song>, onPlay: (List<Song>, Int) -> Unit) {
+private fun RecentRow(songs: List<Song>, onPlay: (List<Song>, Int) -> Unit) {
     val haptics = LocalHapticFeedback.current
-    val state = rememberCarouselState { songs.size }
-    HorizontalMultiBrowseCarousel(
-        state = state,
-        preferredItemWidth = 200.dp,
-        itemSpacing = 8.dp,
+    LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp),
-    ) { index ->
-        val song = songs[index]
-        Box(
-            Modifier
-                .fillMaxSize()
-                .maskClip(MaterialTheme.shapes.extraLarge)
-                .clickable {
-                    haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
-                    onPlay(songs, index)
-                },
-        ) {
-            Artwork(song.id, song.albumId, Modifier.fillMaxSize(), placeholderIconSize = 48.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        itemsIndexed(songs, key = { _, s -> s.id }) { index, song ->
+            val source = remember { MutableInteractionSource() }
+            val scale = animatePressAsState(source, 0.95f)
             Box(
                 Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))
-                    )
-            )
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .graphicsLayer {
-                        // Follow the visible (masked) part of the item and fade out as it narrows,
-                        // so squeezed items never show clipped, overlapping titles.
-                        val info = carouselItemDrawInfo
-                        translationX = info.maskRect.left
-                        val open = if (info.maxSize > 0f) info.size / info.maxSize else 1f
-                        alpha = ((open - 0.7f) / 0.3f).coerceIn(0f, 1f)
-                    }
-                    .padding(16.dp),
-            )
+                    .size(200.dp)
+                    .scaleBy(scale)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .clickable(interactionSource = source, indication = ripple()) {
+                        haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                        onPlay(songs, index)
+                    },
+            ) {
+                Artwork(song.id, song.albumId, Modifier.fillMaxSize(), placeholderIconSize = 48.dp)
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))
+                        )
+                )
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
+                )
+            }
         }
     }
 }

@@ -11,9 +11,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -34,6 +37,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.PositionSnapshot
 import com.ku.pierdoon.ui.components.rememberSmoothProgress
@@ -72,6 +76,8 @@ fun WavySeekBar(
     isPlaying: Boolean,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    /** One line with the times either side, for the player bar. */
+    compact: Boolean = false,
 ) {
     val haptics = LocalHapticFeedback.current
     var dragFraction by remember { mutableStateOf<Float?>(null) }
@@ -129,18 +135,20 @@ fun WavySeekBar(
     }
 
     val thickness by animateDpAsState(
-        targetValue = if (dragging) 10.dp else 6.dp,
+        targetValue = when {
+            compact -> if (dragging) 8.dp else 4.dp
+            else -> if (dragging) 10.dp else 6.dp
+        },
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "thickness",
     )
     val stroke = with(LocalDensity.current) { Stroke(width = thickness.toPx(), cap = StrokeCap.Round) }
 
-    Column(modifier) {
+    val track: @Composable (Modifier) -> Unit = { m ->
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp)
+            modifier = m
+                .height(if (compact) 28.dp else 40.dp)
                 .onSizeChanged { widthPx = it.width }
                 .pointerInput(durationMs) {
                     detectTapGestures { offset ->
@@ -191,20 +199,37 @@ fun WavySeekBar(
                     amplitude = { if (waveOn) 1f else 0f },
                     stroke = stroke,
                     trackStroke = stroke,
+                    wavelength = if (compact) 28.dp else WavyProgressIndicatorDefaults.LinearDeterminateWavelength,
                     waveSpeed = if (waveMoving) 16.dp else 0.dp,
-                    modifier = Modifier.fillMaxWidth().height(20.dp),
+                    modifier = Modifier.fillMaxWidth().height(if (compact) 14.dp else 20.dp),
                 )
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            // Recomposes once per second, not on every progress step.
-            val shownSeconds by remember(durationMs) {
-                derivedStateOf { (((dragFraction ?: seekTarget ?: playFraction) * durationMs) / 1000).toLong() }
+    }
+    // Recomposes once per second, not on every progress step.
+    val shownSeconds by remember(durationMs) {
+        derivedStateOf { (((dragFraction ?: seekTarget ?: playFraction) * durationMs) / 1000).toLong() }
+    }
+    val style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+
+    if (compact) {
+        // Times either side of the bar, the desktop way: one line instead of three.
+        Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                formatDuration(shownSeconds * 1000), style = style, color = color,
+                textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(44.dp),
+            )
+            track(Modifier.weight(1f).padding(horizontal = 10.dp))
+            Text(formatDuration(durationMs), style = style, color = color, maxLines = 1, modifier = Modifier.width(44.dp))
+        }
+    } else {
+        Column(modifier) {
+            track(Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatDuration(shownSeconds * 1000), style = style, color = color)
+                Text(formatDuration(durationMs), style = style, color = color)
             }
-            val style = MaterialTheme.typography.labelLarge
-            val color = MaterialTheme.colorScheme.onSurfaceVariant
-            Text(formatDuration(shownSeconds * 1000), style = style, color = color)
-            Text(formatDuration(durationMs), style = style, color = color)
         }
     }
 }

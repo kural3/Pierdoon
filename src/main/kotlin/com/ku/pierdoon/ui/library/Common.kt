@@ -69,6 +69,9 @@ private val RowMorph by lazy { Morph(MaterialShapes.Square, MaterialShapes.Cooki
 /** Space reserved below lists for the floating bottom chrome (mini player + nav bar). */
 fun listBottomPadding(bottomInset: Dp, extra: Dp = 16.dp) = bottomInset + extra
 
+/** Forms and settings stop growing here on a wide window; past it the rows only got longer. */
+val CONTENT_MAX_WIDTH = 920.dp
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongRow(
@@ -314,7 +317,7 @@ fun SearchCapsule(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
     }
 }
 
-/** Big cover, title and Play / Shuffle pills for album, artist and playlist screens. */
+/** Cover with the count and Play / Shuffle beside it, for album, artist and playlist screens. */
 @Composable
 fun CollectionHeader(
     cover: @Composable (Modifier) -> Unit,
@@ -323,44 +326,45 @@ fun CollectionHeader(
     onShuffle: () -> Unit,
     enabled: Boolean = true,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        verticalAlignment = Alignment.Bottom,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 16.dp),
     ) {
-        cover(Modifier.size(200.dp))
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(16.dp))
-        if (enabled) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                ExpressiveIconButton(
-                    onClick = onPlay,
-                    icon = PlayerIcons.Play,
-                    contentDescription = stringResource(Res.string.play_all),
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    iconSize = 28.dp,
-                    haptic = HapticFeedbackType.Confirm,
-                    modifier = Modifier.weight(1.4f).height(64.dp),
-                )
-                ExpressiveIconButton(
-                    onClick = onShuffle,
-                    icon = PlayerIcons.Shuffle,
-                    contentDescription = stringResource(Res.string.shuffle_all),
-                    iconSize = 26.dp,
-                    haptic = HapticFeedbackType.Confirm,
-                    modifier = Modifier.weight(1f).height(64.dp),
-                )
+        cover(Modifier.size(184.dp))
+        Spacer(Modifier.width(24.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (enabled) {
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ExpressiveIconButton(
+                        onClick = onPlay,
+                        icon = PlayerIcons.Play,
+                        contentDescription = stringResource(Res.string.play_all),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        iconSize = 28.dp,
+                        haptic = HapticFeedbackType.Confirm,
+                        modifier = Modifier.size(width = 112.dp, height = 56.dp),
+                    )
+                    ExpressiveIconButton(
+                        onClick = onShuffle,
+                        icon = PlayerIcons.Shuffle,
+                        contentDescription = stringResource(Res.string.shuffle_all),
+                        iconSize = 24.dp,
+                        haptic = HapticFeedbackType.Confirm,
+                        modifier = Modifier.size(width = 72.dp, height = 56.dp),
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
         }
     }
 }

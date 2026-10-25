@@ -51,7 +51,7 @@ fun SearchScreen(
     songs: List<Song>,
     collections: MusicCollections,
     currentSongId: Long?,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onPlay: (List<Song>, Int) -> Unit,
     onSongLongPress: (Song) -> Unit,
     onOpen: (Route) -> Unit,
