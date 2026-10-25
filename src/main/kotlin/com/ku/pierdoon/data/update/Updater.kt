@@ -55,7 +55,7 @@ sealed interface UpdateState {
  */
 object Updater {
     /** Desktop releases carry an .msi, Android ones only an .apk, so both can share one page. */
-    private const val RELEASES = "https://api.github.com/repos/kural3/Pier.doon4Desktop/releases?per_page=15"
+    private const val RELEASES = "https://api.github.com/repos/kural3/Pierdoon4Desktop/releases?per_page=15"
     private const val CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
     private const val K_LAST_CHECK = "last_check"
     private const val K_SKIPPED = "skipped_version"
