@@ -1,6 +1,20 @@
 package com.ku.pierdoon.ui.player
 
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.rememberScrollableState
@@ -18,8 +32,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,12 +39,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.PositionSnapshot
 import com.ku.pierdoon.playback.NowPlaying
@@ -101,42 +121,59 @@ fun PlayerBar(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            // Own layer: the travelling wave and the clock redraw only it, never the glass blur.
+            modifier = Modifier.graphicsLayer().padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
             // Track ---------------------------------------------------------------------------
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(0.3f),
             ) {
-                Artwork(
-                    songId = nowPlaying.songId,
-                    albumId = nowPlaying.albumId,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable(onClick = onExpand),
-                )
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f, fill = false)) {
-                    Text(
-                        nowPlaying.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(onClick = onExpand),
-                    )
-                    Text(
-                        nowPlaying.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = if (nowPlaying.artist.isNotEmpty()) {
-                            Modifier.clickable { onOpenArtist(nowPlaying.artist) }
-                        } else {
-                            Modifier
-                        },
-                    )
+                // A new track rises in from below, the old one leaves upwards.
+                val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+                val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                AnimatedContent(
+                    targetState = nowPlaying,
+                    contentKey = { it.songId },
+                    transitionSpec = {
+                        (fadeIn(fade) + slideInVertically(spatialOffset) { it / 2 })
+                            .togetherWith(fadeOut(fade) + slideOutVertically(spatialOffset) { -it / 2 })
+                    },
+                    label = "barTrack",
+                    modifier = Modifier.weight(1f, fill = false),
+                ) { nowPlaying ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Artwork(
+                            songId = nowPlaying.songId,
+                            albumId = nowPlaying.albumId,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable(onClick = onExpand),
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                nowPlaying.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.clickable(onClick = onExpand),
+                            )
+                            Text(
+                                nowPlaying.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = if (nowPlaying.artist.isNotEmpty()) {
+                                    Modifier.clickable { onOpenArtist(nowPlaying.artist) }
+                                } else {
+                                    Modifier
+                                },
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
                 ExpressiveIconButton(
@@ -154,15 +191,15 @@ fun PlayerBar(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.weight(0.4f).widthIn(min = 320.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ExpressiveToggleButton(
                         checked = state.shuffle,
                         onClick = onToggleShuffle,
                         icon = PlayerIcons.Shuffle,
                         contentDescription = stringResource(Res.string.shuffle),
-                        iconSize = 20.dp,
+                        iconSize = 18.dp,
                         uncheckedColor = Color.Transparent,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(36.dp),
                     )
                     ExpressiveIconButton(
                         onClick = onPrevious,
@@ -170,15 +207,15 @@ fun PlayerBar(
                         contentDescription = stringResource(Res.string.previous),
                         containerColor = glassButton,
                         contentColor = colors.onSurface,
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(40.dp),
                     )
                     PlayPauseButton(
                         isPlaying = state.isPlaying,
                         onClick = onTogglePlay,
                         playLabel = stringResource(Res.string.play),
                         pauseLabel = stringResource(Res.string.pause),
-                        iconSize = 28.dp,
-                        modifier = Modifier.size(width = 64.dp, height = 48.dp),
+                        iconSize = 24.dp,
+                        modifier = Modifier.size(width = 56.dp, height = 40.dp),
                     )
                     ExpressiveIconButton(
                         onClick = onNext,
@@ -186,26 +223,26 @@ fun PlayerBar(
                         contentDescription = stringResource(Res.string.next),
                         containerColor = glassButton,
                         contentColor = colors.onSurface,
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(40.dp),
                     )
                     ExpressiveToggleButton(
                         checked = state.repeatMode != Player.REPEAT_MODE_OFF,
                         onClick = onCycleRepeat,
                         icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
                         contentDescription = stringResource(Res.string.repeat),
-                        iconSize = 20.dp,
+                        iconSize = 18.dp,
                         uncheckedColor = Color.Transparent,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(36.dp),
                     )
                 }
-                Spacer(Modifier.height(4.dp))
-                // Draws the elapsed and total time under itself.
+                // Elapsed and total time either side of the bar.
                 WavySeekBar(
                     position = position,
                     durationMs = state.durationMs,
                     isPlaying = state.isPlaying,
                     onSeek = onSeek,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                    compact = true,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
@@ -249,9 +286,9 @@ fun PlayerBar(
     }
 }
 
-/** Mute button and slider; the mouse wheel over either nudges the volume. */
+/** Mute button and a slim slider; the mouse wheel over either nudges the volume. */
 @Composable
-fun VolumeControl(volume: Float, muted: Boolean, onVolume: (Float) -> Unit, onToggleMute: () -> Unit) {
+fun VolumeControl(volume: Float, muted: Boolean, onVolume: (Float) -> Unit, onToggleMute: () -> Unit, sliderWidth: Dp = 96.dp) {
     val colors = MaterialTheme.colorScheme
     val shown = if (muted) 0f else volume
     val wheel = rememberScrollableState { delta ->
@@ -275,12 +312,53 @@ fun VolumeControl(volume: Float, muted: Boolean, onVolume: (Float) -> Unit, onTo
             iconSize = 20.dp,
             modifier = Modifier.size(40.dp),
         )
-        Slider(
-            value = shown,
-            onValueChange = onVolume,
-            colors = SliderDefaults.colors(inactiveTrackColor = colors.surfaceContainerHighest),
-            modifier = Modifier.width(110.dp).height(32.dp),
-        )
+        SlimSlider(value = shown, onValueChange = onVolume, modifier = Modifier.width(sliderWidth))
+    }
+}
+
+/**
+ * A desktop-sized slider: a thin rounded track that thickens and grows a knob under the pointer.
+ * M3's own is sized for fingers and looks heavy in a bar.
+ */
+@Composable
+fun SlimSlider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val source = remember { MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    var dragging by remember { mutableStateOf(false) }
+    val active = hovered || dragging
+    val spec = MaterialTheme.motionScheme.fastSpatialSpec<Dp>()
+    val track by animateDpAsState(if (active) 6.dp else 4.dp, spec, label = "sliderTrack")
+    val knob by animateDpAsState(if (active) 7.dp else 0.dp, spec, label = "sliderKnob")
+    val change by rememberUpdatedState(onValueChange)
+    Canvas(
+        modifier
+            .height(28.dp)
+            .hoverable(source)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .pointerInput(Unit) {
+                detectTapGestures { change((it.x / size.width).coerceIn(0f, 1f)) }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragging = true; change((it.x / size.width).coerceIn(0f, 1f)) },
+                    onDragEnd = { dragging = false },
+                    onDragCancel = { dragging = false },
+                ) { c, _ ->
+                    c.consume()
+                    change((c.position.x / size.width).coerceIn(0f, 1f))
+                }
+            },
+    ) {
+        val h = track.toPx()
+        val r = knob.toPx()
+        val left = r.coerceAtLeast(h / 2)
+        val usable = size.width - left * 2
+        val y = size.height / 2
+        val x = left + usable * value.coerceIn(0f, 1f)
+        drawLine(colors.surfaceContainerHighest, Offset(left, y), Offset(left + usable, y), h, StrokeCap.Round)
+        drawLine(colors.primary, Offset(left, y), Offset(x, y), h, StrokeCap.Round)
+        if (r > 0f) drawCircle(colors.primary, r, Offset(x, y))
     }
 }
 

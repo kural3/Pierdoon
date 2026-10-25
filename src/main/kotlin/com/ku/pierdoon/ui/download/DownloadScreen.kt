@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.download
 
+import com.ku.pierdoon.ui.library.CONTENT_MAX_WIDTH
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxHeight
 import com.ku.pierdoon.ui.desktop.Files
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -85,7 +88,7 @@ import com.ku.pierdoon.ui.settings.ItemContainer
 
 /** A link in, a track in the library out: yt-dlp does the work, this page shows how it's going. */
 @Composable
-fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) {
+fun DownloadScreen(onBack: (() -> Unit)?, onPlay: (Long) -> Unit, bottomInset: Dp) {
     val haptics = LocalHapticFeedback.current
     val focus = LocalFocusManager.current
     val settings by SettingsStore.settings.collectAsState()
@@ -136,7 +139,8 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
                 top = inner.calculateTopPadding(),
                 bottom = listBottomPadding(bottomInset),
             ),
-            modifier = Modifier.fillMaxSize().imePadding(),
+            // A readable width on a wide window, lined up under the title.
+            modifier = Modifier.fillMaxHeight().widthIn(max = CONTENT_MAX_WIDTH).imePadding(),
         ) {
             if (!Downloader.supported) {
                 item(key = "unsupported") {

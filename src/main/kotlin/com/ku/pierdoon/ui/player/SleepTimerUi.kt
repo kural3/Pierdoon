@@ -1,17 +1,15 @@
 package com.ku.pierdoon.ui.player
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -19,6 +17,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
+import com.ku.pierdoon.ui.desktop.ContextMenu
 import com.ku.pierdoon.resources.Res
 import com.ku.pierdoon.resources.*
 import com.ku.pierdoon.playback.SleepTimer
@@ -65,25 +64,26 @@ fun sleepTimerLabel(state: SleepTimerState?): String? {
 @Composable
 fun SleepTimerSheet(state: SleepTimerState?, onDismiss: () -> Unit) {
     val haptics = LocalHapticFeedback.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     fun act(block: () -> Unit) {
         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
         block()
         onDismiss()
     }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
+    ContextMenu(onDismiss = onDismiss) {
+        Column {
             Text(
                 stringResource(Res.string.sleep_timer),
-                style = MaterialTheme.typography.titleLargeEmphasized,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             sleepTimerLabel(state)?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
                 )
             }
             SLEEP_MINUTES.forEach { m ->
@@ -93,7 +93,7 @@ fun SleepTimerSheet(state: SleepTimerState?, onDismiss: () -> Unit) {
             }
             ActionItem(PlayerIcons.MusicNote, stringResource(Res.string.sleep_end_of_track)) { act(SleepTimer::endOfTrack) }
             if (state != null) {
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 ActionItem(PlayerIcons.Close, stringResource(Res.string.sleep_off)) { act(SleepTimer::cancel) }
             }
         }

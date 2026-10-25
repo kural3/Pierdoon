@@ -24,9 +24,11 @@ data class ProbedTags(
  * whatever it can't open (Opus, WebM, APE, WavPack and the rest).
  */
 object MediaProbe {
+    // jaudiotagger logs every frame it parses (and every duplicate one at WARNING). Held here: the
+    // logging framework keeps loggers weakly, and a collected one comes back with its level reset.
+    internal val quietTags: Logger = Logger.getLogger("org.jaudiotagger").apply { level = Level.OFF }
+
     init {
-        // jaudiotagger logs every frame it parses at INFO.
-        Logger.getLogger("org.jaudiotagger").level = Level.OFF
         avutil.av_log_set_level(avutil.AV_LOG_QUIET)
     }
 

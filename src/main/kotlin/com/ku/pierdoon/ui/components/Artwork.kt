@@ -14,7 +14,15 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.max
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -254,7 +262,7 @@ private fun ArtworkImage(bitmap: ImageBitmap?, modifier: Modifier, placeholderIc
                     bitmap = image,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    filterQuality = FilterQuality.High,
+                    filterQuality = FilterQuality.Medium,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
@@ -273,7 +281,11 @@ private fun ArtworkImage(bitmap: ImageBitmap?, modifier: Modifier, placeholderIc
 
 private val Vibrant = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.35f) })
 
-/** Full-bleed frosted album art. A static image: zero per-frame cost once drawn. */
+/**
+ * Full-bleed frosted album art. Stretching the tiny blurred copy over the whole window and
+ * tinting it is costly, and the window repaints whole whenever anything moves, so it is done
+ * once per size into a bitmap; every frame after that is a plain copy.
+ */
 @Composable
 fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
     val cover = CoverStore.songVersion(songId)
@@ -288,16 +300,33 @@ fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
         modifier = modifier,
     ) { image ->
         if (image != null) {
-            Image(
-                bitmap = image,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                filterQuality = FilterQuality.High,
-                colorFilter = Vibrant,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Spacer(Modifier.fillMaxSize().drawWithCache {
+                val baked = bakeFrosted(image, size.width.roundToInt(), size.height.roundToInt())
+                onDrawBehind { baked?.let { drawImage(it) } }
+            })
         } else {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer))
         }
+    }
+}
+
+/** [image] cropped to fill [width]×[height] and saturated, as a ready bitmap. */
+private fun bakeFrosted(image: ImageBitmap, width: Int, height: Int): ImageBitmap? {
+    if (width <= 0 || height <= 0) return null
+    val scale = max(width / image.width.toFloat(), height / image.height.toFloat())
+    val srcSize = IntSize((width / scale).roundToInt().coerceIn(1, image.width), (height / scale).roundToInt().coerceIn(1, image.height))
+    val srcOffset = IntOffset((image.width - srcSize.width) / 2, (image.height - srcSize.height) / 2)
+    return ImageBitmap(width, height).also {
+        Canvas(it).drawImageRect(
+            image = image,
+            srcOffset = srcOffset,
+            srcSize = srcSize,
+            dstSize = IntSize(width, height),
+            // Smooth scaling costs nothing here: it runs once, not every frame.
+            paint = Paint().apply {
+                colorFilter = Vibrant
+                filterQuality = FilterQuality.High
+            },
+        )
     }
 }

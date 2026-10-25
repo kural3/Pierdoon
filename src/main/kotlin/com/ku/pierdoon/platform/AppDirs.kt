@@ -5,24 +5,26 @@ import java.io.File
 /**
  * Where the app keeps its files. Roaming data (playlists, settings, covers) under %APPDATA%,
  * anything that can be rebuilt (lyrics, yt-dlp, thumbnails) under %LOCALAPPDATA%.
+ * `-Dpierdoon.home=<dir>` keeps all of it in one folder instead (the screenshot tool runs on a copy).
  */
 object AppDirs {
     private const val NAME = "Pier.doon"
+    private val home = System.getProperty("pierdoon.home")?.let(::File)
 
     val files: File by lazy {
         val base = System.getenv("APPDATA")?.let(::File) ?: File(System.getProperty("user.home"), ".config")
-        File(base, NAME).apply { mkdirs() }
+        (home?.let { File(it, "files") } ?: File(base, NAME)).apply { mkdirs() }
     }
 
     val cache: File by lazy {
         val base = System.getenv("LOCALAPPDATA")?.let(::File) ?: File(System.getProperty("user.home"), ".cache")
-        File(base, "$NAME/cache").apply { mkdirs() }
+        (home?.let { File(it, "cache") } ?: File(base, "$NAME/cache")).apply { mkdirs() }
     }
 
     /** Programs the app fetches for itself (yt-dlp); kept apart from the cache, which can be cleared. */
     val tools: File by lazy {
         val base = System.getenv("LOCALAPPDATA")?.let(::File) ?: File(System.getProperty("user.home"), ".local")
-        File(base, "$NAME/tools").apply { mkdirs() }
+        (home?.let { File(it, "tools") } ?: File(base, "$NAME/tools")).apply { mkdirs() }
     }
 
     /** The user's Music folder, the default library and where downloads go. */

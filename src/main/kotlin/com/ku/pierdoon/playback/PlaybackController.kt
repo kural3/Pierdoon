@@ -85,12 +85,15 @@ object PlaybackController {
             }
         }
 
-        MediaKeys.install(
-            onPlayPause = ::togglePlay,
-            onNext = { player.seekToNext() },
-            onPrevious = { player.seekToPrevious() },
-            onStop = { player.pause() },
-        )
+        // The screenshot tool runs beside the real app and mustn't take its keys.
+        if (System.getProperty("pierdoon.shots") == null) {
+            MediaKeys.install(
+                onPlayPause = ::togglePlay,
+                onNext = { player.seekToNext() },
+                onPrevious = { player.seekToPrevious() },
+                onStop = { player.pause() },
+            )
+        }
     }
 
     @Volatile private var fading = false
