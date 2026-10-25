@@ -2,7 +2,7 @@
 
 A small offline music player for Android. Jetpack Compose + Material 3 Expressive.
 
-> ⚠️ **Vibe-coded.** Most of this was written by an AI assistant over a chat session and tested on a single phone. Expect bugs and rough edges. Use at your own risk.
+> **Vibe-coded.** Most of this was written by an AI assistant over a chat session and tested on a single phone. Expect bugs and rough edges. Use at your own risk.
 
 ## What it does
 
