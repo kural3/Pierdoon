@@ -156,6 +156,7 @@
     <string name="sort_duration">По длительности</string>
     <string name="sort_descending">По убыванию</string>
     <string name="search_library">Поиск по библиотеке</string>
+    <string name="search_short">Поиск</string>
     <string name="search_library_hint">Трек, исполнитель или альбом</string>
     <string name="search_library_empty">Ничего не нашлось</string>
     <string name="search_tracks">Треки</string>

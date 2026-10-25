@@ -25,6 +25,14 @@ import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
+import kotlin.math.roundToInt
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -183,6 +191,10 @@ fun AppScaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets(0),
         topBar = {
+            if (onBack == null) {
+                TabHeader(title, subtitle, actions, belowTitle, scrollBehavior.state)
+                return@Scaffold
+            }
             Column(Modifier.background(MaterialTheme.colorScheme.surface)) {
             MediumFlexibleTopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -208,6 +220,95 @@ fun AppScaffold(
         floatingActionButton = floatingActionButton,
         content = content,
     )
+}
+
+/**
+ * Header of a bottom-bar tab: the title sits at the very top in the home screen's large type and
+ * scrolls away with the list; [belowTitle] (search, sections) stays pinned.
+ */
+@Composable
+private fun TabHeader(
+    title: String,
+    subtitle: String?,
+    actions: @Composable () -> Unit,
+    belowTitle: (@Composable () -> Unit)?,
+    state: TopAppBarState,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .statusBarsPadding(),
+    ) {
+        Layout(
+            content = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .graphicsLayer { alpha = 1f - state.collapsedFraction }
+                        .padding(start = 24.dp, end = 12.dp, top = 32.dp, bottom = 16.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.displaySmallEmphasized,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (subtitle != null) {
+                            Text(
+                                subtitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
+                    actions()
+                }
+            },
+            modifier = Modifier.clipToBounds(),
+        ) { measurables, constraints ->
+            val title = measurables.first().measure(constraints.copy(minHeight = 0))
+            // The list's scroll eats into this height, as with the flexible app bars elsewhere.
+            val limit = -title.height.toFloat()
+            if (state.heightOffsetLimit != limit) state.heightOffsetLimit = limit
+            val height = (title.height + state.heightOffset).roundToInt().coerceIn(0, title.height)
+            layout(title.width, height) { title.place(0, height - title.height) }
+        }
+        belowTitle?.invoke()
+    }
+}
+
+/** Pill that looks like a search field and opens the search page. */
+@Composable
+fun SearchCapsule(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val haptics = LocalHapticFeedback.current
+    val source = remember { MutableInteractionSource() }
+    val scale = animatePressAsState(source, 0.96f)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .height(56.dp)
+            .scaleBy(scale)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(source, ripple()) {
+                haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                onClick()
+            }
+            .padding(horizontal = 20.dp),
+    ) {
+        Icon(PlayerIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(14.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 /** Big cover, title and Play / Shuffle pills for album, artist and playlist screens. */

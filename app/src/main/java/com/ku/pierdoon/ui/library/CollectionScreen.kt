@@ -48,11 +48,10 @@ fun CollectionScreen(
                 )
             } else if (songs.isNotEmpty() || menu.isNotEmpty()) {
                 OverflowMenu(
-                    buildList {
-                        if (songs.isNotEmpty()) add(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() })
-                        if (songs.isNotEmpty() && menu.isNotEmpty()) add(null)
-                        addAll(menu)
-                    }
+                    listOf(
+                        if (songs.isNotEmpty()) listOf(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() }) else emptyList(),
+                        menu,
+                    )
                 )
             }
         },

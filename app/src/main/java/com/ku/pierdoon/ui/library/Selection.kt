@@ -3,10 +3,16 @@ package com.ku.pierdoon.ui.library
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.CheckableDropdownMenuItem
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuPopup
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.SelectableDropdownMenuItem
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -29,6 +35,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.R
 import com.ku.pierdoon.data.Playlist
@@ -122,35 +129,79 @@ fun TopBarIcon(icon: ImageVector, description: String, enabled: Boolean = true, 
     )
 }
 
-/** One entry of a ⋮ menu; [checked] shows a tick for the current choice. */
-class MenuEntry(val label: String, val icon: ImageVector? = null, val checked: Boolean = false, val onClick: () -> Unit)
+/**
+ * One entry of a ⋮ menu. [selected] makes it one of several choices (a sort order),
+ * [checked] an on/off switch; both fill the item in while on.
+ */
+class MenuEntry(
+    val label: String,
+    val icon: ImageVector? = null,
+    val selected: Boolean? = null,
+    val checked: Boolean? = null,
+    val onClick: () -> Unit,
+)
 
-/** ⋮ button with a dropdown; a null entry draws a divider. */
+/** ⋮ button with an expressive menu: each group is a rounded card of its own. */
 @Composable
-fun OverflowMenu(entries: List<MenuEntry?>) {
+fun OverflowMenu(
+    groups: List<List<MenuEntry>>,
+    containerColor: Color = Color.Transparent,
+    size: Dp = 48.dp,
+) {
     var open by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
+    val shown = groups.filter { it.isNotEmpty() }
     Box {
-        TopBarIcon(PlayerIcons.More, stringResource(R.string.more_actions)) { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            entries.forEach { e ->
-                if (e == null) {
-                    HorizontalDivider()
-                } else {
-                    DropdownMenuItem(
-                        text = { Text(e.label) },
-                        leadingIcon = e.icon?.let { { Icon(it, contentDescription = null) } },
-                        trailingIcon = if (e.checked) {
-                            { Icon(PlayerIcons.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-                        } else {
-                            null
-                        },
-                        onClick = {
+        ExpressiveIconButton(
+            onClick = { open = true },
+            icon = PlayerIcons.More,
+            contentDescription = stringResource(R.string.more_actions),
+            containerColor = containerColor,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(size),
+        )
+        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
+            shown.forEachIndexed { g, group ->
+                if (g > 0) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+                DropdownMenuGroup(shapes = MenuDefaults.groupShape(g, shown.size)) {
+                    group.forEachIndexed { i, e ->
+                        val shapes = MenuDefaults.itemShape(i, group.size)
+                        val icon: (@Composable () -> Unit)? = e.icon?.let {
+                            { Icon(it, contentDescription = null, modifier = Modifier.size(MenuDefaults.LeadingIconSize)) }
+                        }
+                        val tick: @Composable () -> Unit = {
+                            Icon(PlayerIcons.Check, contentDescription = null, modifier = Modifier.size(MenuDefaults.LeadingIconSize))
+                        }
+                        val click = {
                             haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                             open = false
                             e.onClick()
-                        },
-                    )
+                        }
+                        when {
+                            e.selected != null -> SelectableDropdownMenuItem(
+                                selected = e.selected,
+                                onClick = click,
+                                text = { Text(e.label) },
+                                shapes = shapes,
+                                leadingIcon = icon,
+                                selectedLeadingIcon = tick,
+                            )
+                            e.checked != null -> CheckableDropdownMenuItem(
+                                checked = e.checked,
+                                onCheckedChange = { click() },
+                                text = { Text(e.label) },
+                                shapes = shapes,
+                                leadingIcon = icon,
+                                checkedLeadingIcon = tick,
+                            )
+                            else -> DropdownMenuItem(
+                                onClick = click,
+                                text = { Text(e.label) },
+                                shape = shapes.shape,
+                                leadingIcon = icon,
+                            )
+                        }
+                    }
                 }
             }
         }
