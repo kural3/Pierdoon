@@ -180,15 +180,17 @@ private fun SyncedLyrics(
     val centerSpring = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     fun userHolding() = SystemClock.elapsedRealtime() - userScrolledAt < USER_SCROLL_HOLD_MS
 
-    // The active line glides to the vertical centre of the panel.
+    // The active line glides to the vertical centre of the panel. Before the first line starts,
+    // that line takes the centre (unlit): the padding is sized for the taller immersive panel,
+    // so left unscrolled it would sit below the visible part of the normal one.
     LaunchedEffect(current) {
-        if (current >= 0 && !userHolding()) listState.centerOn(current, centerSpring)
+        if (!userHolding()) listState.centerOn(current.coerceAtLeast(0), centerSpring)
     }
     // After the panel resizes (immersive in/out), re-centre once, when the size has settled.
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.viewportSize.height }.collectLatest {
             delay(RESIZE_SETTLE_MS)
-            if (current >= 0 && !userHolding()) listState.centerOn(current, centerSpring)
+            if (!userHolding()) listState.centerOn(current.coerceAtLeast(0), centerSpring)
         }
     }
 

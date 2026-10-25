@@ -424,7 +424,7 @@ fun FullPlayer(
     }
 }
 
-private const val IMMERSIVE_DELAY_MS = 2_500L
+private const val IMMERSIVE_DELAY_MS = 5_000L
 
 /** Immersive-lyrics bar: thin progress, track info and small transport buttons. */
 @Composable
