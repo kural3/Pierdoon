@@ -38,7 +38,7 @@ object DiscordPresence {
      * Application ID of the "Pier.doon" application in Discord's developer portal; its name is
      * what Discord shows. Empty: the status stays off.
      */
-    private const val CLIENT_ID = ""
+    private const val CLIENT_ID = "1564028006392004658"
     private const val APP_ICON = "https://raw.githubusercontent.com/kural3/Pierdoon4Desktop/main/icons/pierdoon.png"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
