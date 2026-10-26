@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/banner.svg" alt="Pier.doon, an offline music player for Android" width="100%"></p>
 
-A small offline music player for Android. Jetpack Compose + Material 3 Expressive.
+A small offline music player for Android and Windows. Jetpack Compose / Compose Multiplatform + Material 3 Expressive. The Windows app is described in [desktop/README.md](desktop/README.md); the rest of this page is mostly about Android.
 
 > **Vibe-coded.** Most of this was written by an AI assistant over a chat session and tested on a single phone. Expect bugs and rough edges. Use at your own risk.
 
@@ -21,7 +21,12 @@ A small offline music player for Android. Jetpack Compose + Material 3 Expressiv
 
 ## Install
 
-Grab the APK from [Releases](../../releases). Android 7.0+, 64-bit (arm64) phones since 1.3; older 32-bit phones can stay on 1.2.1.
+Everything is on the [latest release](../../releases/latest):
+
+- **Android**: `Pierdoon-<version>.apk`. Android 7.0+, 64-bit (arm64) phones since 1.3; older 32-bit phones can stay on 1.2.1.
+- **Windows**: `Pier.doon-<version>.msi`. Windows 10/11 x64, no admin rights needed. If you have 1.0.7 or older, install 2.0 from the MSI by hand rather than with the in-app update ([why](desktop/README.md#install)).
+
+Both apps then update themselves from this page.
 
 ## Downloading tracks
 
@@ -50,11 +55,15 @@ Release builds of the APK are signed only if a `keystore.properties` file exists
 
 ## Releasing
 
-Both apps publish to this repository's Releases; each app's updater takes the newest release that has its own file attached (`.apk` or `.msi`).
+One release for both apps: tag `v<version>`, the APK and the MSI attached, marked as the **latest** release.
 
-- Android: tag `android-<version>` with the APK attached, marked as the **latest** release. Android versions up to 1.6 only look at the release marked latest.
-- Windows: tag `desktop-<version>` with the MSI attached, **not** marked latest (`gh release create … --latest=false`).
-- Windows versions up to 1.0.6 look for updates in the old `kural3/Pierdoon4Desktop` repository: the first Windows release from here has to be published there as well, so they reach it.
+```
+gh release create v2.0 Pierdoon-2.0.apk Pier.doon-2.0.0.msi --title "Pier.doon 2.0" --notes-file notes.md --latest
+```
+
+- Each app's updater takes the newest release that has its own file (`.apk` or `.msi`), so a release for just one of the apps works too. Android versions up to 1.6 only look at the release marked latest, so an Android release must be the latest.
+- The MSI needs a three-part version (`2.0.0`); the updater treats `2.0` and `2.0.0` as the same.
+- Windows versions up to 1.0.6 look for updates in the archived `kural3/Pierdoon4Desktop` repository and stop at 1.0.7 there; older tags (`android-…`, `desktop-…`) are still understood.
 
 ## License
 

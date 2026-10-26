@@ -8,7 +8,9 @@ The desktop version of [Pier.doon](https://github.com/kural3/Pierdoon): the same
 
 ## Install
 
-Download `Pier.doon-<version>.msi` from [Releases](https://github.com/kural3/Pierdoon/releases) (the `desktop-…` ones) and run it. It installs for the current user only (no admin rights), adds a Start menu entry and a desktop shortcut, and later updates itself from the same Releases page. Windows 10/11 x64.
+Download `Pier.doon-<version>.msi` from [Releases](https://github.com/kural3/Pierdoon/releases/latest) and run it. It installs for the current user only (no admin rights), adds a Start menu entry and a desktop shortcut, and later updates itself from the same Releases page. Windows 10/11 x64.
+
+Coming from 1.0.7 or older: install 2.0 by hand from the MSI, not with the in-app update button. Those versions download the update into the install folder, which the upgrade wipes, so the old version is removed and the new one never lands. Settings, playlists and favorites are kept either way. From 2.0 on, the in-app update works.
 
 ## What it does
 
