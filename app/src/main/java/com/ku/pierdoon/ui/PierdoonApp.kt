@@ -717,6 +717,7 @@ private fun Screens(
                         lyricsCacheSize = vm::lyricsCacheSize,
                         onClearLyricsCache = vm::clearLyricsCache,
                         onRescan = vm::rescanLibrary,
+                        musicFolders = vm::musicFolders,
                         updateState = vm.update.collectAsStateWithLifecycle().value,
                         onCheckUpdates = vm::checkForUpdates,
                         onShowUpdate = vm::showUpdate,

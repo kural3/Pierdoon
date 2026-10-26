@@ -1,5 +1,7 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.data.MusicFolder
+import kotlinx.coroutines.flow.drop
 import com.ku.pierdoon.data.ALBUM_ID
 import com.ku.pierdoon.data.QUEUE_KEY
 import com.ku.pierdoon.data.artworkUri
@@ -300,6 +302,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             mediaStoreChanged.debounce(MEDIA_STORE_DEBOUNCE_MS).collect { loadLibrary(force = true) }
         }
+        // Leaving a folder out, or taking it back, changes which tracks there are.
+        viewModelScope.launch {
+            SettingsStore.settings.map { it.excludedFolders }.distinctUntilChanged().drop(1).collect { loadLibrary(force = true) }
+        }
     }
 
     fun playSongs(songs: List<Song>, startIndex: Int, shuffle: Boolean = false) {
@@ -413,6 +419,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun lyricsCacheSize(): Long = lyricsRepository.cacheSizeBytes()
     fun clearLyricsCache() { viewModelScope.launch { lyricsRepository.clear() } }
     fun rescanLibrary() = loadLibrary(force = true)
+
+    /** Every folder with music in it, left-out ones too, for Settings → Библиотека. */
+    suspend fun musicFolders(): List<MusicFolder> = repository.folders()
 
     fun setLyricsVisible(visible: Boolean) { lyricsVisible.value = visible }
     fun retryLyrics() { lyricsRetry.update { it + 1 } }

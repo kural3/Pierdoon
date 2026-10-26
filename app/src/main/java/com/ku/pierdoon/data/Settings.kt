@@ -20,6 +20,9 @@ enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono }
 
 const val DEFAULT_SEED: Int = 0xFF6750A4.toInt()
 
+/** Where downloads and tracks from the computer go, relative to the storage root. */
+const val DEFAULT_SAVE_FOLDER = "Music/Pier.doon"
+
 @Immutable
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.System,
@@ -49,6 +52,8 @@ data class AppSettings(
     /** Look for a new release on GitHub now and then (at most twice a day). */
     val checkUpdates: Boolean = true,
     val downloadFormat: DownloadFormat = DownloadFormat.M4a,
+    /** Folders left out of the library, as [MusicFolder.path]s: only that folder, not the ones inside it. */
+    val excludedFolders: Set<String> = emptySet(),
     val songSort: SongSort = SongSort.Title,
     val songSortDescending: Boolean = false,
 )
@@ -92,6 +97,7 @@ object SettingsStore {
             checkUpdates = p.getBoolean(K_UPDATES, d.checkUpdates),
             downloadFormat = runCatching { DownloadFormat.valueOf(p.getString(K_DOWNLOAD_FORMAT, d.downloadFormat.name)!!) }
                 .getOrDefault(d.downloadFormat),
+            excludedFolders = p.getStringSet(K_EXCLUDED, null)?.toSet() ?: d.excludedFolders,
             songSort = runCatching { SongSort.valueOf(p.getString(K_SONG_SORT, d.songSort.name)!!) }.getOrDefault(d.songSort),
             songSortDescending = p.getBoolean(K_SONG_SORT_DESC, d.songSortDescending),
         )
@@ -120,6 +126,7 @@ object SettingsStore {
             putString(K_EDIT_TARGET, s.editTarget.name)
             putBoolean(K_UPDATES, s.checkUpdates)
             putString(K_DOWNLOAD_FORMAT, s.downloadFormat.name)
+            putStringSet(K_EXCLUDED, s.excludedFolders)
             putString(K_SONG_SORT, s.songSort.name)
             putBoolean(K_SONG_SORT_DESC, s.songSortDescending)
         }
@@ -144,6 +151,7 @@ object SettingsStore {
     private const val K_EDIT_TARGET = "edit_target"
     private const val K_UPDATES = "check_updates"
     private const val K_DOWNLOAD_FORMAT = "download_format"
+    private const val K_EXCLUDED = "excluded_folders"
     private const val K_SONG_SORT = "song_sort"
     private const val K_SONG_SORT_DESC = "song_sort_desc"
 }

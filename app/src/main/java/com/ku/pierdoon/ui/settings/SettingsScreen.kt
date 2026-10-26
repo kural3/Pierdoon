@@ -1,5 +1,7 @@
 package com.ku.pierdoon.ui.settings
 
+import com.ku.pierdoon.data.DEFAULT_SAVE_FOLDER
+import com.ku.pierdoon.data.MusicFolder
 import android.os.Build
 import android.text.format.Formatter
 import android.widget.Toast
@@ -95,6 +97,7 @@ fun SettingsScreen(
     lyricsCacheSize: suspend () -> Long,
     onClearLyricsCache: () -> Unit,
     onRescan: () -> Unit,
+    musicFolders: suspend () -> List<MusicFolder>,
     updateState: UpdateState,
     onCheckUpdates: () -> Unit,
     onShowUpdate: () -> Unit,
@@ -129,12 +132,12 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             when (section) {
-                null -> sectionList(onOpen, onOpenComputer, trackCount, updateStatus, version, settings.downloadFormat)
+                null -> sectionList(onOpen, onOpenComputer, trackCount, updateStatus, version, settings)
                 SettingsSection.Appearance -> appearance(settings, onUpdate)
                 SettingsSection.Feedback -> feedback(settings, onUpdate)
                 SettingsSection.Playback -> playback(settings, onUpdate)
                 SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
-                SettingsSection.Library -> library(trackCount, onRescan)
+                SettingsSection.Library -> library(settings, onUpdate, trackCount, onRescan, musicFolders)
                 SettingsSection.Downloads -> downloads(settings, onUpdate)
                 SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
             }
@@ -168,7 +171,7 @@ private fun LazyListScope.sectionList(
     trackCount: Int,
     updateStatus: String,
     version: String,
-    downloadFormat: DownloadFormat,
+    settings: AppSettings,
 ) {
     item(key = "sections") {
         Group(null) {
@@ -184,8 +187,11 @@ private fun LazyListScope.sectionList(
                             SettingsSection.Feedback -> stringResource(R.string.settings_feedback_summary)
                             SettingsSection.Playback -> stringResource(R.string.settings_playback_summary)
                             SettingsSection.Lyrics -> stringResource(R.string.settings_lyrics_summary)
-                            SettingsSection.Library -> stringResource(R.string.tracks_count, trackCount)
-                            SettingsSection.Downloads -> downloadsSummary(downloadFormat)
+                            SettingsSection.Library -> listOfNotNull(
+                                stringResource(R.string.tracks_count, trackCount),
+                                settings.excludedFolders.size.takeIf { it > 0 }?.let { stringResource(R.string.settings_folders_hidden, it) },
+                            ).joinToString(" · ")
+                            SettingsSection.Downloads -> downloadsSummary(settings)
                             SettingsSection.Updates -> updateStatus
                         },
                         onClick = { onOpen(s) },
@@ -507,7 +513,13 @@ private fun LazyListScope.lyrics(
     }
 }
 
-private fun LazyListScope.library(trackCount: Int, onRescan: () -> Unit) {
+private fun LazyListScope.library(
+    settings: AppSettings,
+    onUpdate: Update,
+    trackCount: Int,
+    onRescan: () -> Unit,
+    musicFolders: suspend () -> List<MusicFolder>,
+) {
     item(key = "library") {
         val context = LocalContext.current
         val done = stringResource(R.string.settings_rescan_done)
@@ -528,14 +540,42 @@ private fun LazyListScope.library(trackCount: Int, onRescan: () -> Unit) {
             )
         }
     }
+    item(key = "folders") {
+        // Counted again whenever the library changes, so a new folder shows up here too.
+        val folders by produceState<List<MusicFolder>?>(null, trackCount) { value = musicFolders() }
+        val list = folders.orEmpty()
+        if (list.isEmpty()) return@item
+        Group(stringResource(R.string.settings_folders)) {
+            list.map<MusicFolder, @Composable (Shape) -> Unit> { f ->
+                { shape ->
+                    SwitchItem(
+                        shape = shape,
+                        title = f.path.ifEmpty { stringResource(R.string.settings_folder_root) },
+                        subtitle = stringResource(R.string.tracks_count, f.count),
+                        checked = f.path !in settings.excludedFolders,
+                        onChange = { on ->
+                            onUpdate { s -> s.copy(excludedFolders = if (on) s.excludedFolders - f.path else s.excludedFolders + f.path) }
+                        },
+                    )
+                }
+            }
+        }
+        Text(
+            stringResource(R.string.settings_folders_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
+        )
+    }
 }
 
-/** "M4A · yt-dlp 2025.10.22" on the section list. */
+/** "Music/Pier.doon · M4A" on the section list. */
 @Composable
-private fun downloadsSummary(format: DownloadFormat): String {
-    val version by Downloader.engineVersion.collectAsStateWithLifecycle()
-    val name = stringResource(if (format == DownloadFormat.M4a) R.string.download_format_m4a else R.string.download_format_opus)
-    return listOfNotNull(name, version?.let { stringResource(R.string.download_engine, it) }).joinToString(" · ")
+private fun downloadsSummary(settings: AppSettings): String {
+    val format = stringResource(
+        if (settings.downloadFormat == DownloadFormat.M4a) R.string.download_format_m4a else R.string.download_format_opus
+    )
+    return "$DEFAULT_SAVE_FOLDER · $format"
 }
 
 private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update) {

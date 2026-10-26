@@ -1,5 +1,6 @@
 package com.ku.pierdoon.data.download
 
+import com.ku.pierdoon.data.DEFAULT_SAVE_FOLDER
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -11,7 +12,6 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Build
-import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -437,7 +437,7 @@ object Downloader {
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, display)
             put(MediaStore.Audio.Media.MIME_TYPE, mime)
-            put(MediaStore.Audio.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MUSIC}/$FOLDER")
+            put(MediaStore.Audio.Media.RELATIVE_PATH, "$DEFAULT_SAVE_FOLDER/")
             put(MediaStore.Audio.Media.IS_PENDING, 1)
         }
         val uri = resolver.insert(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values)
@@ -467,7 +467,6 @@ object Downloader {
     private fun prefs() = app.getSharedPreferences("downloader", Context.MODE_PRIVATE)
 
     private const val TAG = "Downloader"
-    private const val FOLDER = "Pier.doon"
     private const val K_CHECKED = "ytdlp_checked"
     private const val UPDATE_EVERY_MS = 24 * 60 * 60 * 1000L
     private const val SEARCH_RESULTS = 15
