@@ -34,6 +34,11 @@ import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
+import java.security.MessageDigest
+import java.security.SecureRandom
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import kotlinx.coroutines.channels.Channel
 
 /**
  * The phone as a remote for Pier.doon on a computer in the same network: finds it, pairs with
@@ -106,11 +111,18 @@ object PcRemote {
     private var stream: Job? = null
     @Volatile private var openConnection: HttpURLConnection? = null
 
+    private val _pcApi = MutableStateFlow<Int?>(null)
+    /** The protocol version of the paired computer, once it answered; null before that. */
+    val pcApi: StateFlow<Int?> = _pcApi.asStateFlow()
+
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("pc_remote", Context.MODE_PRIVATE)
-        deviceName = runCatching { Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME) }
-            .getOrNull()?.takeIf { it.isNotBlank() } ?: Build.MODEL
+        deviceName = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+            runCatching { Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME) }.getOrNull()
+        } else {
+            null
+        })?.takeIf { it.isNotBlank() } ?: Build.MODEL
         val token = prefs.getString(K_TOKEN, null)
         val host = prefs.getString(K_HOST, null)
         if (token != null && host != null) {
@@ -189,6 +201,8 @@ object PcRemote {
     sealed interface PairResult {
         data object Ok : PairResult
         data object WrongCode : PairResult
+        /** Too many wrong codes: the PC refuses pairing for a while (30 s). */
+        data object TooManyAttempts : PairResult
         data object Unreachable : PairResult
     }
 
@@ -200,6 +214,7 @@ object PcRemote {
             return@withContext PairResult.Unreachable
         }
         if (reply.code == 403) return@withContext PairResult.WrongCode
+        if (reply.code == 429) return@withContext PairResult.TooManyAttempts
         if (reply.code != 200) return@withContext PairResult.Unreachable
         val json = reply.json()
         val paired = Paired(json.optString("name", pc.name), pc.host, pc.port, json.getString("token"))
@@ -223,6 +238,7 @@ object PcRemote {
         _queue.value = PcQueue()
         _library.value = PcLibrary()
         _downloads.value = emptyList()
+        _pcApi.value = null
         lyricsCache.evictAll()
         if (p != null) scope.launch { runCatching { request("POST", p.host, p.port, "/unpair", p.token, timeoutMs = 3_000) } }
     }
@@ -265,6 +281,9 @@ object PcRemote {
     private class RevokedException : IOException("revoked")
 
     private fun listen(p: Paired) {
+        // Which protocol it speaks: the screen asks to update whichever side is behind.
+        runCatching { request("GET", p.host, p.port, "/info", token = null, timeoutMs = 5_000).json() }
+            .getOrNull()?.let { _pcApi.value = it.optInt("api", 1) }
         val conn = open("GET", p.host, p.port, "/events", p.token, timeoutMs = 5_000)
         conn.readTimeout = STREAM_TIMEOUT_MS
         openConnection = conn
@@ -320,12 +339,39 @@ object PcRemote {
         if (reply.code == 200) _library.value = reply.json().toLibrary()
     }
 
+    /**
+     * Anything in the network can answer discovery with the computer's name, so a new address is
+     * taken only once the computer there proves it knows this phone's token (without the token
+     * being sent): see [knowsToken].
+     */
     private suspend fun relocate(p: Paired) {
-        val found = runCatching { discover() }.getOrNull()?.firstOrNull { it.name == p.name && it.host != p.host } ?: return
+        val candidates = runCatching { discover() }.getOrNull().orEmpty().filter { it.name == p.name && it.host != p.host }
+        val found = candidates.firstOrNull { knowsToken(it.host, it.port, p.token) } ?: return
         val moved = p.copy(host = found.host, port = found.port)
         save(moved)
         _paired.value = moved
     }
+
+    /**
+     * POST /verify with a fresh nonce: the computer answers with HMAC-SHA256(nonce) under the
+     * SHA-256 of each token it paired. Only the one this phone paired with has a match. Computers
+     * from before API 3 can't answer, so they aren't followed to a new address.
+     */
+    private fun knowsToken(host: String, port: Int, token: String): Boolean = runCatching {
+        val nonce = ByteArray(16).also(SecureRandom()::nextBytes).toHex()
+        val reply = request("POST", host, port, "/verify", token = null, body = JSONObject().put("nonce", nonce), timeoutMs = 4_000)
+        val proofs = reply.json().optJSONArray("proofs") ?: return@runCatching false
+        val expected = hmacSha256(sha256Hex(token), nonce)
+        (0 until proofs.length()).any { MessageDigest.isEqual(proofs.optString(it).toByteArray(), expected.toByteArray()) }
+    }.getOrDefault(false)
+
+    private fun sha256Hex(s: String) = MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).toHex()
+
+    private fun hmacSha256(key: String, message: String): String =
+        Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(key.toByteArray(), "HmacSHA256")) }
+            .doFinal(message.toByteArray()).toHex()
+
+    private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
 
     // Commands ----------------------------------------------------------------------------------
 
@@ -349,22 +395,20 @@ object PcRemote {
     /** A slider moves every frame: only the latest value goes out, one request at a time. */
     fun setVolume(value: Float) {
         _state.update { it.copy(volume = value, muted = false) }
-        pendingVolume = value
-        if (volumeSender?.isActive == true) return
-        volumeSender = scope.launch {
-            var sent: Float? = null
-            while (true) {
-                val v = pendingVolume
-                if (v == sent) break
-                val p = _paired.value ?: break
+        volumeUpdates.trySend(value)
+    }
+
+    /** Conflated: values set while a request is out collapse into the latest, which is never lost. */
+    private val volumeUpdates = Channel<Float>(Channel.CONFLATED)
+
+    init {
+        scope.launch {
+            for (v in volumeUpdates) {
+                val p = _paired.value ?: continue
                 runCatching { request("POST", p.host, p.port, "/command", p.token, JSONObject().put("action", "volume").put("value", v.toDouble())) }
-                sent = v
             }
         }
     }
-
-    @Volatile private var pendingVolume = 1f
-    private var volumeSender: Job? = null
     fun toggleShuffle() = command("shuffle")
     fun cycleRepeat() = command("repeat")
     fun toggleFavorite(songId: Long) = command("favorite") { put("songId", songId) }
@@ -561,6 +605,8 @@ object PcRemote {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     const val DEFAULT_PORT = 47231
+    /** The protocol version this app speaks (docs/remote-api.md); 3 added /verify. */
+    const val API_VERSION = 3
     private const val DISCOVERY_PORT = 47232
     private const val DISCOVER = "PIERDOON_DISCOVER"
     private const val DISCOVERY_MS = 2_500L

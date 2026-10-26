@@ -293,6 +293,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                                                 pairError = when (PcRemote.pair(pc, code)) {
                                                     PcRemote.PairResult.Ok -> null
                                                     PcRemote.PairResult.WrongCode -> R.string.pc_wrong_code
+                                                    PcRemote.PairResult.TooManyAttempts -> R.string.pc_too_many_attempts
                                                     PcRemote.PairResult.Unreachable -> R.string.pc_unreachable
                                                 }
                                                 if (pairError != null) code = ""
@@ -431,6 +432,15 @@ private fun RemoteScreen(name: String, connection: PcRemote.Connection, onBack: 
     val state by PcRemote.state.collectAsStateWithLifecycle()
     val library by PcRemote.library.collectAsStateWithLifecycle()
     val downloads by PcRemote.downloads.collectAsStateWithLifecycle()
+    val pcApi by PcRemote.pcApi.collectAsStateWithLifecycle()
+    // Whichever side speaks the older protocol misses features; say which one to update.
+    val versionNote = pcApi?.let {
+        when {
+            it < PcRemote.API_VERSION -> R.string.pc_update_computer
+            it > PcRemote.API_VERSION -> R.string.pc_update_phone
+            else -> null
+        }
+    }
     var libraryTab by rememberSaveable { mutableStateOf(LibraryTab.Songs) }
     var query by rememberSaveable { mutableStateOf("") }
     var open by remember { mutableStateOf<OpenCollection?>(null) }
@@ -521,6 +531,24 @@ private fun RemoteScreen(name: String, connection: PcRemote.Connection, onBack: 
             contentPadding = PaddingValues(top = inner.calculateTopPadding(), bottom = listBottomPadding(bottomInset)),
             modifier = Modifier.fillMaxSize().imePadding(),
         ) {
+            if (versionNote != null) {
+                item(key = "version") {
+                    Box(Modifier.animateItem().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
+                        Group(null) {
+                            listOf<@Composable (Shape) -> Unit>({ shape ->
+                                ItemContainer(shape) {
+                                    Text(
+                                        stringResource(versionNote),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                                    )
+                                }
+                            })
+                        }
+                    }
+                }
+            }
             item(key = "volume") {
                 Box(Modifier.animateItem().padding(horizontal = 16.dp)) {
                     Group(null) {

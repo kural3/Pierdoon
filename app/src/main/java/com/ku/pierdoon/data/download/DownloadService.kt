@@ -1,15 +1,18 @@
 package com.ku.pierdoon.data.download
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import com.ku.pierdoon.MainActivity
 import com.ku.pierdoon.R
 import kotlinx.coroutines.CoroutineScope
@@ -50,7 +53,7 @@ class DownloadService : Service() {
                     if (active.isEmpty()) {
                         ServiceCompat.stopForeground(this@DownloadService, ServiceCompat.STOP_FOREGROUND_REMOVE)
                         stopSelf()
-                    } else {
+                    } else if (canNotify()) {
                         manager.notify(NOTIFICATION_ID, notification(active))
                     }
                 }
@@ -58,6 +61,11 @@ class DownloadService : Service() {
         }
         return START_NOT_STICKY
     }
+
+    /** Android 13+ drops notifications without the permission (asked by MainActivity); updates are skipped then. */
+    private fun canNotify(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
     override fun onDestroy() {
         scope.cancel()

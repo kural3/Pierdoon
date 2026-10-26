@@ -30,6 +30,7 @@ import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.YoutubeDLResponse
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -228,8 +229,11 @@ object Downloader {
     private suspend fun drain() {
         while (true) {
             val next = _tasks.value.firstOrNull { it.status == DownloadStatus.Queued } ?: return
-            val job = scope.launch { run(next) }
+            // Registered before it starts, so a remove() right away still finds it to cancel.
+            val job = scope.launch(start = CoroutineStart.LAZY) { run(next) }
             synchronized(this) { running = next.id to job }
+            // Removed before it got here: it isn't run at all.
+            if (_tasks.value.none { it.id == next.id }) job.cancel() else job.start()
             job.join()
             synchronized(this) { running = null }
             next.group?.let { finishGroup(it) }
@@ -257,6 +261,8 @@ object Downloader {
             addOption("--flat-playlist")
             addOption("--no-playlist")
             addOption("-J")
+            // The link after "--", as in fetch().
+            addCommands(listOf("--"))
         }
         val info = JSONObject(execute(request, "pierdoon-${task.id}").out)
         if (info.str("_type") != "playlist") return false
@@ -339,6 +345,10 @@ object Downloader {
             addOption("--write-info-json")
             addOption("-f", formatSelector(task.format))
             addOption("-o", File(work, "%(id)s.%(ext)s").path)
+            // Links come from sites too (search results, playlist entries): after "--" one that
+            // starts with "-" is still a link, never an option such as --exec. The library puts
+            // the link last, right after these commands.
+            addCommands(listOf("--"))
         }
         execute(request, "pierdoon-${task.id}") { progress, line ->
             if (!line.startsWith("[download]")) return@execute
