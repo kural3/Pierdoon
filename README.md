@@ -6,7 +6,7 @@ A small offline music player for Android and Windows, with the same Material 3 E
 
 ## Install
 
-Both apps are on the [latest release](../../releases/latest), and both then update themselves from it.
+Take the newest file for your platform from [Releases](../../releases); after that the app updates itself from there.
 
 - **Android**: `Pierdoon-<version>.apk`. Android 7.0+, 64-bit (arm64).
 - **Windows**: `Pier.doon-<version>.msi`. Windows 10/11 x64. Installs for the current user only (no admin rights), with a Start menu entry and a desktop shortcut.
@@ -87,14 +87,23 @@ Release builds of the APK are signed only if a `keystore.properties` file exists
 
 ## Releasing
 
-One release for both apps: tag `v<version>`, the APK and the MSI attached, marked as the latest release, notes in Russian.
+The apps can be released together or one at a time. Notes are in Russian.
+
+| release | tag | files | latest |
+| --- | --- | --- | --- |
+| both apps | `v<version>` | APK and MSI | yes |
+| Android only | `android-<version>` | APK | yes |
+| Windows only | `desktop-<version>` | MSI | no (`--latest=false`) |
 
 ```
 gh release create v<version> Pierdoon-<version>.apk Pier.doon-<version>.msi --title "Pier.doon <version>" --notes-file notes.md --latest
+gh release create android-<version> Pierdoon-<version>.apk --title "Pier.doon <version> для Android" --notes-file notes.md --latest
+gh release create desktop-<version> Pier.doon-<version>.msi --title "Pier.doon <version> для Windows" --notes-file notes.md --latest=false
 ```
 
-- Each app's updater takes the newest release that has its own file (`.apk` or `.msi`), so a release for just one app works too.
-- Older Android versions only look at the release marked latest, so a release with an APK must be the latest.
+- Each app's updater takes the newest release that has its own file (`.apk` or `.msi`) and ignores the rest, so a release for one app never offers anything to the other.
+- The two apps' version numbers move independently; the prefixes keep their tags from clashing. Bump the version in `app/build.gradle.kts` or `desktop/build.gradle.kts` only for the app being released.
+- Older Android versions only look at the release marked latest, so a release with an APK must be the latest and a Windows-only one must not.
 - The MSI needs a three-part version (`x.y.0`); the updater treats `x.y` and `x.y.0` as the same.
 - Never keep files in the Windows install folder: the installer wipes it on every upgrade.
 
