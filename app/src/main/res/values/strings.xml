@@ -92,6 +92,10 @@
     <string name="settings_rescan">Обновить библиотеку</string>
     <string name="settings_rescan_desc">Найти новые аудиофайлы на устройстве</string>
     <string name="settings_rescan_done">Библиотека обновлена</string>
+    <string name="settings_folders">Папки с музыкой</string>
+    <string name="settings_folders_desc">Треки из выключенных папок не показываются в библиотеке. Сами файлы остаются на месте</string>
+    <string name="settings_folder_root">Корень памяти</string>
+    <string name="settings_folders_hidden">скрыто папок: %1$d</string>
     <string name="settings_downloads">Загрузки</string>
     <string name="settings_about">О приложении</string>
     <string name="settings_version">Версия %1$s</string>

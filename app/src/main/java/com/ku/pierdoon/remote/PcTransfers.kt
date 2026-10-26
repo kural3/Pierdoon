@@ -1,5 +1,6 @@
 package com.ku.pierdoon.remote
 
+import com.ku.pierdoon.data.DEFAULT_SAVE_FOLDER
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -289,7 +290,7 @@ object PcTransfers {
             val values = ContentValues().apply {
                 put(MediaStore.Audio.Media.DISPLAY_NAME, "$base.$ext")
                 put(MediaStore.Audio.Media.MIME_TYPE, MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "audio/*")
-                put(MediaStore.Audio.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MUSIC}/$FOLDER")
+                put(MediaStore.Audio.Media.RELATIVE_PATH, "$DEFAULT_SAVE_FOLDER/")
                 put(MediaStore.Audio.Media.IS_PENDING, 1)
             }
             val uri = resolver.insert(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values)
@@ -349,7 +350,6 @@ object PcTransfers {
 
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
 
-    private const val FOLDER = "Pier.doon"
     /** Left free on the phone after a track from the computer is saved. */
     private const val FREE_SPACE_MARGIN = 200L * 1024 * 1024
 }
