@@ -3,7 +3,6 @@ package com.ku.pierdoon.data.update
 import androidx.compose.runtime.Immutable
 import com.ku.pierdoon.BuildConfig
 import com.ku.pierdoon.data.USER_AGENT
-import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.platform.Prefs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -128,8 +127,9 @@ object Updater {
                 return@launch
             }
             _state.value = UpdateState.Installing(release)
+            val log = File(installer.parentFile, "install.log")
             val started = runCatching {
-                ProcessBuilder("msiexec.exe", "/i", installer.absolutePath, "/passive").start()
+                ProcessBuilder("msiexec.exe", "/i", installer.absolutePath, "/passive", "/l*v", log.absolutePath).start()
             }.isSuccess
             if (started) {
                 onQuitForUpdate?.invoke() ?: exitProcess(0)
@@ -172,7 +172,9 @@ object Updater {
      * the SHA-256 GitHub lists for it before it is ever started.
      */
     private suspend fun downloadInstaller(release: AppRelease, onProgress: (Float?) -> Unit): File {
-        val dir = File(AppDirs.cache, "update").apply { mkdirs() }
+        // In %TEMP%, never under the install folder: the upgrade wipes that folder while the
+        // installer still reads from it, which aborts it after the old version is gone.
+        val dir = File(System.getProperty("java.io.tmpdir"), "Pier.doon-update").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "Pierdoon-${release.version}.msi")
         val digest = MessageDigest.getInstance("SHA-256")

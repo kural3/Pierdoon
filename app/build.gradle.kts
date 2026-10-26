@@ -28,8 +28,8 @@ android {
         applicationId = "com.ku.pierdoon"
         minSdk = 24
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.6"
+        versionCode = 9
+        versionName = "2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

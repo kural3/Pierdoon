@@ -59,6 +59,7 @@ Any JDK to start Gradle with; the JDK 25 it builds with is downloaded automatica
 
 - Settings, playlists, favorites, history, the saved queue, picked covers: `%APPDATA%\Pier.doon`
 - Error log (attach it to a bug report): `%APPDATA%\Pier.doon\logs\errors.log`
-- Library index, lyrics cache: `%LOCALAPPDATA%\Pier.doon\cache`
-- yt-dlp: `%LOCALAPPDATA%\Pier.doon\tools`
+- Library index, lyrics cache: `%LOCALAPPDATA%\Pier.doon Data\cache`
+- yt-dlp: `%LOCALAPPDATA%\Pier.doon Data\tools`
+- The app itself: `%LOCALAPPDATA%\Pier.doon`. Every upgrade and uninstall wipes this folder, so the app keeps nothing there.
 - Downloads: `Music\Pier.doon`
