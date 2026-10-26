@@ -15,8 +15,9 @@ val javacppPlatform = "windows-x86_64"
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":ui"))
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.12.0-alpha03")
+    implementation(libs.compose.mp.material3)
     implementation("org.jetbrains.compose.components:components-resources:1.12.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
     implementation("org.json:json:20260814")
