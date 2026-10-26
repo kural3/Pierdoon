@@ -1,0 +1,344 @@
+package com.ku.pierdoon.ui.library
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
+import androidx.compose.material3.toShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.ku.pierdoon.resources.Res
+import com.ku.pierdoon.resources.*
+import com.ku.pierdoon.data.Album
+import com.ku.pierdoon.data.MusicCollections
+import com.ku.pierdoon.data.Playlist
+import com.ku.pierdoon.data.Song
+import com.ku.pierdoon.ui.components.Artwork
+import com.ku.pierdoon.ui.components.PlayerIcons
+import com.ku.pierdoon.ui.components.animatePressAsState
+import com.ku.pierdoon.ui.components.scaleBy
+import com.ku.pierdoon.ui.navigation.Route
+import java.util.Calendar
+
+@Composable
+fun HomeScreen(
+    recent: List<Song>,
+    collections: MusicCollections,
+    playlists: List<Playlist>,
+    favoritesCount: Int,
+    resolveCover: (Playlist) -> Song?,
+    onPlay: (List<Song>, Int) -> Unit,
+    onShuffleAll: () -> Unit,
+    onOpen: (Route) -> Unit,
+    onSongLongPress: (Song) -> Unit,
+    bottomInset: Dp,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(bottom = listBottomPadding(bottomInset)),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(key = "greeting") {
+            Text(
+                text = stringResource(greetingRes()),
+                style = MaterialTheme.typography.displaySmallEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 20.dp),
+            )
+        }
+        item(key = "quick") {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(horizontal = 16.dp),
+            ) {
+                QuickCard(
+                    title = stringResource(Res.string.shuffle_all),
+                    icon = PlayerIcons.Shuffle,
+                    shape = MaterialShapes.Cookie9Sided.toShape(),
+                    container = MaterialTheme.colorScheme.primaryContainer,
+                    content = MaterialTheme.colorScheme.onPrimaryContainer,
+                    onClick = onShuffleAll,
+                    modifier = Modifier.weight(1f),
+                )
+                QuickCard(
+                    title = stringResource(Res.string.favorites),
+                    subtitle = stringResource(Res.string.songs_count, favoritesCount),
+                    icon = PlayerIcons.Favorite,
+                    shape = MaterialShapes.Sunny.toShape(),
+                    container = MaterialTheme.colorScheme.tertiaryContainer,
+                    content = MaterialTheme.colorScheme.onTertiaryContainer,
+                    onClick = { onOpen(Route.Favorites) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
+        if (recent.isNotEmpty()) {
+            item(key = "recentTitle") { SectionTitle(stringResource(Res.string.recently_played)) }
+            item(key = "recent") { RecentRow(recent, onPlay) }
+        }
+        if (collections.recentlyAdded.isNotEmpty()) {
+            item(key = "addedTitle") { SectionTitle(stringResource(Res.string.recently_added)) }
+            item(key = "added") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    itemsIndexed(collections.recentlyAdded, key = { _, s -> s.id }) { i, song ->
+                        CoverCard(
+                            title = song.title,
+                            subtitle = song.artist,
+                            songId = song.id,
+                            albumId = song.albumId,
+                            onClick = { onPlay(collections.recentlyAdded, i) },
+                            onLongClick = { onSongLongPress(song) },
+                        )
+                    }
+                }
+            }
+        }
+        if (collections.albums.isNotEmpty()) {
+            item(key = "albumsTitle") { SectionTitle(stringResource(Res.string.nav_albums)) }
+            item(key = "albums") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(collections.albums.take(12), key = { it.id }) { album -> AlbumCard(album, onOpen) }
+                }
+            }
+        }
+        if (playlists.isNotEmpty()) {
+            item(key = "playlistsTitle") { SectionTitle(stringResource(Res.string.your_playlists)) }
+            item(key = "playlists") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(playlists, key = { it.id }) { p ->
+                        val cover = resolveCover(p)
+                        CoverCard(
+                            title = p.name,
+                            subtitle = stringResource(Res.string.songs_count, p.songIds.size),
+                            songId = cover?.id ?: -1L,
+                            albumId = cover?.albumId ?: -1L,
+                            onClick = { onOpen(Route.PlaylistDetail(p.id)) },
+                            art = { m -> PlaylistCover(p, cover, m, placeholderIconSize = 40.dp) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun greetingRes(): StringResource = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+    in 5..11 -> Res.string.greeting_morning
+    in 12..17 -> Res.string.greeting_day
+    in 18..22 -> Res.string.greeting_evening
+    else -> Res.string.greeting_night
+}
+
+@Composable
+private fun QuickCard(
+    title: String,
+    icon: ImageVector,
+    shape: Shape,
+    container: Color,
+    content: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+) {
+    val haptics = LocalHapticFeedback.current
+    val source = remember { MutableInteractionSource() }
+    val scale = animatePressAsState(source, 0.93f)
+    Column(
+        modifier = modifier
+            .scaleBy(scale)
+            .clip(RoundedCornerShape(28.dp))
+            .background(container)
+            .clickable(interactionSource = source, indication = ripple()) {
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                onClick()
+            }
+            .padding(16.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(shape)
+                .background(content.copy(alpha = 0.14f)),
+        ) {
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(24.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMediumEmphasized,
+            color = content,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            subtitle.orEmpty(),
+            style = MaterialTheme.typography.bodySmall,
+            color = content.copy(alpha = 0.75f),
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * Big covers of what was played last. A plain row rather than the phone's carousel: the carousel
+ * re-lays its items whenever its width changes, so opening the side panel made them jump.
+ */
+@Composable
+private fun RecentRow(songs: List<Song>, onPlay: (List<Song>, Int) -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        itemsIndexed(songs, key = { _, s -> s.id }) { index, song ->
+            val source = remember { MutableInteractionSource() }
+            val scale = animatePressAsState(source, 0.95f)
+            Box(
+                Modifier
+                    .size(200.dp)
+                    .scaleBy(scale)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .clickable(interactionSource = source, indication = ripple()) {
+                        haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                        onPlay(songs, index)
+                    },
+            ) {
+                Artwork(song.id, song.albumId, Modifier.fillMaxSize(), placeholderIconSize = 48.dp)
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))
+                        )
+                )
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CoverCard(
+    title: String,
+    subtitle: String,
+    songId: Long,
+    albumId: Long,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    width: Dp = 148.dp,
+    shape: Shape = RoundedCornerShape(28.dp),
+    onLongClick: (() -> Unit)? = null,
+    /** Draws the picture instead of the track's art; gets the square, unclipped bounds. */
+    art: (@Composable (Modifier) -> Unit)? = null,
+) {
+    val haptics = LocalHapticFeedback.current
+    val source = remember { MutableInteractionSource() }
+    val scale = animatePressAsState(source, 0.94f)
+    Column(
+        modifier = modifier
+            .width(width)
+            .scaleBy(scale)
+            .clip(RoundedCornerShape(24.dp))
+            .combinedClickableCompat(source, onClick, onLongClick, haptics)
+            .padding(4.dp),
+    ) {
+        if (art != null) {
+            art(Modifier.fillMaxWidth().aspectRatio(1f))
+        } else {
+            Artwork(
+                songId = songId,
+                albumId = albumId,
+                placeholderIconSize = 40.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(shape),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Text(
+            text = subtitle.ifEmpty { stringResource(Res.string.unknown_artist) },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+    }
+}
+
+@Composable
+fun AlbumCard(album: Album, onOpen: (Route) -> Unit, modifier: Modifier = Modifier, width: Dp = 148.dp) {
+    CoverCard(
+        title = album.title,
+        subtitle = album.artist,
+        songId = album.coverSongId,
+        albumId = album.coverAlbumId,
+        onClick = { onOpen(Route.AlbumDetail(album.id)) },
+        width = width,
+        modifier = modifier,
+    )
+}

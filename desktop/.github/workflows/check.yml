@@ -1,0 +1,24 @@
+# Tests on every push and pull request. Windows: FFmpeg is pulled in for windows-x86_64 only.
+# The audio tests skip themselves there (no music folder, no sound device).
+name: Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew test --console=plain
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: build/reports/
