@@ -222,6 +222,8 @@ fun BulkActionsSheet(
     onCreatePlaylist: () -> Unit,
     onRemoveFromPlaylist: () -> Unit,
     onDelete: (() -> Unit)?,
+    /** Null without a paired computer. */
+    onSendToComputer: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     var pickingPlaylist by remember { mutableStateOf(false) }
@@ -256,6 +258,9 @@ fun BulkActionsSheet(
                         ActionItem(PlayerIcons.PlaylistAdd, stringResource(R.string.add_to_playlist)) {
                             haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                             pickingPlaylist = true
+                        }
+                        if (onSendToComputer != null) {
+                            ActionItem(PlayerIcons.Desktop, stringResource(R.string.transfer_send_to_pc)) { act(onSendToComputer) }
                         }
                         if (target.playlistId != null) {
                             ActionItem(PlayerIcons.Remove, stringResource(R.string.remove_from_playlist)) { act(onRemoveFromPlaylist) }

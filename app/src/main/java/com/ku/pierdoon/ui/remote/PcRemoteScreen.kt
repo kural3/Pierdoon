@@ -117,7 +117,7 @@ import kotlinx.coroutines.launch
  * and its whole library. What it plays shows in the app's own player (see rememberPcPlayback).
  */
 @Composable
-fun PcRemoteScreen(onBack: () -> Unit, bottomInset: Dp) {
+fun PcRemoteScreen(onBack: () -> Unit, bottomInset: Dp, onSaveToPhone: ((List<PcSong>) -> Unit)? = null) {
     val paired by PcRemote.paired.collectAsStateWithLifecycle()
     val connection by PcRemote.connection.collectAsStateWithLifecycle()
 
@@ -159,7 +159,7 @@ fun PcRemoteScreen(onBack: () -> Unit, bottomInset: Dp) {
         if (name == null) {
             PairingScreen(onBack, bottomInset, revoked = revoked)
         } else {
-            RemoteScreen(name, connection, onBack, bottomInset)
+            RemoteScreen(name, connection, onBack, bottomInset, onSaveToPhone)
         }
     }
 }
@@ -428,7 +428,13 @@ private sealed interface SendState {
 }
 
 @Composable
-private fun RemoteScreen(name: String, connection: PcRemote.Connection, onBack: () -> Unit, bottomInset: Dp) {
+private fun RemoteScreen(
+    name: String,
+    connection: PcRemote.Connection,
+    onBack: () -> Unit,
+    bottomInset: Dp,
+    onSaveToPhone: ((List<PcSong>) -> Unit)?,
+) {
     val state by PcRemote.state.collectAsStateWithLifecycle()
     val library by PcRemote.library.collectAsStateWithLifecycle()
     val downloads by PcRemote.downloads.collectAsStateWithLifecycle()
@@ -616,6 +622,7 @@ private fun RemoteScreen(name: String, connection: PcRemote.Connection, onBack: 
                 onQuery = { query = it },
                 open = open,
                 onOpen = { open = it },
+                onSave = onSaveToPhone,
             )
         }
     }
@@ -863,6 +870,7 @@ private fun LazyListScope.libraryItems(
     onQuery: (String) -> Unit,
     open: OpenCollection?,
     onOpen: (OpenCollection?) -> Unit,
+    onSave: ((List<PcSong>) -> Unit)?,
 ) {
     if (library.version < 0) {
         item(key = "lib_loading") { Hint(stringResource(R.string.pc_library_loading), Modifier.animateItem()) }
@@ -880,10 +888,26 @@ private fun LazyListScope.libraryItems(
                     modifier = Modifier.size(48.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(open.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    open.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onSave != null && open.ids.isNotEmpty()) {
+                    ExpressiveIconButton(
+                        onClick = { onSave(library.resolve(open.ids)) },
+                        icon = PlayerIcons.Smartphone,
+                        contentDescription = stringResource(R.string.transfer_save_all_to_phone),
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(48.dp),
+                    )
+                }
             }
         }
-        songItems(library.resolve(open.ids), currentId, "open")
+        songItems(library.resolve(open.ids), currentId, "open", onSave)
         return
     }
     item(key = "lib_search") {
@@ -938,11 +962,11 @@ private fun LazyListScope.libraryItems(
             it.title.lowercase().contains(q) || it.artist.lowercase().contains(q) || it.album.lowercase().contains(q)
         }
         if (hits.isEmpty()) item(key = "lib_none") { Hint(stringResource(R.string.pc_nothing_found), Modifier.animateItem()) }
-        songItems(hits, currentId, "hit")
+        songItems(hits, currentId, "hit", onSave)
         return
     }
     when (tab) {
-        LibraryTab.Songs -> songItems(library.songs, currentId, "song")
+        LibraryTab.Songs -> songItems(library.songs, currentId, "song", onSave)
         LibraryTab.Albums -> itemsIndexed(library.albums, key = { _, a -> "album_${a.id}" }) { _, a ->
             CollectionRow(
                 modifier = Modifier.animateItem(),
@@ -986,7 +1010,7 @@ private fun LazyListScope.libraryItems(
     }
 }
 
-private fun LazyListScope.songItems(songs: List<PcSong>, currentId: Long?, prefix: String) {
+private fun LazyListScope.songItems(songs: List<PcSong>, currentId: Long?, prefix: String, onSave: ((List<PcSong>) -> Unit)?) {
     val ids = songs.map { it.id }
     itemsIndexed(songs, key = { i, s -> "${prefix}_${s.id}_$i" }) { i, song ->
         var menu by remember { mutableStateOf(false) }
@@ -1016,7 +1040,14 @@ private fun LazyListScope.songItems(songs: List<PcSong>, currentId: Long?, prefi
                                 PcRemote.addToQueue(listOf(song.id))
                             },
                         ),
-                    ),
+                        listOfNotNull(
+                            onSave?.let { save ->
+                                MenuAction(stringResource(R.string.transfer_save_to_phone), PlayerIcons.Smartphone) {
+                                    save(listOf(song))
+                                }
+                            },
+                        ),
+                    ).filter { it.isNotEmpty() },
                     offset = DpOffset(0.dp, (-4).dp),
                 )
             }

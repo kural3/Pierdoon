@@ -23,10 +23,12 @@ What changed in each version is in its release notes.
 - Sleep timer, by minutes or at the end of the track
 - Expanding player, frosted glass, album art / wallpaper or Windows accent / custom color themes, a Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts
 - The phone works as a remote for the computer over Wi-Fi: the computer's playback in the phone's own player, its queue, lyrics and library, and downloads sent to it
+- Copies tracks between the phone and the computer over Wi-Fi, byte for byte: "Send to computer" on the phone's tracks and playlists, "Save to phone" on the computer's. Tracks that look like ones already there (same title, artist and length) are pointed out first
 
 **Android**
 - Media3 playback with notification and lock screen controls, hardware audio offload
 - Immersive lyrics mode, landscape player
+- Swipe the mini player or the cover sideways to change track
 - Share a link to Pier.doon from any app to download it (Android 10+)
 - Tries to go easy on the battery
 

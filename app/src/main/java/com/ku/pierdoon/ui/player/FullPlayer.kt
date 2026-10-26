@@ -160,6 +160,8 @@ fun FullPlayer(
     onOpenArtist: (String) -> Unit,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Swiping the art back: the track before, where the button may restart this one instead. */
+    onPreviousTrack: () -> Unit = onPrevious,
     /** The expanding sheet owns the vertical drag (swipe down shrinks the player back). */
     dragModifier: Modifier = Modifier,
     /** The phone and the paired computer, to switch the player between; null without a computer. */
@@ -324,6 +326,8 @@ fun FullPlayer(
                                 durationMs = state.durationMs,
                                 onTap = onTogglePlay,
                                 onSeek = onSeek,
+                                onNext = onNext,
+                                onPrevious = onPreviousTrack,
                                 modifier = Modifier
                                     .widthIn(max = minOf(maxWidth, maxHeight))
                                     .fillMaxWidth()
@@ -728,6 +732,7 @@ private fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, containerCo
  * Tap toggles playback. Double-tap the left or right third to skip 10 s back or forward,
  * YouTube Music style: further taps on that side while the hint is up add 10 s each.
  * The middle third never waits for a second tap, so play/pause there stays instant.
+ * Swipe sideways for the next or previous track.
  */
 @Composable
 private fun PlayerArtwork(
@@ -737,9 +742,12 @@ private fun PlayerArtwork(
     durationMs: Long,
     onTap: () -> Unit,
     onSeek: (Long) -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
+    val swipe = rememberTrackSwipeState()
     val source = remember { MutableInteractionSource() }
     val press = animatePressAsState(source, 0.94f)
     val slowSpatial = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
@@ -787,7 +795,7 @@ private fun PlayerArtwork(
 
     val backLabel = stringResource(R.string.seek_back)
     val forwardLabel = stringResource(R.string.seek_forward)
-    Box(modifier, contentAlignment = Alignment.Center) {
+    Box(modifier.trackSwipe(swipe, onNext, onPrevious), contentAlignment = Alignment.Center) {
         Artwork(
             songId = nowPlaying.songId,
             albumId = nowPlaying.albumId,
@@ -795,6 +803,7 @@ private fun PlayerArtwork(
             placeholderIconSize = 96.dp,
             modifier = Modifier
                 .fillMaxSize()
+                .trackSwipeOffset(swipe)
                 .scaleBy(scale)
                 .morphClip(ArtworkMorph, morph)
                 .semantics {

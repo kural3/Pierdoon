@@ -313,4 +313,61 @@
     <string name="share_where">Куда скачать?</string>
     <string name="share_phone">На телефон</string>
     <string name="share_pc">На компьютер «%1$s»</string>
+    <string name="transfer_send_to_pc">Отправить на компьютер</string>
+    <string name="transfer_save_to_phone">Сохранить на телефон</string>
+    <string name="transfer_save_all_to_phone">Сохранить всё на телефон</string>
+    <string name="transfer_channel">Передача треков</string>
+    <string name="transfer_to_pc_title">Отправка на компьютер</string>
+    <string name="transfer_to_phone_title">Сохранение на телефон</string>
+    <string name="transfer_checking">Проверяю, что уже есть…</string>
+    <string name="transfer_offline">Компьютер не отвечает. Проверьте, что Pier.doon на нём открыт и вы в одной сети</string>
+    <string name="transfer_outdated">Обновите Pier.doon на компьютере: передача треков появилась в 2.1</string>
+    <string name="transfer_unsupported">Сохранять треки с компьютера можно на Android 10 и новее</string>
+    <string name="transfer_dup_title_pc">Похоже, это уже есть на компьютере</string>
+    <string name="transfer_dup_title_phone">Похоже, это уже есть на телефоне</string>
+    <string name="transfer_dup_one">Трек с таким же названием, исполнителем и длительностью там уже есть. Всё равно скопировать?</string>
+    <string name="transfer_dup_some">%1$d из %2$d уже там, судя по названию, исполнителю и длительности:</string>
+    <string name="transfer_dup_only_new">Только новые</string>
+    <string name="transfer_dup_all">Все</string>
+    <string name="transfer_dup_anyway">Всё равно</string>
+    <string name="transfer_reason_offline">компьютер перестал отвечать</string>
+    <string name="transfer_reason_space">не хватает места</string>
+    <string name="transfer_reason_missing">файл не найден</string>
+    <string name="transfer_reason_other">ошибка при передаче</string>
+    <plurals name="transfer_started_pc">
+        <item quantity="one">Отправляю %d трек на компьютер</item>
+        <item quantity="few">Отправляю %d трека на компьютер</item>
+        <item quantity="many">Отправляю %d треков на компьютер</item>
+        <item quantity="other">Отправляю %d трека на компьютер</item>
+    </plurals>
+    <plurals name="transfer_started_phone">
+        <item quantity="one">Сохраняю %d трек на телефон</item>
+        <item quantity="few">Сохраняю %d трека на телефон</item>
+        <item quantity="many">Сохраняю %d треков на телефон</item>
+        <item quantity="other">Сохраняю %d трека на телефон</item>
+    </plurals>
+    <plurals name="transfer_left">
+        <item quantity="one">остался %d</item>
+        <item quantity="few">осталось %d</item>
+        <item quantity="many">осталось %d</item>
+        <item quantity="other">осталось %d</item>
+    </plurals>
+    <plurals name="transfer_done_pc">
+        <item quantity="one">%d трек отправлен на компьютер</item>
+        <item quantity="few">%d трека отправлено на компьютер</item>
+        <item quantity="many">%d треков отправлено на компьютер</item>
+        <item quantity="other">%d трека отправлено на компьютер</item>
+    </plurals>
+    <plurals name="transfer_done_phone">
+        <item quantity="one">%d трек сохранён на телефон</item>
+        <item quantity="few">%d трека сохранено на телефон</item>
+        <item quantity="many">%d треков сохранено на телефон</item>
+        <item quantity="other">%d трека сохранено на телефон</item>
+    </plurals>
+    <plurals name="transfer_failed">
+        <item quantity="one">%d не удалось</item>
+        <item quantity="few">%d не удалось</item>
+        <item quantity="many">%d не удалось</item>
+        <item quantity="other">%d не удалось</item>
+    </plurals>
 </resources>

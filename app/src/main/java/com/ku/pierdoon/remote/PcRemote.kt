@@ -507,6 +507,39 @@ object PcRemote {
         }
     }
 
+    // Moving tracks between the phone and the computer -------------------------------------------
+
+    /** The computer's protocol version, asked now; null if it doesn't answer. */
+    internal fun apiNow(): Int? {
+        val p = _paired.value ?: return null
+        return runCatching { request("GET", p.host, p.port, "/info", token = null, timeoutMs = 5_000).json().optInt("api", 1) }
+            .getOrNull()?.also { _pcApi.value = it }
+    }
+
+    /** The computer's library, fetched now unless the live connection already keeps it current. */
+    internal fun libraryNow(): PcLibrary? {
+        val p = _paired.value ?: return null
+        if (_connection.value == Connection.Connected && _library.value.version >= 0) return _library.value
+        return runCatching { fetchLibrary(p) }.getOrNull()?.let { _library.value.takeIf { it.version >= 0 } }
+    }
+
+    /** GET /file/{id}, the track's audio file: the caller reads it and disconnects. */
+    internal fun openFile(songId: Long): HttpURLConnection? {
+        val p = _paired.value ?: return null
+        return open("GET", p.host, p.port, "/file/$songId", p.token, timeoutMs = TRANSFER_TIMEOUT_MS)
+    }
+
+    /** POST /upload: the caller writes exactly [length] bytes, reads the reply and disconnects. */
+    internal fun openUpload(name: String, tags: JSONObject?, length: Long): HttpURLConnection? {
+        val p = _paired.value ?: return null
+        val query = "name=${enc(name)}" + (tags?.let { "&tags=${enc(it.toString())}" } ?: "")
+        return open("POST", p.host, p.port, "/upload?$query", p.token, timeoutMs = TRANSFER_TIMEOUT_MS).apply {
+            doOutput = true
+            setRequestProperty("Content-Type", "application/octet-stream")
+            setFixedLengthStreamingMode(length)
+        }
+    }
+
     // Lyrics and covers ------------------------------------------------------------------------
 
     /** The computer looks lyrics up on LRCLIB if it hasn't yet, so the first call can take a while. */
@@ -605,8 +638,12 @@ object PcRemote {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     const val DEFAULT_PORT = 47231
-    /** The protocol version this app speaks (docs/remote-api.md); 3 added /verify. */
-    const val API_VERSION = 3
+    /** The protocol version this app speaks (docs/remote-api.md); 3 added /verify, 4 /file and /upload. */
+    const val API_VERSION = 4
+    /** Moving tracks needs this much on the computer. */
+    const val TRANSFER_API = 4
+    /** Per read or write: a slow Wi-Fi moves a big file in many of these. */
+    private const val TRANSFER_TIMEOUT_MS = 30_000
     private const val DISCOVERY_PORT = 47232
     private const val DISCOVER = "PIERDOON_DISCOVER"
     private const val DISCOVERY_MS = 2_500L

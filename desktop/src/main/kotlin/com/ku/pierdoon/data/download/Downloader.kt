@@ -134,6 +134,11 @@ object Downloader {
     private val _added = MutableSharedFlow<Long>(extraBufferCapacity = 16)
     val added: SharedFlow<Long> = _added.asSharedFlow()
 
+    /** A track put into [folder] some other way (sent from the phone): the library looks again. */
+    fun announce(file: File) {
+        _added.tryEmit(Song.idFor(file))
+    }
+
     /** Playlists made for finished groups, so a track retried later joins its playlist. */
     private val groupPlaylists = mutableMapOf<Long, Long>()
 

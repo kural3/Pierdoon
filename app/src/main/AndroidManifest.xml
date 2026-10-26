@@ -76,6 +76,11 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".remote.TransferService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <receiver
             android:name=".data.update.InstallResultReceiver"
             android:exported="false" />
