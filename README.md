@@ -15,7 +15,7 @@ A small offline music player for Android. Jetpack Compose + Material 3 Expressiv
 - Edits tags and covers, in the app or in the file; deletes tracks from the device
 - Expanding player, frosted glass, wallpaper / album art / custom color themes
 - A Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts, monospace included
-- Remote for [Pier.doon for Windows](https://github.com/kural3/Pierdoon4Desktop) over Wi-Fi: the computer's playback in the app's own player, its library, and downloads sent to it
+- Remote for [Pier.doon for Windows](desktop/) over Wi-Fi: the computer's playback in the app's own player, its library, and downloads sent to it
 - Updates itself from GitHub releases
 - Tries to go easy on the battery
 
@@ -31,11 +31,29 @@ Only download what you have the rights to.
 
 ## Build
 
+One Gradle build for both apps:
+
+| folder | what |
+| --- | --- |
+| `app/` | the Android app |
+| `desktop/` | [Pier.doon for Windows](desktop/README.md) (Compose Multiplatform) |
+| `core/` | code both use: the track model, library lists and search, lyrics parsing, track naming, queue restore, version compare. Plain Kotlin/JVM, nothing platform-specific |
+
 ```
-./gradlew assembleRelease
+./gradlew :app:assembleRelease            # APK
+./gradlew :desktop:packageReleaseMsi      # Windows installer
+./gradlew :core:test :app:testDebugUnitTest :desktop:test
 ```
 
-Release builds are signed only if a `keystore.properties` file exists in the project root (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`); otherwise they're left unsigned.
+Release builds of the APK are signed only if a `keystore.properties` file exists in the project root or in `Pierdoon-signing/` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`); otherwise they're left unsigned.
+
+## Releasing
+
+Both apps publish to this repository's Releases; each app's updater takes the newest release that has its own file attached (`.apk` or `.msi`).
+
+- Android: tag `android-<version>` with the APK attached, marked as the **latest** release. Android versions up to 1.6 only look at the release marked latest.
+- Windows: tag `desktop-<version>` with the MSI attached, **not** marked latest (`gh release create … --latest=false`).
+- Windows versions up to 1.0.6 look for updates in the old `kural3/Pierdoon4Desktop` repository: the first Windows release from here has to be published there as well, so they reach it.
 
 ## License
 

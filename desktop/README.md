@@ -8,7 +8,7 @@ The desktop version of [Pier.doon](https://github.com/kural3/Pierdoon): the same
 
 ## Install
 
-Download `Pier.doon-<version>.msi` from [Releases](https://github.com/kural3/Pierdoon4Desktop/releases) and run it. It installs for the current user only (no admin rights), adds a Start menu entry and a desktop shortcut, and later updates itself from the same Releases page. Windows 10/11 x64.
+Download `Pier.doon-<version>.msi` from [Releases](https://github.com/kural3/Pierdoon/releases) (the `desktop-…` ones) and run it. It installs for the current user only (no admin rights), adds a Start menu entry and a desktop shortcut, and later updates itself from the same Releases page. Windows 10/11 x64.
 
 ## What it does
 
@@ -48,12 +48,12 @@ Download `Pier.doon-<version>.msi` from [Releases](https://github.com/kural3/Pie
 Any JDK to start Gradle with; the JDK 25 it builds with is downloaded automatically if missing.
 
 ```
-./gradlew run                 # start it
-./gradlew test                # unit tests, including real playback at volume 0
-./gradlew packageReleaseMsi   # installer in build/compose/binaries/main-release/msi
+./gradlew :desktop:run                 # start it (from the repository root)
+./gradlew :desktop:test                # unit tests, including real playback at volume 0
+./gradlew :desktop:packageReleaseMsi   # installer in desktop/build/compose/binaries/main-release/msi
 ```
 
-`./gradlew shots -PshotsScript=<file>` renders the app off screen from a script of steps (clicks, drags, waits, screenshots, frame timings) on a separate copy of the app data; see `src/test/kotlin/com/ku/pierdoon/Shots.kt`.
+`./gradlew :desktop:shots -PshotsScript=<file>` renders the app off screen from a script of steps (clicks, drags, waits, screenshots, frame timings) on a separate copy of the app data; see `src/test/kotlin/com/ku/pierdoon/Shots.kt`.
 
 ## Where things live
 

@@ -1,4 +1,4 @@
-# Unit tests and lint on every push and pull request.
+# Tests (and Android lint) on every push and pull request, for both apps and the shared core.
 name: Check
 
 on:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  check:
+  android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,9 +16,29 @@ jobs:
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
-      - run: ./gradlew testDebugUnitTest lintDebug --console=plain
+      - run: ./gradlew :core:test :app:testDebugUnitTest :app:lintDebug --console=plain
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: reports
-          path: app/build/reports/
+          name: android-reports
+          path: |
+            core/build/reports/
+            app/build/reports/
+
+  # Windows: FFmpeg is pulled in for windows-x86_64 only. The audio tests skip themselves there
+  # (no music folder, no sound device).
+  desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :desktop:test --console=plain
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-reports
+          path: desktop/build/reports/

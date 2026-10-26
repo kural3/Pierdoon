@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -55,7 +56,8 @@ sealed interface UpdateState {
  * Updates straight from the GitHub releases page: the app is not in a store, so nothing else
  * would tell its users that a new version is out.
  *
- * The latest release is checked at most twice a day; the APK is downloaded on request and
+ * Releases are checked at most twice a day; the newest one with an APK attached is offered
+ * (the Windows app publishes to the same repository). The APK is downloaded on request and
  * handed to [PackageInstaller]. Android shows its own confirmation and only accepts an APK
  * signed with the same key, so a tampered download can't replace the app.
  *
@@ -63,7 +65,7 @@ sealed interface UpdateState {
  * receiver, outside any screen.
  */
 object Updater {
-    private const val LATEST = "https://api.github.com/repos/kural3/Pierdoon/releases/latest"
+    private const val RELEASES = "https://api.github.com/repos/kural3/Pierdoon/releases?per_page=30"
     private const val CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
     private const val K_LAST_CHECK = "last_check"
     private const val K_SKIPPED = "skipped_version"
@@ -164,21 +166,26 @@ object Updater {
     }
 
     private fun fetchLatest(): AppRelease? {
-        val conn = open(LATEST, "application/vnd.github+json")
-        val o = try {
-            JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+        val conn = open(RELEASES, "application/vnd.github+json")
+        val releases = try {
+            JSONArray(conn.inputStream.bufferedReader().use { it.readText() })
         } finally {
             conn.disconnect()
         }
-        val assets = o.optJSONArray("assets") ?: return null
-        val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
-            .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) } ?: return null
-        return AppRelease(
-            version = o.optString("tag_name").removePrefix("v"),
-            notes = o.optString("body"),
-            apkUrl = apk.getString("browser_download_url"),
-            apkSize = apk.optLong("size"),
-        )
+        for (i in 0 until releases.length()) {
+            val o = releases.getJSONObject(i)
+            if (o.optBoolean("draft") || o.optBoolean("prerelease")) continue
+            val assets = o.optJSONArray("assets") ?: continue
+            val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
+                .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) } ?: continue
+            return AppRelease(
+                version = o.optString("tag_name").removePrefix("android-").removePrefix("v"),
+                notes = o.optString("body"),
+                apkUrl = apk.getString("browser_download_url"),
+                apkSize = apk.optLong("size"),
+            )
+        }
+        return null
     }
 
     /** Cancellable between chunks: the "Cancel" button stops it within one read. */
@@ -253,26 +260,6 @@ object Updater {
         }
         return conn
     }
-}
-
-/**
- * "1.10" > "1.9"; missing parts count as 0, so "1.2" == "1.2.0".
- * A pre-release comes before its release ("1.3-beta" < "1.3"), so a beta install is still
- * offered the final version. Two pre-releases of the same version aren't ranked: no offer
- * beats a guess that could be a downgrade.
- *
- * Outside [Updater] so it can be tested without the object's Android-bound state.
- */
-internal fun isNewerVersion(candidate: String, current: String): Boolean {
-    fun numbers(v: String) = v.substringBefore('-').split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
-    val a = numbers(candidate)
-    val b = numbers(current)
-    for (i in 0 until maxOf(a.size, b.size)) {
-        val x = a.getOrElse(i) { 0 }
-        val y = b.getOrElse(i) { 0 }
-        if (x != y) return x > y
-    }
-    return '-' in current && '-' !in candidate
 }
 
 class InstallResultReceiver : BroadcastReceiver() {

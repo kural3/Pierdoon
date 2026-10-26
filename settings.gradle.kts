@@ -23,4 +23,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Pier.doon"
-include(":app")
+// app: Android. desktop: Windows. core: code both use, plain Kotlin/JVM.
+include(":app", ":desktop", ":core")
