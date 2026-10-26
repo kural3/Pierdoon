@@ -73,6 +73,29 @@ class AudioEngineTest {
     }
 
     @Test
+    fun commandsDuringPlaybackLoseNoAudio() {
+        assumeTrue(music.isNotEmpty() && AudioSystem.getMixerInfo().isNotEmpty())
+        // MP3 frames come out of the resampler longer than one write: those are the ones cut short.
+        val track = music.firstOrNull { it.extension.equals("mp3", ignoreCase = true) } ?: music.first()
+        val startedLatch = CountDownLatch(1)
+        val endedLatch = CountDownLatch(1)
+        val e = engine(started = { startedLatch.countDown() }, ended = { endedLatch.countDown() })
+        e.load(track, token = 1, startMs = 0, play = true)
+        assertTrue("never started", startedLatch.await(10, TimeUnit.SECONDS))
+        val duration = com.ku.pierdoon.platform.MediaProbe.tags(track)!!.durationMs
+        e.seek(duration - 3_000)
+        val start = System.nanoTime()
+        // What a queue edit sends: none of it should cut the audio being written short.
+        while (endedLatch.count > 0 && System.nanoTime() - start < 10_000_000_000L) {
+            e.setNext(null, -1)
+            Thread.sleep(5)
+        }
+        val playedMs = (System.nanoTime() - start) / 1_000_000
+        assertTrue("the last 3 s played in $playedMs ms", playedMs >= 2_850)
+        e.release()
+    }
+
+    @Test
     fun switchesToNextTrackWithoutGap() {
         assumeTrue(music.size >= 2 && AudioSystem.getMixerInfo().isNotEmpty())
         val started = mutableListOf<Long>()

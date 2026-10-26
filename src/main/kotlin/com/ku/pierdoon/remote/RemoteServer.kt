@@ -51,6 +51,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPOutputStream
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import javax.swing.SwingUtilities
 
 /** What the settings page shows about the phone connection. */
@@ -79,7 +81,8 @@ data class RemoteDevice(val id: String, val name: String, val pairedAt: Long)
  */
 object RemoteServer {
     const val PORT = 47231
-    const val API_VERSION = 2
+    /** 2: downloads; 3: /verify. */
+    const val API_VERSION = 3
     private const val DOWNLOADS_THROTTLE_MS = 400L
     private const val MAX_DOWNLOADS_SENT = 20
 
@@ -94,8 +97,14 @@ object RemoteServer {
     private var server: HttpServer? = null
     private var watchers: Job? = null
     private val clients = CopyOnWriteArrayList<LinkedBlockingQueue<String>>()
-    private var failedPairings = 0
-    private var libraryVersion = 0
+    /**
+     * Wrong codes by address. After every few from one address pairing pauses for it, so the code
+     * can't be guessed by trying them all, while a phone elsewhere can still pair.
+     */
+    private val failedPairings = HashMap<String, PairingAttempts>()
+
+    private class PairingAttempts(var failed: Int = 0, var blockedUntil: Long = 0L)
+    @Volatile private var libraryVersion = 0
 
     private val player: Player get() = PlaybackController.player
 
@@ -202,6 +211,7 @@ object RemoteServer {
         when {
             path == "/info" && method == "GET" -> return send(ex, 200, infoJson())
             path == "/pair" && method == "POST" -> return pair(ex)
+            path == "/verify" && method == "POST" -> return verify(ex)
         }
         if (!authorized(ex)) return send(ex, 401, JSONObject().put("error", "unauthorized"))
         when {
@@ -232,19 +242,31 @@ object RemoteServer {
     private fun pair(ex: HttpExchange) {
         val body = readJson(ex)
         val code = body.optString("code").filter(Char::isDigit)
+        val now = System.currentTimeMillis()
+        val from = ex.remoteAddress?.address?.hostAddress ?: "?"
         val ok = synchronized(this) {
-            if (code.isNotEmpty() && code == _status.value.pairingCode) {
-                failedPairings = 0
-                true
-            } else {
-                // Guessing a six-digit code takes more than a handful of tries: after five, a new one.
-                if (++failedPairings >= MAX_FAILED_PAIRINGS) {
-                    failedPairings = 0
-                    _status.update { it.copy(pairingCode = newCode()) }
+            // Addresses that are neither paused nor have wrong codes left to count are dropped.
+            failedPairings.values.removeIf { it.blockedUntil < now && it.failed % MAX_FAILED_PAIRINGS == 0 }
+            val attempts = failedPairings.getOrPut(from) { PairingAttempts() }
+            when {
+                // Not even the right code gets in now: it would tell a guesser it was right.
+                now < attempts.blockedUntil -> null
+                code.isNotEmpty() && code == _status.value.pairingCode -> {
+                    failedPairings.remove(from)
+                    true
                 }
-                false
+                else -> {
+                    // Guessing a six-digit code takes more than a handful of tries: after five, a new
+                    // code and a pause, so trying them all would take months.
+                    if (++attempts.failed % MAX_FAILED_PAIRINGS == 0) {
+                        attempts.blockedUntil = now + PAIRING_PAUSE_MS
+                        _status.update { it.copy(pairingCode = newCode()) }
+                    }
+                    false
+                }
             }
         }
+        if (ok == null) return send(ex, 429, JSONObject().put("error", "too many attempts"))
         if (!ok) return send(ex, 403, JSONObject().put("error", "wrong code"))
         val token = ByteArray(32).also(random::nextBytes).joinToString("") { "%02x".format(it) }
         val name = body.optString("name").take(60).ifBlank { "Телефон" }
@@ -252,6 +274,21 @@ object RemoteServer {
         _status.update { it.copy(devices = loadDevices(), pairingCode = newCode()) }
         send(ex, 200, JSONObject().put("token", token).put("name", computerName()))
     }
+
+    /**
+     * Proves to a phone that this is the computer it paired with, without it sending the token:
+     * HMAC of its nonce under each paired token's hash, which only this computer has.
+     */
+    private fun verify(ex: HttpExchange) {
+        val nonce = readJson(ex).optString("nonce").takeIf { it.isNotEmpty() && it.length <= MAX_NONCE_CHARS }
+            ?: return send(ex, 400, JSONObject().put("error", "nonce"))
+        val proofs = prefs.keys().filter { it.startsWith(DEVICE) }.map { hmac(it.removePrefix(DEVICE), nonce) }
+        send(ex, 200, JSONObject().put("proofs", JSONArray(proofs)))
+    }
+
+    private fun hmac(key: String, message: String): String =
+        Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(key.toByteArray(), "HmacSHA256")) }
+            .doFinal(message.toByteArray()).joinToString("") { "%02x".format(it) }
 
     private fun authorized(ex: HttpExchange): Boolean {
         val token = tokenOf(ex) ?: return false
@@ -549,6 +586,8 @@ object RemoteServer {
     private const val CLOSE = "\u0000close"
     private const val KEEPALIVE_S = 15L
     private const val MAX_FAILED_PAIRINGS = 5
+    private const val PAIRING_PAUSE_MS = 30_000L
+    private const val MAX_NONCE_CHARS = 128
     private const val GZIP_MIN_BYTES = 4096
     private const val MAX_BODY_BYTES = 256 * 1024
     private const val COVER_CACHE_BYTES = 16 * 1024 * 1024

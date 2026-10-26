@@ -1,6 +1,6 @@
 # Phone connection API
 
-Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 1 (`api: 1`). The server is in `src/main/kotlin/com/ku/pierdoon/remote/`.
+Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 3 (`api: 3`). Version 2 added downloads; version 3 added `/verify`. A phone compares `api` from `/info` with its own and asks the user to update whichever side is behind. The server is in `src/main/kotlin/com/ku/pierdoon/remote/`.
 
 The server is off by default. The user turns it on in the Телефон tab of the side menu → Управление с телефона. While it runs, that tab shows a six-digit pairing code and the computer's addresses.
 
@@ -19,7 +19,7 @@ Use the packet's source address with `port`. If nothing replies within a couple 
 - Base URL: `http://<address>:47231/api`. The traffic is plain HTTP, so on Android 9+ the app needs `usesCleartextTraffic` or a network security config.
 - Bodies are JSON in UTF-8.
 - Send `Accept-Encoding: gzip`: large responses (the library) come back compressed.
-- Every endpoint except `/info` and `/pair` needs `Authorization: Bearer <token>`. Image loaders that can't set headers may add `?token=<token>` to the URL instead.
+- Every endpoint except `/info`, `/pair` and `/verify` needs `Authorization: Bearer <token>`. Image loaders that can't set headers may add `?token=<token>` to the URL instead.
 - `401` means the token is unknown: the phone was unpaired on the PC, so pair again.
 
 ### `GET /info` (no auth)
@@ -35,7 +35,19 @@ Use the packet's source address with `port`. If nothing replies within a couple 
 ```
 
 - `200 {"token": "…64 hex…", "name": "DESKTOP-7O84MEM"}`. Keep the token; it doesn't expire. The PC shows a new code after each successful pairing.
-- `403` wrong code. After five wrong codes the PC switches to a new code.
+- `403` wrong code. After every five wrong codes from one address the PC switches to a new code and refuses pairing from that address for 30 seconds. Other phones can still pair meanwhile.
+- `429` pairing is paused for this address after wrong codes; try again in 30 seconds.
+
+### `POST /verify` (no auth, since API 3)
+
+Lets a phone check that a computer answering at a new address (found by name through discovery) is really the one it paired with, without sending it the token.
+
+```json
+{"nonce": "…32 hex…"}
+```
+
+- `200 {"proofs": ["…64 hex…", …]}`: for every paired phone, `hex(HMAC-SHA256(key = hex(SHA-256(token)), message = nonce))`, keys and message as UTF-8 bytes. The phone computes the same for its own token; if no proof matches, it keeps the old address.
+- `400` the nonce is missing or longer than 128 characters.
 
 ### `POST /unpair`
 

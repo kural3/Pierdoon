@@ -34,7 +34,11 @@ class Player {
     /** Token handed to the engine for the item now loaded, and the index it stands for. */
     private var loadedToken = -1L
     private var nextToken = -1L
-    private var nextIndex = -1
+    /**
+     * Every "next" handed to the engine since the last switch, token to queue key. The engine may
+     * already be decoding one that a queue edit replaced since; when it's heard, it's still followed.
+     */
+    private val nextKeys = HashMap<Long, Long>()
 
     var currentMediaItemIndex: Int = -1
         private set
@@ -113,16 +117,17 @@ class Player {
     private val engine = AudioEngine(object : AudioEngine.Listener {
         override fun onTrackStarted(token: Long) {
             errorStreak = 0
-            if (token == nextToken && nextIndex in items.indices) {
-                // The engine moved on by itself (gapless): follow it.
-                currentMediaItemIndex = nextIndex
-                loadedToken = token
-                lastPositionMs = 0
-                nextToken = -1
-                nextIndex = -1
-                updateNext()
-                emit(Event.Transition, Event.Timeline)
-            }
+            val key = nextKeys[token] ?: return
+            val index = items.indexOfFirst { it.queueKey == key }
+            if (index < 0) return
+            // The engine moved on by itself (gapless): follow it.
+            currentMediaItemIndex = index
+            loadedToken = token
+            lastPositionMs = 0
+            nextToken = -1
+            nextKeys.clear()
+            updateNext()
+            emit(Event.Transition, Event.Timeline)
         }
 
         override fun onEnded(token: Long) {
@@ -145,7 +150,7 @@ class Player {
         }
 
         override fun onError(token: Long, error: Throwable) {
-            if (token != loadedToken && token != nextToken) return
+            if (token != loadedToken && token !in nextKeys) return
             // A broken file is skipped, as Media3 would after an error the app recovers from.
             val following = nextIndexFor(currentMediaItemIndex, if (repeatMode == REPEAT_MODE_ONE) REPEAT_MODE_ALL else repeatMode)
             if (following >= 0 && following != currentMediaItemIndex && errorStreak < items.size) {
@@ -357,6 +362,18 @@ class Player {
         }
     }
 
+    /** The shuffled play order, for saving; null with shuffle off. */
+    val shuffleOrderSnapshot: List<Int>?
+        get() = if (shuffleModeEnabled && shuffleOrder.size == items.size) shuffleOrder.toList() else null
+
+    /** Puts a saved play order back. Ignored unless shuffle is on and [order] covers every item once. */
+    fun restoreShuffleOrder(order: List<Int>) {
+        if (!shuffleModeEnabled || order.size != items.size || order.toSet() != items.indices.toSet()) return
+        shuffleOrder = order.toIntArray()
+        updateNext()
+        emit(Event.Timeline)
+    }
+
     private fun playOrder(): IntArray =
         if (shuffleModeEnabled && shuffleOrder.size == items.size) shuffleOrder else IntArray(items.size) { it }
 
@@ -384,7 +401,7 @@ class Player {
         val token = ++tokenSeq
         loadedToken = token
         nextToken = -1
-        nextIndex = -1
+        nextKeys.clear()
         lastPositionMs = startMs
         playbackState = STATE_READY
         engine.load(item.song.file, token, startMs, play)
@@ -397,14 +414,13 @@ class Player {
         if (loadedToken < 0) return
         val n = if (pauseAtEndOfMediaItems) -1 else nextIndexFor(currentMediaItemIndex, repeatMode)
         if (n < 0) {
-            if (nextIndex != -1) engine.setNext(null, -1)
-            nextIndex = -1
+            if (nextToken != -1L) engine.setNext(null, -1)
             nextToken = -1
             return
         }
         val token = ++tokenSeq
-        nextIndex = n
         nextToken = token
+        nextKeys[token] = items[n].queueKey
         engine.setNext(items[n].song.file, token)
     }
 
@@ -412,7 +428,7 @@ class Player {
         val closed = engine.stop()
         loadedToken = -1
         nextToken = -1
-        nextIndex = -1
+        nextKeys.clear()
         playbackState = STATE_IDLE
         playWhenReadyInternal(false)
         return closed

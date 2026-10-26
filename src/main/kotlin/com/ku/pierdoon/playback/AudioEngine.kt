@@ -67,13 +67,15 @@ class AudioEngine(private val listener: Listener) {
     @Volatile var isPlaying: Boolean = false
         private set
 
-    // Owned by the audio thread.
-    private var line: SourceDataLine? = null
+    // Owned by the audio thread; the volatile ones are also read by position() on the UI thread.
+    @Volatile private var line: SourceDataLine? = null
     private var deviceName: String? = null
     private var decoder: FFmpegFrameGrabber? = null
     private var decoderToken = -1L
     private var next: Pair<File, Long>? = null
-    private var framesWritten = 0L
+    @Volatile private var framesWritten = 0L
+    /** The rest of a decoded frame whose writing a command interrupted; written before decoding on. */
+    private var leftover: ShortBuffer? = null
     private var playing = false
     private var pendingMark = true
     private var silentFrames = 0L
@@ -127,6 +129,11 @@ class AudioEngine(private val listener: Listener) {
             if (!playing) continue
             val d = decoder ?: continue
             try {
+                val rest = leftover
+                if (rest != null) {
+                    writeLeftover(rest, chunk)
+                    continue
+                }
                 val written = decodeInto(d, chunk)
                 if (written < 0) onDecoderEnd()
             } catch (e: Exception) {
@@ -183,6 +190,8 @@ class AudioEngine(private val listener: Listener) {
                 val heard = position()
                 line?.run { stop(); flush(); close() }
                 line = null
+                // Repositioned below from what was heard: the unwritten rest would come twice.
+                leftover = null
                 // What was buffered is lost: carry on from where the listener was.
                 heard?.let { (token, ms) ->
                     if (token == decoderToken) decoder?.let { d -> runCatching { d.timestamp = ms * 1000 } }
@@ -257,24 +266,39 @@ class AudioEngine(private val listener: Listener) {
             post { listener.onOutputUnavailable() }
             return frames
         }
-        var offset = 0
-        while (offset < samples) {
-            val n = minOf(samples - offset, chunk.size / 2)
+        // A view of its own: the grabber's buffer keeps its position for the next grab.
+        writeSamples(l, buffer.duplicate(), gain, chunk)
+        trimMarks()
+        announceIfHeard()
+        return frames
+    }
+
+    /**
+     * Writes [samples] from their position on. A command (pause, seek, skip) shouldn't wait for
+     * a long frame to finish, so a waiting one stops it; what's left is kept in [leftover] and
+     * written next, as dropping it would cut the audio and put the position behind the music.
+     */
+    private fun writeSamples(l: SourceDataLine, samples: ShortBuffer, gain: Float, chunk: ByteArray) {
+        while (samples.hasRemaining()) {
+            val n = minOf(samples.remaining(), chunk.size / 2)
             var o = 0
-            for (i in 0 until n) {
-                val s = (buffer.get(buffer.position() + offset + i) * gain).toInt().coerceIn(-32768, 32767)
+            repeat(n) {
+                val s = (samples.get() * gain).toInt().coerceIn(-32768, 32767)
                 chunk[o++] = (s and 0xFF).toByte()
                 chunk[o++] = ((s shr 8) and 0xFF).toByte()
             }
             l.write(chunk, 0, o)
             framesWritten += n / CHANNELS
-            offset += n
-            // A command (pause, seek, skip) shouldn't wait for a long frame to finish.
             if (commands.isNotEmpty()) break
         }
+        leftover = samples.takeIf { it.hasRemaining() }
+    }
+
+    private fun writeLeftover(rest: ShortBuffer, chunk: ByteArray) {
+        val l = line ?: run { leftover = null; return }
+        writeSamples(l, rest, volume.let { it * it * it }, chunk)
         trimMarks()
         announceIfHeard()
-        return frames
     }
 
     private fun onDecoderEnd() {
@@ -318,12 +342,14 @@ class AudioEngine(private val listener: Listener) {
             if (playing) start()
         }
         // Nothing buffered any more: what's written is what's heard.
+        leftover = null
         synchronized(lock) { marks.clear() }
         pendingMark = true
         announcedToken = -1L
     }
 
     private fun closeDecoder() {
+        leftover = null
         decoder?.let { runCatching { it.stop(); it.release() } }
         decoder = null
     }

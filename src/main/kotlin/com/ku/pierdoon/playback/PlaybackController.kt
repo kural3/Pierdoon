@@ -151,6 +151,8 @@ object PlaybackController {
                     player.shuffleModeEnabled = false
                     player.setMediaItems(plan.songIds.map { MediaItem(byId.getValue(it)) }, plan.index, plan.positionMs)
                     player.shuffleModeEnabled = q.shuffle
+                    // The same shuffle as before, not a new one: what was coming up still is.
+                    plan.shuffleOrder?.let(player::restoreShuffleOrder)
                     player.repeatMode = q.repeatMode
                 }
             }
@@ -191,6 +193,7 @@ object PlaybackController {
         positionMs = player.currentPosition,
         shuffle = player.shuffleModeEnabled,
         repeatMode = player.repeatMode,
+        shuffleOrder = player.shuffleOrderSnapshot,
     )
 
     private const val SAVE_DELAY_MS = 1_000L

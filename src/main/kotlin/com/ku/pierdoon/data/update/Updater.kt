@@ -22,6 +22,8 @@ import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.DigestInputStream
+import java.security.MessageDigest
 import kotlin.system.exitProcess
 
 /** A published release that has a Windows installer attached. */
@@ -31,6 +33,8 @@ data class AppRelease(
     val notes: String,
     val installerUrl: String,
     val installerSize: Long,
+    /** Hex SHA-256 GitHub lists for the installer; null on releases from before it did. */
+    val installerSha256: String? = null,
 )
 
 sealed interface UpdateState {
@@ -157,22 +161,27 @@ object Updater {
                 notes = o.optString("body"),
                 installerUrl = msi.getString("browser_download_url"),
                 installerSize = msi.optLong("size"),
+                installerSha256 = sha256Of(msi.optString("digest")),
             )
         }
         return null
     }
 
-    /** Cancellable between chunks: the "Cancel" button stops it within one read. */
+    /**
+     * Cancellable between chunks: the "Cancel" button stops it within one read. Checked against
+     * the SHA-256 GitHub lists for it before it is ever started.
+     */
     private suspend fun downloadInstaller(release: AppRelease, onProgress: (Float?) -> Unit): File {
         val dir = File(AppDirs.cache, "update").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "Pierdoon-${release.version}.msi")
+        val digest = MessageDigest.getInstance("SHA-256")
         val conn = open(release.installerUrl, "application/octet-stream")
         try {
             val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.installerSize.takeIf { it > 0 }
             var read = 0L
-            var lastReported = -1
-            conn.inputStream.use { input ->
+            var lastReported: Int? = -1
+            DigestInputStream(conn.inputStream, digest).use { input ->
                 file.outputStream().use { out ->
                     val buf = ByteArray(64 * 1024)
                     while (true) {
@@ -182,14 +191,22 @@ object Updater {
                         out.write(buf, 0, n)
                         read += n
                         val percent = total?.let { (read * 100 / it).toInt() }
+                        // Unknown size: reported once as null, not on every chunk.
                         if (percent != lastReported) {
-                            lastReported = percent ?: -1
+                            lastReported = percent
                             onProgress(total?.let { read.toFloat() / it })
                         }
                     }
                 }
             }
             if (total != null && read != total) throw IOException("Truncated download")
+            val actual = digest.digest().joinToString("") { "%02x".format(it) }
+            if (release.installerSha256 != null && actual != release.installerSha256) {
+                throw IOException("Installer checksum mismatch")
+            }
+        } catch (e: Exception) {
+            file.delete()
+            throw e
         } finally {
             conn.disconnect()
         }
@@ -230,3 +247,8 @@ internal fun isNewerVersion(candidate: String, current: String): Boolean {
     }
     return '-' in current && '-' !in candidate
 }
+
+/** The hex out of "sha256:<hex>", as GitHub gives an asset's digest; null for anything else. */
+internal fun sha256Of(digest: String): String? =
+    digest.removePrefix("sha256:").lowercase()
+        .takeIf { digest.startsWith("sha256:") && it.length == 64 && it.all { c -> c in '0'..'9' || c in 'a'..'f' } }

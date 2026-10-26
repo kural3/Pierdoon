@@ -50,4 +50,19 @@ class RestorePlanTest {
         assertNull(queue(1, 2, index = 0).restorePlan { false })
         assertNull(queue(index = 0).restorePlan { true })
     }
+
+    @Test
+    fun shuffleOrderSurvivesWithoutTheDeletedTracks() {
+        // Play order 3, 1, 4, 2 (ids); the track with id 4 is gone.
+        val saved = SavedQueue(listOf(1, 2, 3, 4), 2, 0L, shuffle = true, repeatMode = 0, shuffleOrder = listOf(2, 0, 3, 1))
+        val plan = saved.restorePlan { it != 4L }!!
+        assertEquals(listOf(1L, 2L, 3L), plan.songIds)
+        assertEquals(listOf(2, 0, 1), plan.shuffleOrder)
+    }
+
+    @Test
+    fun brokenShuffleOrderIsDropped() {
+        val saved = SavedQueue(listOf(1, 2, 3), 0, 0L, shuffle = true, repeatMode = 0, shuffleOrder = listOf(0, 0, 1))
+        assertNull(saved.restorePlan { true }!!.shuffleOrder)
+    }
 }
