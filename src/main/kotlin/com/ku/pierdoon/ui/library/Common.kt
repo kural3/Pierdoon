@@ -206,16 +206,14 @@ fun AppScaffold(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 subtitle = subtitle?.let { { Text(it) } },
                 navigationIcon = {
-                    if (onBack != null) {
-                        ExpressiveIconButton(
-                            onClick = onBack,
-                            icon = PlayerIcons.Back,
-                            contentDescription = stringResource(Res.string.back),
-                            containerColor = Color.Transparent,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(start = 4.dp).size(48.dp),
-                        )
-                    }
+                    ExpressiveIconButton(
+                        onClick = onBack,
+                        icon = PlayerIcons.Back,
+                        contentDescription = stringResource(Res.string.back),
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = 4.dp).size(48.dp),
+                    )
                 },
                 actions = { actions() },
                 scrollBehavior = scrollBehavior,

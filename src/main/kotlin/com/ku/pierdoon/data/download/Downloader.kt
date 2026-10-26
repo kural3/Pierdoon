@@ -16,6 +16,7 @@ import com.ku.pierdoon.platform.Images
 import com.ku.pierdoon.platform.Prefs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -218,8 +219,11 @@ object Downloader {
     private suspend fun drain() {
         while (true) {
             val next = _tasks.value.firstOrNull { it.status == DownloadStatus.Queued } ?: return
-            val job = scope.launch { run(next) }
+            // Registered before it starts, so a remove() right away still finds it to cancel.
+            val job = scope.launch(start = CoroutineStart.LAZY) { run(next) }
             synchronized(this) { running = next.id to job }
+            // Removed before it got here: it isn't run at all.
+            if (_tasks.value.none { it.id == next.id }) job.cancel() else job.start()
             job.join()
             synchronized(this) { running = null }
             next.group?.let { finishGroup(it) }
@@ -243,7 +247,7 @@ object Downloader {
 
     /** A playlist or album link: its tracks take [task]'s place in the queue. False if it's a single track. */
     private suspend fun expand(task: DownloadTask): Boolean {
-        val info = JSONObject(execute(listOf(task.url, "--flat-playlist", "--no-playlist", "-J")))
+        val info = JSONObject(execute(listOf("--flat-playlist", "--no-playlist", "-J", "--", task.url)))
         if (info.str("_type") != "playlist") return false
         val entries = info.optJSONArray("entries")
         // Channel pages list their tabs as playlists of their own; only tracks are taken.
@@ -357,7 +361,6 @@ object Downloader {
     /** Runs yt-dlp: the audio file and its .info.json land in [work]. */
     private suspend fun fetch(task: DownloadTask, work: File): JSONObject {
         val args = listOf(
-            task.url,
             "--no-playlist",
             "--no-mtime",
             "--newline",
@@ -367,6 +370,9 @@ object Downloader {
             "-x", "--audio-format", "best",
             "--ffmpeg-location", ffmpegPath(),
             "-o", File(work, "%(id)s.%(ext)s").path,
+            // Links come from sites too (search results, playlist entries): after "--" one that
+            // starts with "-" is still a link, never an option such as --exec.
+            "--", task.url,
         )
         execute(args) { line ->
             val m = PROGRESS.find(line) ?: return@execute
@@ -391,7 +397,9 @@ object Downloader {
      * @throws IOException with the error lines when yt-dlp fails.
      */
     private fun runYtDlp(args: List<String>, onLine: ((String) -> Unit)? = null): String {
-        val process = ProcessBuilder(listOf(ytDlp.absolutePath, "--encoding", "utf-8") + args)
+        // --ignore-config: a yt-dlp.conf of the user's (in %APPDATA%, say) could change the output
+        // format or the -J json this reads.
+        val process = ProcessBuilder(listOf(ytDlp.absolutePath, "--ignore-config", "--encoding", "utf-8") + args)
             .redirectErrorStream(false)
             .apply { environment()["PYTHONIOENCODING"] = "utf-8" }
             .start()
