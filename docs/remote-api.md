@@ -1,6 +1,6 @@
 # Phone connection API
 
-Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 3 (`api: 3`). Version 2 added downloads; version 3 added `/verify`. A phone compares `api` from `/info` with its own and asks the user to update whichever side is behind. The server is in `src/main/kotlin/com/ku/pierdoon/remote/`.
+Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 3 (`api: 3`). Version 2 added downloads; version 3 added `/verify`. A phone compares `api` from `/info` with its own and asks the user to update whichever side is behind. The server is in `desktop/src/main/kotlin/com/ku/pierdoon/remote/`, the phone side in `app/src/main/java/com/ku/pierdoon/remote/PcRemote.kt`.
 
 The server is off by default. The user turns it on in the Телефон tab of the side menu → Управление с телефона. While it runs, that tab shows a six-digit pairing code and the computer's addresses.
 
