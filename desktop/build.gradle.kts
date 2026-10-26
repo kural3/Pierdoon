@@ -1,9 +1,9 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("jvm") version "2.4.21"
-    kotlin("plugin.compose") version "2.4.21"
-    id("org.jetbrains.compose") version "1.12.2"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.compose.multiplatform)
 }
 
 group = "com.ku.pierdoon"
@@ -14,6 +14,7 @@ version = "1.0.6"
 val javacppPlatform = "windows-x86_64"
 
 dependencies {
+    implementation(project(":core"))
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.compose.material3:material3:1.12.0-alpha03")
     implementation("org.jetbrains.compose.components:components-resources:1.12.2")

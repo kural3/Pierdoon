@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.components
 
+import com.ku.pierdoon.data.ALBUM_ART_URI
 import androidx.compose.ui.draw.blur
 import androidx.compose.runtime.staticCompositionLocalOf
 import android.content.ContentUris

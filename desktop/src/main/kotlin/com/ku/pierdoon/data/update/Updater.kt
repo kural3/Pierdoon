@@ -58,8 +58,8 @@ sealed interface UpdateState {
  * The installer is downloaded on request, started, and the app quits so it can be replaced.
  */
 object Updater {
-    /** Only releases with an .msi attached count. */
-    private const val RELEASES = "https://api.github.com/repos/kural3/Pierdoon4Desktop/releases?per_page=15"
+    /** One repository for both apps (desktop-… tags): only releases with an .msi attached count. */
+    private const val RELEASES = "https://api.github.com/repos/kural3/Pierdoon/releases?per_page=30"
     private const val CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
     private const val K_LAST_CHECK = "last_check"
     private const val K_SKIPPED = "skipped_version"
@@ -226,26 +226,6 @@ object Updater {
         }
         return conn
     }
-}
-
-/**
- * "1.10" > "1.9"; missing parts count as 0, so "1.2" == "1.2.0".
- * A pre-release comes before its release ("1.3-beta" < "1.3"), so a beta install is still
- * offered the final version. Two pre-releases of the same version aren't ranked: no offer
- * beats a guess that could be a downgrade.
- *
- * Outside [Updater] so it can be tested on its own.
- */
-internal fun isNewerVersion(candidate: String, current: String): Boolean {
-    fun numbers(v: String) = v.substringBefore('-').split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
-    val a = numbers(candidate)
-    val b = numbers(current)
-    for (i in 0 until maxOf(a.size, b.size)) {
-        val x = a.getOrElse(i) { 0 }
-        val y = b.getOrElse(i) { 0 }
-        if (x != y) return x > y
-    }
-    return '-' in current && '-' !in candidate
 }
 
 /** The hex out of "sha256:<hex>", as GitHub gives an asset's digest; null for anything else. */

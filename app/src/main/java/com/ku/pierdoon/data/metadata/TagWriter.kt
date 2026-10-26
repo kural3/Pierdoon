@@ -1,5 +1,6 @@
 package com.ku.pierdoon.data.metadata
 
+import com.ku.pierdoon.data.uri
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.provider.MediaStore

@@ -1,5 +1,10 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.data.ALBUM_ID
+import com.ku.pierdoon.data.QUEUE_KEY
+import com.ku.pierdoon.data.artworkUri
+import com.ku.pierdoon.data.uri
+import com.ku.pierdoon.data.toMediaItem
 import android.app.Application
 import android.content.ComponentName
 import android.content.ContentUris
@@ -594,7 +599,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (md.title?.toString() == song.title && md.artist?.toString() == song.artist &&
                 md.albumTitle?.toString() == song.album && md.artworkUri == song.artworkUri
             ) continue
-            val key = md.extras?.getLong(Song.QUEUE_KEY, 0L)?.takeIf { it != 0L }
+            val key = md.extras?.getLong(QUEUE_KEY, 0L)?.takeIf { it != 0L }
             // Same file, new metadata: Media3 swaps it in without interrupting playback.
             p.replaceMediaItem(i, if (key != null) song.toMediaItem(key) else song.toMediaItem())
         }
@@ -674,7 +679,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 private fun queueKeyOf(item: MediaItem, index: Int): String =
-    item.mediaMetadata.extras?.getLong(Song.QUEUE_KEY, 0L)?.takeIf { it != 0L }?.let { "q:$it" } ?: "slot:$index"
+    item.mediaMetadata.extras?.getLong(QUEUE_KEY, 0L)?.takeIf { it != 0L }?.let { "q:$it" } ?: "slot:$index"
 
 private fun Player.indexOfQueueKey(key: String): Int? =
     (0 until mediaItemCount).firstOrNull { queueKeyOf(getMediaItemAt(it), it) == key }
@@ -694,5 +699,5 @@ private fun MediaItem.toSong(): Song {
 
 /** Album of a queued item: from the extra, or (items queued before it existed) the art URI. */
 private fun MediaMetadata.albumId(): Long =
-    extras?.getLong(Song.ALBUM_ID, -1L)?.takeIf { it != -1L }
+    extras?.getLong(ALBUM_ID, -1L)?.takeIf { it != -1L }
         ?: artworkUri?.let { runCatching { ContentUris.parseId(it) }.getOrNull() } ?: -1L

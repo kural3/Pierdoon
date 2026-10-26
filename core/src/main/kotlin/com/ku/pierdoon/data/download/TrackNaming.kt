@@ -9,7 +9,7 @@ data class TrackName(val title: String, val artist: String)
  * Music services (YouTube Music, SoundCloud, Bandcamp) give the track and artist outright.
  * Plain videos only have a title, usually "Artist - Title (Official Video)", and the channel.
  */
-internal fun trackName(
+fun trackName(
     title: String?,
     track: String?,
     artist: String?,
@@ -31,7 +31,7 @@ internal fun trackName(
 }
 
 /** Drops "(Official Video)", "[Lyrics]", "| 4K" and the like: video labels, not part of the song's name. */
-internal fun cleanTitle(title: String): String =
+fun cleanTitle(title: String): String =
     title.replace(NOISE, "").replace(Regex("""\s{2,}"""), " ").trim().ifEmpty { title.trim() }
 
 /** The first web link in shared text ("Check this out https://youtu.be/…"). */
@@ -41,7 +41,7 @@ fun findUrl(text: String): String? = URL.find(text)?.value?.trimEnd('.', ',', ')
  * Links that are surely one track, so there's no need to ask yt-dlp first whether they're a
  * playlist or an album. Anything else is looked at before downloading.
  */
-internal fun looksLikeSingleTrack(url: String): Boolean {
+fun looksLikeSingleTrack(url: String): Boolean {
     val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
     val host = uri.host?.lowercase()?.removePrefix("www.")?.removePrefix("m.")?.removePrefix("music.") ?: return false
     val path = uri.path.orEmpty()
@@ -56,13 +56,13 @@ internal fun looksLikeSingleTrack(url: String): Boolean {
 }
 
 /** "Album - Name" is how YouTube Music titles an album's playlist. */
-internal fun playlistName(title: String?): String? =
+fun playlistName(title: String?): String? =
     title?.removePrefix("Album - ")?.trim()?.takeIf { it.isNotEmpty() }
 
 private val SOUNDCLOUD_LISTS = setOf("sets", "tracks", "albums", "likes", "reposts", "popular-tracks", "followers", "following")
 
 /** A file name every filesystem accepts, short enough to leave room for "(1)" and the extension. */
-internal fun safeFileName(name: String): String =
+fun safeFileName(name: String): String =
     name.replace(Regex("""[\\/:*?"<>|\u0000-\u001f]"""), "_").trim().trimStart('.').take(120).ifBlank { "track" }
 
 private val DASHES = Regex("""\s[-–—]\s""")
