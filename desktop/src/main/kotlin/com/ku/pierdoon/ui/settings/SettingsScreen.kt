@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.settings
 
+import com.ku.pierdoon.data.download.EngineUpdate
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import com.ku.pierdoon.ui.library.CONTENT_MAX_WIDTH
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -679,6 +682,30 @@ private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update, onD
                             )
                         }
                     }
+                },
+            )
+        }
+    }
+    item(key = "download_engine") {
+        LaunchedEffect(Unit) { Downloader.warmUp() }
+        val version by Downloader.engineVersion.collectAsState()
+        val engineUpdate by Downloader.engineUpdate.collectAsState()
+        Group(null) {
+            listOf<@Composable (Shape) -> Unit>(
+                { shape ->
+                    ActionItem(
+                        shape = shape,
+                        title = stringResource(Res.string.download_engine_update),
+                        subtitle = when (engineUpdate) {
+                            EngineUpdate.Idle -> version?.let { stringResource(Res.string.download_engine, it) }
+                                ?: stringResource(Res.string.download_engine_unknown)
+                            EngineUpdate.Running -> stringResource(Res.string.download_engine_updating)
+                            EngineUpdate.Updated -> stringResource(Res.string.download_engine_updated)
+                            EngineUpdate.UpToDate -> stringResource(Res.string.download_engine_latest)
+                            EngineUpdate.Failed -> stringResource(Res.string.download_engine_failed)
+                        },
+                        onClick = { if (engineUpdate != EngineUpdate.Running) Downloader.updateEngine() },
+                    )
                 },
             )
         }

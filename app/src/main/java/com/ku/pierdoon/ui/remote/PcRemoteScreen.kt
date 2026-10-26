@@ -750,11 +750,12 @@ private fun SendBox(
                     add { shape -> SendHitRow(hit, shape, sent = hit.url in sentUrls) { onPick(hit) } }
                 }
             }
-            add { shape ->
-                ItemContainer(shape) {
-                    Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Tip(PlayerIcons.Download, stringResource(R.string.pc_send_hint))
-                        Tip(PlayerIcons.Smartphone, stringResource(R.string.pc_send_share))
+            if (link.isEmpty() && send !is SendState.Found) {
+                add { shape ->
+                    ItemContainer(shape) {
+                        Box(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+                            Tip(PlayerIcons.Smartphone, stringResource(R.string.pc_send_share))
+                        }
                     }
                 }
             }

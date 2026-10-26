@@ -28,6 +28,10 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import com.ku.pierdoon.data.download.DownloadFormat
+import com.ku.pierdoon.data.download.Downloader
+import com.ku.pierdoon.data.download.EngineUpdate
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -71,7 +75,7 @@ internal fun groupShape(index: Int, count: Int): Shape {
 }
 
 /** A page of settings, opened from the list on the Settings tab. */
-enum class SettingsSection { Appearance, Feedback, Playback, Lyrics, Library, Updates }
+enum class SettingsSection { Appearance, Feedback, Playback, Lyrics, Library, Downloads, Updates }
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
 
@@ -125,12 +129,13 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             when (section) {
-                null -> sectionList(onOpen, onOpenComputer, trackCount, updateStatus, version)
+                null -> sectionList(onOpen, onOpenComputer, trackCount, updateStatus, version, settings.downloadFormat)
                 SettingsSection.Appearance -> appearance(settings, onUpdate)
                 SettingsSection.Feedback -> feedback(settings, onUpdate)
                 SettingsSection.Playback -> playback(settings, onUpdate)
                 SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
                 SettingsSection.Library -> library(trackCount, onRescan)
+                SettingsSection.Downloads -> downloads(settings, onUpdate)
                 SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
             }
         }
@@ -143,6 +148,7 @@ private fun SettingsSection.title(): Int = when (this) {
     SettingsSection.Playback -> R.string.settings_playback
     SettingsSection.Lyrics -> R.string.settings_lyrics
     SettingsSection.Library -> R.string.settings_library
+    SettingsSection.Downloads -> R.string.settings_downloads
     SettingsSection.Updates -> R.string.settings_updates
 }
 
@@ -152,6 +158,7 @@ private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Playback -> PlayerIcons.Play
     SettingsSection.Lyrics -> PlayerIcons.Lyrics
     SettingsSection.Library -> PlayerIcons.Library
+    SettingsSection.Downloads -> PlayerIcons.Download
     SettingsSection.Updates -> PlayerIcons.Refresh
 }
 
@@ -161,10 +168,12 @@ private fun LazyListScope.sectionList(
     trackCount: Int,
     updateStatus: String,
     version: String,
+    downloadFormat: DownloadFormat,
 ) {
     item(key = "sections") {
         Group(null) {
-            SettingsSection.entries.map { s ->
+            // Downloads need Android 10; before that the section would only say so.
+            SettingsSection.entries.filter { it != SettingsSection.Downloads || Downloader.supported }.map { s ->
                 { shape ->
                     SectionItem(
                         shape = shape,
@@ -176,6 +185,7 @@ private fun LazyListScope.sectionList(
                             SettingsSection.Playback -> stringResource(R.string.settings_playback_summary)
                             SettingsSection.Lyrics -> stringResource(R.string.settings_lyrics_summary)
                             SettingsSection.Library -> stringResource(R.string.tracks_count, trackCount)
+                            SettingsSection.Downloads -> downloadsSummary(downloadFormat)
                             SettingsSection.Updates -> updateStatus
                         },
                         onClick = { onOpen(s) },
@@ -513,6 +523,71 @@ private fun LazyListScope.library(trackCount: Int, onRescan: () -> Unit) {
                             onRescan()
                             Toast.makeText(context, done, Toast.LENGTH_SHORT).show()
                         },
+                    )
+                },
+            )
+        }
+    }
+}
+
+/** "M4A · yt-dlp 2025.10.22" on the section list. */
+@Composable
+private fun downloadsSummary(format: DownloadFormat): String {
+    val version by Downloader.engineVersion.collectAsStateWithLifecycle()
+    val name = stringResource(if (format == DownloadFormat.M4a) R.string.download_format_m4a else R.string.download_format_opus)
+    return listOfNotNull(name, version?.let { stringResource(R.string.download_engine, it) }).joinToString(" · ")
+}
+
+private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update) {
+    item(key = "download_format") {
+        Group(stringResource(R.string.download_format)) {
+            listOf<@Composable (Shape) -> Unit>(
+                { shape ->
+                    ItemContainer(shape) {
+                        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                            ConnectedChoice(
+                                options = listOf(
+                                    stringResource(R.string.download_format_m4a),
+                                    stringResource(R.string.download_format_opus),
+                                ),
+                                selected = settings.downloadFormat.ordinal,
+                                onSelect = { i -> onUpdate { it.copy(downloadFormat = DownloadFormat.entries[i]) } },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                stringResource(
+                                    if (settings.downloadFormat == DownloadFormat.M4a) R.string.download_format_m4a_desc
+                                    else R.string.download_format_opus_desc
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
+            )
+        }
+    }
+    item(key = "download_engine") {
+        LaunchedEffect(Unit) { Downloader.warmUp() }
+        val version by Downloader.engineVersion.collectAsStateWithLifecycle()
+        val engineUpdate by Downloader.engineUpdate.collectAsStateWithLifecycle()
+        Group(null) {
+            listOf<@Composable (Shape) -> Unit>(
+                { shape ->
+                    ActionItem(
+                        shape = shape,
+                        title = stringResource(R.string.download_engine_update),
+                        subtitle = when (engineUpdate) {
+                            EngineUpdate.Idle -> version?.let { stringResource(R.string.download_engine, it) }
+                                ?: stringResource(R.string.download_engine_unknown)
+                            EngineUpdate.Running -> stringResource(R.string.download_engine_updating)
+                            EngineUpdate.Updated -> stringResource(R.string.download_engine_updated)
+                            EngineUpdate.UpToDate -> stringResource(R.string.download_engine_latest)
+                            EngineUpdate.Failed -> stringResource(R.string.download_engine_failed)
+                        },
+                        onClick = { if (engineUpdate != EngineUpdate.Running) Downloader.updateEngine() },
                     )
                 },
             )
