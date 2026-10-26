@@ -400,6 +400,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun next() { controller?.seekToNext() }
     fun previous() { controller?.seekToPrevious() }
+    /** Swiping back: always the track before, never a restart of this one as the button does past 3 s. */
+    fun previousTrack() { controller?.seekToPreviousMediaItem() }
     fun seekTo(positionMs: Long) { controller?.seekTo(positionMs) }
 
     private fun networkAllowed(): Boolean {

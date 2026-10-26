@@ -1,6 +1,6 @@
 # Phone connection API
 
-Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 3 (`api: 3`). Version 2 added downloads; version 3 added `/verify`. A phone compares `api` from `/info` with its own and asks the user to update whichever side is behind. The server is in `desktop/src/main/kotlin/com/ku/pierdoon/remote/`, the phone side in `app/src/main/java/com/ku/pierdoon/remote/PcRemote.kt`.
+Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 4 (`api: 4`). Version 2 added downloads; version 3 added `/verify`; version 4 added `/file` and `/upload` for copying tracks. A phone compares `api` from `/info` with its own and asks the user to update whichever side is behind. The server is in `desktop/src/main/kotlin/com/ku/pierdoon/remote/`, the phone side in `app/src/main/java/com/ku/pierdoon/remote/PcRemote.kt`.
 
 The server is off by default. The user turns it on in the Телефон tab of the side menu → Управление с телефона. While it runs, that tab shows a six-digit pairing code and the computer's addresses.
 
@@ -118,6 +118,26 @@ Songs come sorted by title. Albums and artists are in the PC's order.
 ### `GET /cover/{songId}?size=600`
 
 The track's cover as JPEG, at most `size` px on a side (64–1200). `404` means the track has no cover. The response may be cached forever under the song's `art` key.
+
+### `GET /file/{songId}` (since API 4)
+
+The track's audio file, byte for byte, as `application/octet-stream` with `Content-Length`. Headers:
+
+- `X-Pierdoon-Name`: the file's name, URL-encoded (`Artist - Title.flac`). Its extension tells the format.
+- `X-Pierdoon-Tags`: only when the user edited the track's tags in the app rather than in the file. URL-encoded JSON, `{"title", "artist", "album"}`, each field optional. The phone keeps them as its own in-app edits.
+
+`404` means the track is unknown or its file is gone.
+
+### `POST /upload?name=…&tags=…` (since API 4)
+
+A track for the computer to keep. The body is the file, byte for byte, with `Content-Length` (up to 2 GB). `name` is its file name, including the extension. `tags` is optional: URL-encoded JSON like `X-Pierdoon-Tags` above.
+
+The computer saves it to its downloads folder under `name`, as `name (1)` if that's taken, and adds it to the library. It doesn't check whether it already has the track: the phone does that against `/library` before sending, by title, artist and length.
+
+- `200 {"ok": true, "name": "…"}`: saved under that name.
+- `400`: the body ended before `Content-Length` bytes. Nothing is kept.
+- `411`: no `Content-Length`. `413`: over 2 GB. `415`: not an audio extension the library plays.
+- `507`: not enough room on the computer's disk.
 
 ### `GET /lyrics?songId=…`
 

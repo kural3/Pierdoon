@@ -3,6 +3,7 @@ package com.ku.pierdoon
 import android.Manifest
 import android.view.KeyEvent
 import com.ku.pierdoon.remote.PcRemote
+import com.ku.pierdoon.remote.PcTransfers
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         SettingsStore.init(this)
         PcRemote.init(this)
+        PcTransfers.init(this)
         CoverStore.init(this)
         Updater.init(this)
         Downloader.init(this)

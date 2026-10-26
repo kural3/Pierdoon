@@ -58,6 +58,7 @@ fun MiniPlayer(
     durationMs: Long,
     onTogglePlay: () -> Unit,
     onNext: () -> Unit,
+    onPrevious: () -> Unit,
     onExpand: () -> Unit,
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
@@ -67,6 +68,7 @@ fun MiniPlayer(
 ) {
     val haptics = LocalHapticFeedback.current
     val colors = MaterialTheme.colorScheme
+    val swipe = rememberTrackSwipeState()
     val source = remember { MutableInteractionSource() }
     var barWidthPx by remember { mutableIntStateOf(0) }
     val progress by rememberSmoothProgress(position, durationMs, barWidthPx)
@@ -90,6 +92,7 @@ fun MiniPlayer(
         border = BorderStroke(1.dp, colors.onSurface.copy(alpha = 0.08f)),
         modifier = modifier
             .then(dragModifier)
+            .trackSwipe(swipe, onNext, onPrevious)
             .scaleBy(scale)
             .glass(
                 backdrop = backdrop,
@@ -106,10 +109,10 @@ fun MiniPlayer(
                 Artwork(
                     songId = nowPlaying.songId,
                     albumId = nowPlaying.albumId,
-                    modifier = Modifier.size(48.dp).morphClip(MiniMorph, morph),
+                    modifier = Modifier.size(48.dp).trackSwipeOffset(swipe).morphClip(MiniMorph, morph),
                 )
                 Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).trackSwipeOffset(swipe)) {
                     Text(
                         text = nowPlaying.title,
                         style = MaterialTheme.typography.titleMedium,

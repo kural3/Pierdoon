@@ -14,6 +14,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.ku.pierdoon.ui.components.LocalRemoteCovers
 import com.ku.pierdoon.ui.remote.rememberPcPlayback
 import com.ku.pierdoon.remote.PcRemote
+import com.ku.pierdoon.remote.PcTransfers
+import com.ku.pierdoon.ui.remote.TransferPrompts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
@@ -396,6 +398,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                                 durationMs = shownPc?.state?.durationMs ?: player.durationMs,
                                 onTogglePlay = if (shownPc != null) PcRemote::toggle else vm::togglePlay,
                                 onNext = if (shownPc != null) PcRemote::next else vm::next,
+                                onPrevious = if (shownPc != null) PcRemote::previous else vm::previousTrack,
                                 sourceName = shownPc?.name,
                                 onExpand = { expanded = true },
                                 backdrop = backdrop,
@@ -499,6 +502,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                         onResetLyricsOffset = vm::resetLyricsOffset,
                         onTogglePlay = vm::togglePlay,
                         onPrevious = vm::previous,
+                        onPreviousTrack = vm::previousTrack,
                         onNext = vm::next,
                         onSeek = vm::seekTo,
                         onToggleShuffle = vm::toggleShuffle,
@@ -534,6 +538,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                 nav.push(Route.EditSong(target.song.id))
             },
             onDelete = deleteSongs?.let { delete -> { delete(listOf(target.song)) {} } },
+            onSendToComputer = pcPaired?.let { { PcTransfers.sendToComputer(listOf(target.song)) } },
         )
     }
     bulk?.let { target ->
@@ -550,6 +555,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             onCreatePlaylist = { dialog = PlaylistDialog.Create(ids) },
             onRemoveFromPlaylist = { target.playlistId?.let { vm.removeFromPlaylist(it, ids.toSet()) } },
             onDelete = deleteSongs?.let { delete -> { delete(target.songs, target.onDone) } },
+            onSendToComputer = pcPaired?.let { { PcTransfers.sendToComputer(target.songs) } },
         )
     }
     playlistAction?.let { p ->
@@ -559,8 +565,10 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             onRename = { dialog = PlaylistDialog.Rename(p) },
             onCover = { coverSheetFor = p.id },
             onDelete = { dialog = PlaylistDialog.Delete(p) },
+            onSendToComputer = pcPaired?.let { { PcTransfers.sendToComputer(vm.resolve(p.songIds)) } },
         )
     }
+    TransferPrompts()
     // Read from the live list, so the sheet shows each change as it's made.
     coverSheetFor?.let { id -> userData.playlists.firstOrNull { it.id == id } }?.let { p ->
         PlaylistCoverSheet(
@@ -688,7 +696,15 @@ private fun Screens(
                     onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
                     bottomInset = bottomInset,
                 )
-                Route.Computer -> PcRemoteScreen(onBack = { nav.pop() }, bottomInset = bottomInset)
+                Route.Computer -> PcRemoteScreen(
+                    onBack = { nav.pop() },
+                    bottomInset = bottomInset,
+                    onSaveToPhone = if (PcTransfers.supportedToPhone) {
+                        { picked -> PcTransfers.saveToPhone(picked, songs) }
+                    } else {
+                        null
+                    },
+                )
                 Route.Settings, is Route.SettingsPage -> {
                     SettingsScreen(
                         section = (route as? Route.SettingsPage)?.section,

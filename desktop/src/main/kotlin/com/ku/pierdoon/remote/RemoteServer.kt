@@ -5,7 +5,10 @@ import com.ku.pierdoon.LibraryState
 import com.ku.pierdoon.MainViewModel
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.SettingsStore
+import com.ku.pierdoon.data.MusicRepository
 import com.ku.pierdoon.data.Song
+import com.ku.pierdoon.data.TagOverride
+import com.ku.pierdoon.data.TagOverrides
 import com.ku.pierdoon.data.download.DownloadStatus
 import com.ku.pierdoon.data.download.DownloadTask
 import com.ku.pierdoon.data.download.Downloader
@@ -81,8 +84,8 @@ data class RemoteDevice(val id: String, val name: String, val pairedAt: Long)
  */
 object RemoteServer {
     const val PORT = 47231
-    /** 2: downloads; 3: /verify. */
-    const val API_VERSION = 3
+    /** 2: downloads; 3: /verify; 4: /file and /upload. */
+    const val API_VERSION = 4
     private const val DOWNLOADS_THROTTLE_MS = 400L
     private const val MAX_DOWNLOADS_SENT = 20
 
@@ -223,6 +226,8 @@ object RemoteServer {
             path == "/downloads" && method == "GET" -> send(ex, 200, downloadsJson(Downloader.tasks.value))
             path == "/downloads/search" && method == "GET" -> downloadSearch(ex)
             path.startsWith("/cover/") && method == "GET" -> cover(ex, path.removePrefix("/cover/"))
+            path.startsWith("/file/") && method == "GET" -> file(ex, path.removePrefix("/file/"))
+            path == "/upload" && method == "POST" -> upload(ex)
             path == "/command" && method == "POST" -> command(ex)
             path == "/unpair" && method == "POST" -> {
                 tokenOf(ex)?.let { token -> prefs.edit { remove(DEVICE + hash(token)) } }
@@ -387,6 +392,58 @@ object RemoteServer {
         ex.sendResponseHeaders(200, jpeg.size.toLong())
         ex.responseBody.use { it.write(jpeg) }
     }
+
+    /**
+     * /file/{songId}: the track's audio file byte for byte, for the phone to keep. Its name comes
+     * in X-Pierdoon-Name; tags edited in the app (not in the file) in X-Pierdoon-Tags.
+     */
+    private fun file(ex: HttpExchange, id: String) {
+        val model = vm ?: return send(ex, 503, JSONObject())
+        val song = id.toLongOrNull()?.let(model::song) ?: return send(ex, 404, JSONObject().put("error", "no such track"))
+        val file = song.file.takeIf { it.isFile } ?: return send(ex, 404, JSONObject().put("error", "file gone"))
+        ex.responseHeaders.add("Content-Type", "application/octet-stream")
+        ex.responseHeaders.add("X-Pierdoon-Name", enc(file.name))
+        TagOverrides.get().get(song.id)?.let { ex.responseHeaders.add("X-Pierdoon-Tags", enc(tagsJson(it).toString())) }
+        ex.sendResponseHeaders(200, file.length())
+        ex.responseBody.use { out -> file.inputStream().use { it.copyTo(out, COPY_BUFFER) } }
+    }
+
+    /**
+     * /upload?name=…&tags=…: a track sent from the phone, kept byte for byte in the downloads
+     * folder, where the library picks it up. [name] is the file name on the phone; tags, as JSON,
+     * the ones the user edited in the phone app rather than in the file.
+     */
+    private fun upload(ex: HttpExchange) {
+        val params = query(ex)
+        val name = params["name"]?.substringAfterLast('/')?.substringAfterLast('\\').orEmpty()
+        val ext = name.substringAfterLast('.', "").lowercase()
+        if (ext !in MusicRepository.AUDIO_EXTENSIONS) return send(ex, 415, JSONObject().put("error", "not audio"))
+        val length = ex.requestHeaders.getFirst("Content-Length")?.toLongOrNull()
+            ?: return send(ex, 411, JSONObject().put("error", "length required"))
+        if (length <= 0 || length > MAX_UPLOAD_BYTES) return send(ex, 413, JSONObject().put("error", "too large"))
+        val dir = Downloader.folder.apply { mkdirs() }
+        if (!dir.isDirectory) return send(ex, 500, JSONObject().put("error", "no folder"))
+        if (dir.usableSpace < length + FREE_SPACE_MARGIN) return send(ex, 507, JSONObject().put("error", "no space"))
+        val tags = params["tags"]?.let { runCatching { JSONObject(it) }.getOrNull() }?.let { t ->
+            TagOverride(t.optStringOrNull("title"), t.optStringOrNull("artist"), t.optStringOrNull("album"))
+        }
+        val target = ex.requestBody.use { receiveTrack(it, length, name, dir) }
+            ?: return send(ex, 400, JSONObject().put("error", "incomplete"))
+        // Before the library looks, so its first look already has them.
+        tags?.let { TagOverrides.get().set(Song.idFor(target), it) }
+        Downloader.announce(target)
+        send(ex, 200, JSONObject().put("ok", true).put("name", target.name))
+    }
+
+    private fun tagsJson(t: TagOverride) = JSONObject().apply {
+        t.title?.let { put("title", it) }
+        t.artist?.let { put("artist", it) }
+        t.album?.let { put("album", it) }
+    }
+
+    private fun JSONObject.optStringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
+
+    private fun enc(s: String): String = java.net.URLEncoder.encode(s, Charsets.UTF_8).replace("+", "%20")
 
     private fun command(ex: HttpExchange) {
         val model = vm ?: return send(ex, 503, JSONObject())
@@ -591,6 +648,10 @@ object RemoteServer {
     private const val GZIP_MIN_BYTES = 4096
     private const val MAX_BODY_BYTES = 256 * 1024
     private const val COVER_CACHE_BYTES = 16 * 1024 * 1024
+    private const val COPY_BUFFER = 64 * 1024
+    private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024
+    /** Left free on the disk after a track from the phone is saved. */
+    private const val FREE_SPACE_MARGIN = 200L * 1024 * 1024
     /** VPN and proxy adapters (Throne's "throne-tun", WireGuard, Wintun…): the phone can't reach them. */
     private val TUNNEL = Regex("""(?i)(^tun|-tun|wintun|wireguard|tunnel|vpn)""")
     private val VIRTUAL = listOf("VirtualBox", "VMware", "Hyper-V", "vEthernet", "WSL", "Npcap", "TAP", "Tailscale", "ZeroTier")

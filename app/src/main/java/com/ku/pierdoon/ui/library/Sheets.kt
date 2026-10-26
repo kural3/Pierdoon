@@ -86,6 +86,8 @@ fun SongActionsSheet(
     onEdit: () -> Unit,
     /** Null where the system can't ask for consent to delete (below Android 11). */
     onDelete: (() -> Unit)?,
+    /** Null without a paired computer. */
+    onSendToComputer: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     var pickingPlaylist by remember { mutableStateOf(false) }
@@ -144,6 +146,9 @@ fun SongActionsSheet(
                             onDismiss()
                             onEdit()
                         }
+                        if (onSendToComputer != null) {
+                            ActionItem(PlayerIcons.Desktop, stringResource(R.string.transfer_send_to_pc)) { act(onSendToComputer) }
+                        }
                         if (target.playlistId != null) {
                             ActionItem(PlayerIcons.Remove, stringResource(R.string.remove_from_playlist)) {
                                 act(onRemoveFromPlaylist)
@@ -175,6 +180,8 @@ fun PlaylistActionsSheet(
     onRename: () -> Unit,
     onCover: () -> Unit,
     onDelete: () -> Unit,
+    /** Its tracks to the paired computer; null without one. */
+    onSendToComputer: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -184,6 +191,13 @@ fun PlaylistActionsSheet(
                 style = MaterialTheme.typography.titleLargeEmphasized,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
+            if (onSendToComputer != null && playlist.songIds.isNotEmpty()) {
+                ActionItem(PlayerIcons.Desktop, stringResource(R.string.transfer_send_to_pc)) {
+                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                    onDismiss()
+                    onSendToComputer()
+                }
+            }
             ActionItem(PlayerIcons.Edit, stringResource(R.string.rename)) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onDismiss()
