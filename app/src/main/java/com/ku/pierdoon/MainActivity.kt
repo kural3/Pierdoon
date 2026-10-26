@@ -18,10 +18,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.activity.SystemBarStyle
-import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.download.DownloadService
@@ -31,7 +31,7 @@ import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.ui.PierdoonApp
-import com.ku.pierdoon.ui.components.installFrameRateBooster
+import com.ku.pierdoon.ui.components.withFrameRateBooster
 import com.ku.pierdoon.ui.theme.PierdoonTheme
 import com.ku.pierdoon.ui.theme.isDarkTheme
 
@@ -47,7 +47,9 @@ class MainActivity : ComponentActivity() {
         // Not again after rotation: the link was already taken.
         if (savedInstanceState == null) handleIntent(intent)
         enableEdgeToEdge()
-        setContent {
+        // A ComposeView of our own rather than setContent, so it can sit inside the booster.
+        val content = ComposeView(this)
+        content.setContent {
             val settings by SettingsStore.settings.collectAsStateWithLifecycle()
             val dark = settings.isDarkTheme()
             // Keep status/navigation bar icons readable when the theme is forced.
@@ -62,7 +64,7 @@ class MainActivity : ComponentActivity() {
                 PierdoonApp()
             }
         }
-        installFrameRateBooster(findViewById(android.R.id.content))
+        setContentView(withFrameRateBooster(content))
         askForNotificationsOnFirstDownload()
     }
 

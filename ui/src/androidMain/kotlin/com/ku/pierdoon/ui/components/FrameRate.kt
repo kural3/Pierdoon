@@ -3,8 +3,7 @@ package com.ku.pierdoon.ui.components
 import android.content.Context
 import android.os.Build
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewTreeObserver
+import android.widget.FrameLayout
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -43,48 +42,49 @@ object HighFrameRate {
 /**
  * Window-wide "high" vote for every frame the app draws anyway.
  *
- * A 1 px transparent view re-invalidates itself in the pre-draw pass of each frame, so it is
- * redrawn inside that same frame and casts a "high" frame-rate category vote — the same trick
- * Compose uses internally. It never schedules a frame of its own: when nothing animates
- * nothing is drawn, no vote is cast, and the adaptive panel falls back to its idle rate.
+ * Wraps the content and listens to every invalidation passing through on its way to the
+ * window, Compose's layer-only repaints included. Each one also redraws a 1 px transparent
+ * view in the frame already being scheduled, and that view casts a "high" frame-rate category
+ * vote: the same trick Compose uses internally. Nothing is invalidated on its own, so when
+ * nothing animates nothing is drawn, no vote is cast, and the adaptive panel falls back to its
+ * idle rate.
  */
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-class FrameRateBoosterView(context: Context) : View(context) {
+private class FrameRateBoosterFrame(context: Context) : FrameLayout(context) {
 
-    private val preDraw = ViewTreeObserver.OnPreDrawListener {
-        if (HighFrameRate.enabled && !HighFrameRate.suppressed) {
-            requestedFrameRate = REQUESTED_FRAME_RATE_CATEGORY_HIGH
-            invalidate() // part of the frame already being drawn; does not request a new one
-        } else {
-            requestedFrameRate = REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+    private val booster = object : View(context) {
+        init {
+            isFocusable = false
+            isClickable = false
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            setWillNotDraw(false)
         }
-        true
     }
 
     init {
-        isFocusable = false
-        isClickable = false
-        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-        setWillNotDraw(false)
+        addView(booster, LayoutParams(1, 1))
     }
 
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        viewTreeObserver.addOnPreDrawListener(preDraw)
-    }
-
-    override fun onDetachedFromWindow() {
-        viewTreeObserver.removeOnPreDrawListener(preDraw)
-        super.onDetachedFromWindow()
+    override fun onDescendantInvalidated(child: View, target: View) {
+        super.onDescendantInvalidated(child, target)
+        if (target === booster) return
+        val high = HighFrameRate.enabled && !HighFrameRate.suppressed
+        val category = if (high) REQUESTED_FRAME_RATE_CATEGORY_HIGH else REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+        if (booster.requestedFrameRate != category) booster.requestedFrameRate = category
+        if (high) booster.invalidate() // joins the frame this invalidation already asked for
     }
 }
 
-/** Adds [FrameRateBoosterView] to an activity's content frame; no-op before Android 15. */
-fun installFrameRateBooster(content: ViewGroup) {
+/**
+ * [content] inside the frame-rate booster, to be the activity's content view; [content]
+ * itself before Android 15.
+ */
+fun withFrameRateBooster(content: View): View =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-        content.addView(FrameRateBoosterView(content.context), ViewGroup.LayoutParams(1, 1))
+        FrameRateBoosterFrame(content.context).apply { addView(content) }
+    } else {
+        content
     }
-}
 
 /**
  * Put directly before an animated `graphicsLayer`: the category is applied to the next
