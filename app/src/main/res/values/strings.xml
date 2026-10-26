@@ -285,6 +285,9 @@
     <string name="pc_code_hint">Шесть цифр с экрана компьютера</string>
     <string name="pc_connect">Подключить</string>
     <string name="pc_wrong_code">Неверный код</string>
+    <string name="pc_too_many_attempts">Слишком много неверных кодов. Подождите 30 секунд</string>
+    <string name="pc_update_computer">Обновите Pier.doon на компьютере: без этого часть функций не работает</string>
+    <string name="pc_update_phone">Pier.doon на компьютере новее приложения на телефоне: обновите его здесь</string>
     <string name="pc_unreachable">Компьютер не отвечает</string>
     <string name="pc_revoked">Компьютер отключил этот телефон. Подключитесь заново</string>
     <string name="pc_status_connecting">Подключение…</string>
@@ -295,7 +298,6 @@
     <string name="pc_search">Поиск по библиотеке компьютера</string>
     <string name="pc_nothing_found">Ничего не найдено</string>
     <string name="pc_volume">Громкость на компьютере</string>
-    <string name="pc_albums_count">Альбомов: %1$d</string>
     <string name="player_device_phone">Телефон</string>
     <string name="player_device_switch">Выбрать, где играет</string>
     <string name="player_device_idle">Ничего не играет</string>
@@ -308,7 +310,6 @@
     <string name="pc_send_outdated">Обновите Pier.doon на компьютере до 1.0.5, чтобы скачивать с телефона</string>
     <string name="pc_send_failed">Компьютер не ответил. Проверьте, что он в сети</string>
     <string name="pc_downloads">Загрузки на компьютере</string>
-    <string name="pc_controls">Компьютер</string>
     <string name="share_where">Куда скачать?</string>
     <string name="share_phone">На телефон</string>
     <string name="share_pc">На компьютер «%1$s»</string>

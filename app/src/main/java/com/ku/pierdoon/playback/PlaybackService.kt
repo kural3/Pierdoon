@@ -14,11 +14,13 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.RenderersFactory
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -43,6 +45,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+// Media3 marks much of what a player service needs (custom renderers, offload, shuffle orders,
+// notification provider) as unstable API.
+@OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null
@@ -55,7 +60,6 @@ class PlaybackService : MediaSessionService() {
     /** The queue found on disk at start (null if none); shared by restore and resumption. */
     private val savedQueue = SettableFuture.create<MediaSession.MediaItemsWithStartPosition?>()
 
-    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         SettingsStore.init(this)
@@ -189,7 +193,7 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
-    private fun restoreQueue(player: Player) {
+    private fun restoreQueue(player: ExoPlayer) {
         scope.launch {
             val saved = withContext(Dispatchers.IO) { loadSavedQueue() }
             // A controller may have started something new while the file was read; that wins.
@@ -197,6 +201,8 @@ class PlaybackService : MediaSessionService() {
                 player.shuffleModeEnabled = saved.shuffle
                 player.repeatMode = saved.repeatMode
                 player.setMediaItems(saved.items.mediaItems, saved.items.startIndex, saved.items.startPositionMs)
+                // The same shuffle as before, not a new one: what was coming up still is.
+                saved.shuffleOrder?.let { player.setShuffleOrder(DefaultShuffleOrder(it.toIntArray(), System.nanoTime())) }
                 player.prepare()
             }
             restoring = false
@@ -208,6 +214,7 @@ class PlaybackService : MediaSessionService() {
         val items: MediaSession.MediaItemsWithStartPosition,
         val shuffle: Boolean,
         val repeatMode: Int,
+        val shuffleOrder: List<Int>?,
     )
 
     /** Saved ids resolved against MediaStore; deleted files are dropped. */
@@ -223,6 +230,7 @@ class PlaybackService : MediaSessionService() {
             ),
             q.shuffle,
             q.repeatMode,
+            plan.shuffleOrder,
         )
     }
 
@@ -243,7 +251,18 @@ class PlaybackService : MediaSessionService() {
         positionMs = player.currentPosition,
         shuffle = player.shuffleModeEnabled,
         repeatMode = player.repeatMode,
+        shuffleOrder = shuffleOrderOf(player),
     )
+
+    /** The shuffled play order as indices, for saving; null with shuffle off. */
+    private fun shuffleOrderOf(player: Player): List<Int>? {
+        if (!player.shuffleModeEnabled) return null
+        val order = (player as? ExoPlayer)?.shuffleOrder ?: return null
+        if (order.length != player.mediaItemCount) return null
+        return generateSequence(order.firstIndex.takeIf { it != C.INDEX_UNSET }) { i ->
+            order.getNextIndex(i).takeIf { it != C.INDEX_UNSET }
+        }.take(order.length).toList()
+    }
 
     /** Shuffle and repeat for the notification / lock screen, showing the current mode. */
     private fun modeButtons(player: Player) = listOf(
@@ -289,7 +308,7 @@ class PlaybackService : MediaSessionService() {
             when (customCommand.customAction) {
                 TOGGLE_SHUFFLE.customAction -> player.shuffleModeEnabled = !player.shuffleModeEnabled
                 CYCLE_REPEAT.customAction -> player.repeatMode = nextRepeatMode(player.repeatMode)
-                else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
+                else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }

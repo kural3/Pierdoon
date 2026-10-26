@@ -6,9 +6,16 @@ plugins {
 }
 
 // Release signing comes from an untracked keystore.properties (storeFile, storePassword,
-// keyAlias, keyPassword). Without it, release builds are simply left unsigned.
+// keyAlias, keyPassword), in the project root or in Pierdoon-signing/. Without it, release
+// builds are simply left unsigned.
+val keystorePropsFile = listOf("keystore.properties", "Pierdoon-signing/keystore.properties")
+    .map(rootProject::file).firstOrNull { it.exists() }
 val keystoreProps = Properties().apply {
-    rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+    keystorePropsFile?.inputStream()?.use { load(it) }
+}
+// storeFile may be a path from another computer: then the keystore next to the properties file.
+val keystoreFile = keystoreProps.getProperty("storeFile")?.let { path ->
+    file(path).takeIf { it.exists() } ?: keystorePropsFile?.resolveSibling(File(path).name)?.takeIf { it.exists() }
 }
 
 android {
@@ -34,9 +41,9 @@ android {
     }
 
     signingConfigs {
-        if (!keystoreProps.isEmpty) {
+        if (keystoreFile != null) {
             create("release") {
-                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storeFile = keystoreFile
                 storePassword = keystoreProps.getProperty("storePassword")
                 keyAlias = keystoreProps.getProperty("keyAlias")
                 keyPassword = keystoreProps.getProperty("keyPassword")

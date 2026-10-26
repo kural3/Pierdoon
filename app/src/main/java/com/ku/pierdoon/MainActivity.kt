@@ -1,11 +1,21 @@
 package com.ku.pierdoon
 
+import android.Manifest
 import android.view.KeyEvent
 import com.ku.pierdoon.remote.PcRemote
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -51,7 +61,31 @@ class MainActivity : ComponentActivity() {
             }
         }
         installFrameRateBooster(findViewById(android.R.id.content))
+        askForNotificationsOnFirstDownload()
     }
+
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    /**
+     * Android 13+ hides the downloads notification without the permission. It's asked once per
+     * launch, when a download starts here (from any screen or a share), not at the first start.
+     */
+    private fun askForNotificationsOnFirstDownload() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                if (askedForNotifications) return@repeatOnLifecycle
+                Downloader.tasks.first { tasks -> tasks.any { it.active } }
+                askedForNotifications = true
+                val granted = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+                if (!granted) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    private var askedForNotifications = false
 
     /** With the computer in the player, the volume keys set its volume (the phone plays nothing then). */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
