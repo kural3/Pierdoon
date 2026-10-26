@@ -43,7 +43,7 @@ import kotlinx.coroutines.channels.Channel
 /**
  * The phone as a remote for Pier.doon on a computer in the same network: finds it, pairs with
  * the code it shows, then mirrors its player, queue and library and sends it commands. The
- * protocol is desktop/docs/remote-api.md.
+ * protocol is docs/remote-api.md.
  *
  * While [active], the app's own player shows and drives the computer's playback instead of the
  * phone's. The event stream is open only while something on screen needs it ([acquire] and
