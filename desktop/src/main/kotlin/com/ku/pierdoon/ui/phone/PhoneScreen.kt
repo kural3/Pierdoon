@@ -152,7 +152,7 @@ private fun DeviceItem(shape: Shape, name: String, onForget: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
         ) {
-            Icon(PlayerIcons.Phone, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(PlayerIcons.Smartphone, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(16.dp))
             Text(
                 name,

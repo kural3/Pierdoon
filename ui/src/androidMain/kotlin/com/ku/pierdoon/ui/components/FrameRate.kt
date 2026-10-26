@@ -90,7 +90,7 @@ fun installFrameRateBooster(content: ViewGroup) {
  * Put directly before an animated `graphicsLayer`: the category is applied to the next
  * layer in the chain, which then votes "high" whenever its properties change.
  */
-fun Modifier.highFrameRate(): Modifier =
+actual fun Modifier.highFrameRate(): Modifier =
     if (HighFrameRate.enabled) preferredFrameRate(FrameRateCategory.High) else this
 
 /**

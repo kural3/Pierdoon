@@ -15,6 +15,8 @@ jaudiotagger = "3.0.1"
 youtubedl = "0.18.1"
 # The Windows app's UI toolkit (and the shared UI module's on both).
 composeMultiplatform = "1.12.2"
+composeMaterial3 = "1.12.0-alpha03"
+graphicsShapes = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -38,6 +40,12 @@ androidx-media3-session = { group = "androidx.media3", name = "media3-session", 
 jaudiotagger = { group = "net.jthink", name = "jaudiotagger", version.ref = "jaudiotagger" }
 compose-runtime-annotation = { group = "androidx.compose.runtime", name = "runtime-annotation", version = "1.12.1" }
 youtubedl = { group = "io.github.junkfood02.youtubedl-android", name = "library", version.ref = "youtubedl" }
+# Compose Multiplatform, for the shared ui module (on Android these resolve to the androidx ones).
+compose-mp-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
+compose-mp-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
+compose-mp-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "composeMultiplatform" }
+compose-mp-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "composeMaterial3" }
+androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

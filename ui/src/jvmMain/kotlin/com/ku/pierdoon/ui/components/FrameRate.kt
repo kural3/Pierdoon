@@ -15,7 +15,7 @@ object HighFrameRate {
     var suppressed: Boolean = false
 }
 
-fun Modifier.highFrameRate(): Modifier = this
+actual fun Modifier.highFrameRate(): Modifier = this
 
 @Composable
 fun FrameRateBoost(active: Boolean) = Unit

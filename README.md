@@ -38,11 +38,12 @@ One Gradle build for both apps:
 | `app/` | the Android app |
 | `desktop/` | [Pier.doon for Windows](desktop/README.md) (Compose Multiplatform) |
 | `core/` | code both use: the track model, library lists and search, lyrics parsing, track naming, queue restore, version compare. Plain Kotlin/JVM, nothing platform-specific |
+| `ui/` | Compose code both draw with: expressive shapes and buttons, the colour scheme generator, transitions, the colour picker, the expanding player, the icons. Kotlin Multiplatform (Android + JVM) |
 
 ```
 ./gradlew :app:assembleRelease            # APK
 ./gradlew :desktop:packageReleaseMsi      # Windows installer
-./gradlew :core:test :app:testDebugUnitTest :desktop:test
+./gradlew :core:test :desktop:test :app:lintDebug
 ```
 
 Release builds of the APK are signed only if a `keystore.properties` file exists in the project root or in `Pierdoon-signing/` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`); otherwise they're left unsigned.

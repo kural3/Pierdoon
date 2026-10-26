@@ -948,7 +948,7 @@ private fun Route.Tab.icon() = when (this) {
     Route.Library -> PlayerIcons.Library
     Route.Playlists -> PlayerIcons.Playlist
     Route.Downloads -> PlayerIcons.Download
-    Route.Phone -> PlayerIcons.Phone
+    Route.Phone -> PlayerIcons.Smartphone
     Route.Settings -> PlayerIcons.Settings
 }
 
