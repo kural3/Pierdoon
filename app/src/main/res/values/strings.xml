@@ -92,6 +92,7 @@
     <string name="settings_rescan">Обновить библиотеку</string>
     <string name="settings_rescan_desc">Найти новые аудиофайлы на устройстве</string>
     <string name="settings_rescan_done">Библиотека обновлена</string>
+    <string name="settings_downloads">Загрузки</string>
     <string name="settings_about">О приложении</string>
     <string name="settings_version">Версия %1$s</string>
     <string name="settings_lyrics_source">Тексты песен предоставляет LRCLIB (lrclib.net)</string>
@@ -177,17 +178,13 @@
     <string name="search_artists">Исполнители</string>
     <string name="downloads">Загрузка треков</string>
     <string name="download_link">Ссылка или название</string>
-    <string name="download_link_hint">Ссылка на трек, плейлист или альбом с YouTube, SoundCloud, Bandcamp и сотен других сайтов. Или просто название, чтобы найти</string>
-    <string name="download_what">Что скачать</string>
     <string name="download_search">Найти</string>
     <string name="download_source_youtube">YouTube</string>
     <string name="download_source_soundcloud">SoundCloud</string>
-    <string name="download_results">Результаты</string>
     <string name="download_searching">Поиск…</string>
     <string name="download_search_empty">Ничего не нашлось</string>
     <string name="download_search_failed">Не удалось выполнить поиск. Проверьте сеть</string>
     <string name="download_in_queue">В загрузках</string>
-    <string name="download_group">Плейлист «%1$s»</string>
     <string name="download_group_progress">Скачано %1$d из %2$d</string>
     <string name="download_group_done">Скачано %1$d из %2$d, плейлист создан</string>
     <string name="download_paste">Вставить</string>
@@ -201,10 +198,10 @@
     <string name="download_clear">Убрать готовые</string>
     <string name="download_queued">В очереди</string>
     <string name="download_preparing">Подготовка…</string>
-    <string name="download_progress">Загрузка… %1$d%%</string>
+    <string name="download_progress">%1$d%%</string>
     <string name="download_running">Загрузка…</string>
     <string name="download_saving">Сохранение…</string>
-    <string name="download_done">Готово, трек в библиотеке</string>
+    <string name="download_done">В библиотеке</string>
     <string name="download_more">И ещё %1$d в очереди</string>
     <string name="download_cancel">Отменить</string>
     <string name="download_fail_unsupported">Этот сайт не поддерживается</string>
@@ -214,7 +211,6 @@
     <string name="download_fail_network">Не удалось подключиться. Проверьте сеть</string>
     <string name="download_fail_save">Не удалось сохранить файл</string>
     <string name="download_fail_other">Не удалось скачать</string>
-    <string name="download_where">Треки сохраняются в Music/Pier.doon и сразу появляются в библиотеке. Скачивайте только то, на что у вас есть права.</string>
     <string name="download_engine">yt-dlp %1$s</string>
     <string name="download_engine_unknown">yt-dlp</string>
     <string name="download_engine_update">Обновить загрузчик</string>
@@ -223,6 +219,8 @@
     <string name="download_engine_latest">Последняя версия</string>
     <string name="download_engine_failed">Не удалось обновить</string>
     <string name="download_unsupported_os">Загрузка треков доступна с Android 10</string>
+    <string name="download_empty">Вставьте ссылку на трек, плейлист или альбом. Или введите название, и найдём его на YouTube или SoundCloud</string>
+    <string name="download_rights">Скачивайте только то, на что у вас есть права</string>
     <string name="edit_track">Изменить</string>
     <string name="edit_track_title">Изменить трек</string>
     <string name="tags">Теги</string>
@@ -303,8 +301,7 @@
     <string name="player_device_idle">Ничего не играет</string>
     <string name="player_device_offline">Не в сети</string>
     <string name="pc_send_title">Скачать на компьютер</string>
-    <string name="pc_send_hint">Вставьте ссылку с YouTube, SoundCloud, Bandcamp и других сайтов, и компьютер скачает трек в свою папку загрузок. Можно и просто название: найдём и покажем варианты</string>
-    <string name="pc_send_share">Ещё быстрее: в YouTube или браузере нажмите «Поделиться», выберите Pier.doon, затем «На компьютер»</string>
+    <string name="pc_send_share">Можно и из YouTube или браузера: «Поделиться» → Pier.doon → «На компьютер»</string>
     <string name="pc_send">Отправить</string>
     <string name="pc_sent">Отправлено на компьютер</string>
     <string name="pc_send_outdated">Обновите Pier.doon на компьютере до 1.0.5, чтобы скачивать с телефона</string>
