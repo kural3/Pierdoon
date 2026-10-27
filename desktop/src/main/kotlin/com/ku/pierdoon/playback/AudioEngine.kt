@@ -12,7 +12,11 @@ import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.Mixer
 import javax.sound.sampled.SourceDataLine
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Plays audio files through one output line, FFmpeg decoding whatever the file holds.
@@ -20,6 +24,10 @@ import kotlin.math.abs
  * Everything is resampled to 48 kHz stereo 16-bit, so the line never has to be reopened between
  * tracks: when a track ends, the next one ([setNext]) is decoded straight into the same buffer
  * and plays without a gap.
+ *
+ * With [crossfadeMs] set and the next track asking for it, the next one is opened that long
+ * before the end instead, and the two are mixed: the old one fading out, the new one in. From the
+ * first mixed frame on, the new track is the one playing.
  *
  * The decoding thread owns FFmpeg and the line; callers only post commands. Where playback is
  * (which track, which millisecond) is derived from marks laid down as audio is written: a mark
@@ -44,24 +52,31 @@ class AudioEngine(private val listener: Listener) {
 
     private sealed interface Command {
         data class Load(val file: File, val token: Long, val startMs: Long, val play: Boolean) : Command
-        data class Next(val file: File?, val token: Long) : Command
+        data class Next(val file: File?, val token: Long, val crossfade: Boolean) : Command
         data class Seek(val ms: Long) : Command
         data object Play : Command
         data object Pause : Command
         /** [done] completes once the file is closed, so it can be rewritten or moved. */
         class Stop(val done: CompletableFuture<Unit>) : Command
         data class Device(val name: String?) : Command
+        data class Speed(val value: Float) : Command
         data object Quit : Command
     }
 
-    private class Mark(val lineFrame: Long, val token: Long, val mediaMs: Long)
+    /** From [lineFrame] on, [token]'s audio from [mediaMs], played at [speed]. */
+    private class Mark(val lineFrame: Long, val token: Long, val mediaMs: Long, val speed: Float)
+
+    private class Upcoming(val file: File, val token: Long, val crossfade: Boolean)
 
     private val commands = LinkedBlockingQueue<Command>()
+    private val meter = LevelMeter(RATE)
     private val marks = ArrayDeque<Mark>()
     private val lock = Any()
 
     @Volatile var volume: Float = 1f
     @Volatile var skipSilence: Boolean = false
+    /** How long the end of a track and the start of the next overlap; 0 for none. */
+    @Volatile var crossfadeMs: Long = 0
 
     /** Set while [Command.Play] is in force; read by the UI thread. */
     @Volatile var isPlaying: Boolean = false
@@ -72,7 +87,19 @@ class AudioEngine(private val listener: Listener) {
     private var deviceName: String? = null
     private var decoder: FFmpegFrameGrabber? = null
     private var decoderToken = -1L
-    private var next: Pair<File, Long>? = null
+    private var decoderFile: File? = null
+    /** Played this much faster than recorded, pitch and all: the decoder resamples to [RATE] / speed. */
+    private var speed = 1f
+    private var next: Upcoming? = null
+    /** The next track while it fades in over the end of [decoder]'s. */
+    private var incoming: FFmpegFrameGrabber? = null
+    private var incomingToken = -1L
+    /** What [incoming] was opened from, to fall back on if the fade is called off. */
+    private var incomingNext: Upcoming? = null
+    /** What [incoming] decoded and the mix hasn't used yet. */
+    private var incomingRest: ShortBuffer? = null
+    private var fadeFrames = 0L
+    private var fadeDone = 0L
     @Volatile private var framesWritten = 0L
     /** The rest of a decoded frame whose writing a command interrupted; written before decoding on. */
     private var leftover: ShortBuffer? = null
@@ -89,7 +116,8 @@ class AudioEngine(private val listener: Listener) {
     }
 
     fun load(file: File, token: Long, startMs: Long, play: Boolean) = commands.put(Command.Load(file, token, startMs, play))
-    fun setNext(file: File?, token: Long) = commands.put(Command.Next(file, token))
+    /** [crossfade]: fade into it over [crossfadeMs] rather than start it right after the end. */
+    fun setNext(file: File?, token: Long, crossfade: Boolean = false) = commands.put(Command.Next(file, token, crossfade))
     fun seek(ms: Long) = commands.put(Command.Seek(ms))
     fun play() { isPlaying = true; commands.put(Command.Play) }
     fun pause() { isPlaying = false; commands.put(Command.Pause) }
@@ -99,6 +127,8 @@ class AudioEngine(private val listener: Listener) {
         return CompletableFuture<Unit>().also { commands.put(Command.Stop(it)) }
     }
     fun setDevice(name: String?) = commands.put(Command.Device(name))
+    /** Slower is lower, faster higher, as on a turntable. */
+    fun setSpeed(value: Float) = commands.put(Command.Speed(value))
     fun release() = commands.put(Command.Quit)
 
     /** Token of the track being heard and its position, or null with nothing loaded. */
@@ -106,9 +136,12 @@ class AudioEngine(private val listener: Listener) {
         val heard = heardFrame()
         // The newest mark already reached is what's playing now.
         val mark = marks.lastOrNull { it.lineFrame <= heard } ?: marks.firstOrNull() ?: return null
-        val elapsed = ((heard - mark.lineFrame).coerceAtLeast(0) * 1000 / RATE)
-        mark.token to mark.mediaMs + elapsed
+        val elapsed = (heard - mark.lineFrame).coerceAtLeast(0) * 1000 / RATE
+        mark.token to mark.mediaMs + (elapsed * mark.speed).toLong()
     }
+
+    /** Loudness and beats of what's coming out of the speakers now, for the visualizer. */
+    fun levels(): AudioLevels = if (isPlaying) meter.at(heardFrame()) else AudioLevels.Silent
 
     /** Frames that have left the line's buffer: what the listener has heard so far. */
     private fun heardFrame(): Long {
@@ -158,21 +191,26 @@ class AudioEngine(private val listener: Listener) {
                 isPlaying = cmd.play
                 if (playing) ensureLine()?.start()
             }
-            is Command.Next -> next = cmd.file?.let { it to cmd.token }
+            is Command.Next -> next = cmd.file?.let { Upcoming(it, cmd.token, cmd.crossfade) }
             is Command.Seek -> {
+                // The incoming track is the one playing already: the seek is in it.
+                endCrossfade()
                 val d = decoder ?: return true
                 flushLine()
                 runCatching { d.timestamp = cmd.ms.coerceAtLeast(0) * 1000 }
-                synchronized(lock) { marks.clear(); marks += Mark(framesWritten, decoderToken, cmd.ms) }
+                synchronized(lock) { marks.clear(); marks += Mark(framesWritten, decoderToken, cmd.ms, speed) }
                 pendingMark = false
                 endedToken = -1L
             }
+            // Set again here: a Load queued before them has put isPlaying to its own value since.
             Command.Play -> {
                 playing = true
+                isPlaying = true
                 ensureLine()?.start()
             }
             Command.Pause -> {
                 playing = false
+                isPlaying = false
                 line?.stop()
             }
             is Command.Stop -> {
@@ -186,6 +224,7 @@ class AudioEngine(private val listener: Listener) {
             is Command.Device -> if (cmd.name != deviceName) {
                 deviceName = cmd.name
                 val wasRunning = line?.isRunning == true
+                endCrossfade()
                 // Taken while the old line still says how much of its buffer was heard.
                 val heard = position()
                 line?.run { stop(); flush(); close() }
@@ -195,37 +234,157 @@ class AudioEngine(private val listener: Listener) {
                 // What was buffered is lost: carry on from where the listener was.
                 heard?.let { (token, ms) ->
                     if (token == decoderToken) decoder?.let { d -> runCatching { d.timestamp = ms * 1000 } }
-                    synchronized(lock) { marks.clear(); marks += Mark(framesWritten, token, ms) }
+                    synchronized(lock) { marks.clear(); marks += Mark(framesWritten, token, ms, speed) }
                 }
                 if (wasRunning || playing) ensureLine()?.start()
+            }
+            is Command.Speed -> if (cmd.value != speed) {
+                // The decoder's rate is set when it opens: it opens again where the listener is.
+                endCrossfade()
+                val heard = position()
+                speed = cmd.value
+                val file = decoderFile
+                if (decoder != null && file != null && heard != null && heard.first == decoderToken) {
+                    flushLine()
+                    closeDecoder()
+                    open(file, heard.first, heard.second)
+                }
+                // Otherwise the rate goes with the next track opened.
             }
             Command.Quit -> return false
         }
         return true
     }
 
-    private fun open(file: File, token: Long, startMs: Long): Boolean {
+    /** A started decoder for [file], giving the line's format. */
+    private fun grabber(file: File): FFmpegFrameGrabber {
         val g = FFmpegFrameGrabber(file)
-        return try {
+        try {
             g.sampleMode = FrameGrabber.SampleMode.SHORT
             g.sampleFormat = avutil.AV_SAMPLE_FMT_S16
-            g.sampleRate = RATE
+            g.sampleRate = (RATE / speed).roundToInt()
             g.audioChannels = CHANNELS
             g.start()
             if (g.audioChannels <= 0) throw IllegalStateException("No audio stream")
+            return g
+        } catch (e: Exception) {
+            runCatching { g.release() }
+            throw e
+        }
+    }
+
+    private fun open(file: File, token: Long, startMs: Long): Boolean {
+        return try {
+            val g = grabber(file)
             if (startMs > 0) g.timestamp = startMs * 1000
             decoder = g
             decoderToken = token
-            synchronized(lock) { marks += Mark(framesWritten, token, startMs.coerceAtLeast(0)) }
+            decoderFile = file
+            synchronized(lock) { marks += Mark(framesWritten, token, startMs.coerceAtLeast(0), speed) }
             pendingMark = false
             silentFrames = 0
             endedToken = -1L
             true
         } catch (e: Exception) {
-            runCatching { g.release() }
             post { listener.onError(token, e) }
             false
         }
+    }
+
+    /**
+     * Opens the next track as [incoming] once [d]'s track is within [crossfadeMs] of its end,
+     * which [mediaMs] is the start of the frame just decoded. A track that won't open is reported
+     * and skipped: the following one is the player's business then, as after any error.
+     */
+    private fun startCrossfadeIfDue(d: FFmpegFrameGrabber, mediaMs: Long) {
+        val n = next ?: return
+        val fadeMs = crossfadeMs
+        if (!n.crossfade || fadeMs <= 0) return
+        val lengthMs = d.lengthInTime / 1000
+        if (lengthMs <= 0) return
+        val left = lengthMs - mediaMs
+        // Less than that left (a seek to the very end) just runs into the next track.
+        if (left > fadeMs || left < MIN_FADE_MS) return
+        next = null
+        val g = try {
+            grabber(n.file)
+        } catch (e: Exception) {
+            post { listener.onError(n.token, e) }
+            return
+        }
+        incoming = g
+        incomingToken = n.token
+        incomingNext = n
+        incomingRest = null
+        fadeFrames = (left * RATE / 1000 / speed).toLong()
+        fadeDone = 0
+        // From here the new track is what's playing, its position counting from its start.
+        synchronized(lock) { marks += Mark(framesWritten, n.token, 0, speed) }
+    }
+
+    /**
+     * [out] (the old track's samples) mixed with as many of [incoming]'s, along an equal-power
+     * curve so the overlap is as loud as either track alone. Runs short of incoming audio only
+     * when the next track is shorter than the fade; silence stands in for it then.
+     */
+    private fun mixIncoming(out: ShortBuffer): ShortBuffer {
+        val count = out.remaining()
+        val mixed = ShortArray(count)
+        val start = out.position()
+        var i = 0
+        while (i < count) {
+            val t = ((fadeDone + i / CHANNELS).toDouble() / fadeFrames).coerceIn(0.0, 1.0)
+            val gainOut = cos(t * PI / 2)
+            val gainIn = sin(t * PI / 2)
+            for (c in 0 until CHANNELS) {
+                if (i + c >= count) break
+                val a = out.get(start + i + c)
+                val b = incomingSample()
+                mixed[i + c] = (a * gainOut + b * gainIn).toInt().coerceIn(-32768, 32767).toShort()
+            }
+            i += CHANNELS
+        }
+        fadeDone += count / CHANNELS
+        return ShortBuffer.wrap(mixed)
+    }
+
+    /** The next sample of [incoming], decoding more as needed; 0 past its end. */
+    private fun incomingSample(): Int {
+        var rest = incomingRest
+        while (rest == null || !rest.hasRemaining()) {
+            val g = incoming ?: return 0
+            val frame = g.grabSamples() ?: run { incomingRest = null; return 0 }
+            rest = (frame.samples?.firstOrNull() as? ShortBuffer)?.duplicate()
+            incomingRest = rest
+        }
+        return rest.get().toInt()
+    }
+
+    /** The fade is over (or cut short): [incoming] becomes the track being decoded. */
+    private fun endCrossfade() {
+        val g = incoming ?: return
+        decoder?.let { runCatching { it.stop(); it.release() } }
+        decoder = g
+        decoderToken = incomingToken
+        decoderFile = incomingNext?.file
+        // Decoded already but not mixed in yet: it goes out first.
+        leftover = incomingRest?.takeIf { it.hasRemaining() }
+        incoming = null
+        incomingRest = null
+        incomingNext = null
+        pendingMark = false
+        silentFrames = 0
+        endedToken = -1L
+    }
+
+    /** Drops [incoming] unheard-of: the old track is the one playing again, the next one still next. */
+    private fun abortCrossfade() {
+        val g = incoming ?: return
+        runCatching { g.stop(); g.release() }
+        if (next == null) next = incomingNext
+        incoming = null
+        incomingRest = null
+        incomingNext = null
     }
 
     /** Decodes one frame of audio and writes it to the line. -1 at the end of the file. */
@@ -238,7 +397,8 @@ class AudioEngine(private val listener: Listener) {
         val frames = samples / CHANNELS
         val gain = volume.let { it * it * it }
 
-        if (skipSilence) {
+        // Mid-fade the old track's quiet tail is part of the mix, not something to skip.
+        if (skipSilence && incoming == null) {
             var peak = 0
             for (i in 0 until samples) peak = maxOf(peak, abs(buffer.get(buffer.position() + i).toInt()))
             if (peak < SILENCE_PEAK) {
@@ -253,13 +413,17 @@ class AudioEngine(private val listener: Listener) {
             }
         }
         if (pendingMark) {
-            synchronized(lock) { marks += Mark(framesWritten, decoderToken, mediaMs) }
+            synchronized(lock) { marks += Mark(framesWritten, decoderToken, mediaMs, speed) }
             pendingMark = false
         }
+        // After the mark above: from the fade on, the next track's mark has to be the newest.
+        if (incoming == null) startCrossfadeIfDue(d, mediaMs)
 
         val l = ensureLine() ?: run {
+            // The fade starts over once there's an output again.
+            abortCrossfade()
             // Decoding on without anywhere to play would race through the queue in silence.
-            synchronized(lock) { marks.clear(); marks += Mark(framesWritten, decoderToken, mediaMs) }
+            synchronized(lock) { marks.clear(); marks += Mark(framesWritten, decoderToken, mediaMs, speed) }
             runCatching { d.timestamp = mediaMs * 1000 }
             playing = false
             isPlaying = false
@@ -267,7 +431,7 @@ class AudioEngine(private val listener: Listener) {
             return frames
         }
         // A view of its own: the grabber's buffer keeps its position for the next grab.
-        writeSamples(l, buffer.duplicate(), gain, chunk)
+        writeSamples(l, if (incoming != null) mixIncoming(buffer.duplicate()) else buffer.duplicate(), gain, chunk)
         trimMarks()
         announceIfHeard()
         return frames
@@ -283,11 +447,15 @@ class AudioEngine(private val listener: Listener) {
             val n = minOf(samples.remaining(), chunk.size / 2)
             var o = 0
             repeat(n) {
-                val s = (samples.get() * gain).toInt().coerceIn(-32768, 32767)
+                val raw = samples.get()
+                // Before the volume: the picture shouldn't fade with the sound turned down.
+                meter.sample(raw)
+                val s = (raw * gain).toInt().coerceIn(-32768, 32767)
                 chunk[o++] = (s and 0xFF).toByte()
                 chunk[o++] = ((s shr 8) and 0xFF).toByte()
             }
             l.write(chunk, 0, o)
+            meter.commit(framesWritten)
             framesWritten += n / CHANNELS
             if (commands.isNotEmpty()) break
         }
@@ -302,13 +470,18 @@ class AudioEngine(private val listener: Listener) {
     }
 
     private fun onDecoderEnd() {
+        if (incoming != null) {
+            // The old track has faded out; the new one goes on by itself.
+            endCrossfade()
+            return
+        }
         val n = next
         val endedOf = decoderToken
         closeDecoder()
         if (n != null) {
             next = null
             // Gapless: the next file's audio goes into the same line right behind this one's.
-            open(n.first, n.second, 0L)
+            open(n.file, n.token, 0L)
             return
         }
         // Let what's buffered play out before reporting the end.
@@ -352,6 +525,10 @@ class AudioEngine(private val listener: Listener) {
         leftover = null
         decoder?.let { runCatching { it.stop(); it.release() } }
         decoder = null
+        incoming?.let { runCatching { it.stop(); it.release() } }
+        incoming = null
+        incomingRest = null
+        incomingNext = null
     }
 
     private fun ensureLine(): SourceDataLine? {
@@ -364,10 +541,11 @@ class AudioEngine(private val listener: Listener) {
         }.getOrNull() ?: return null
         // A fresh line starts counting from zero again.
         framesWritten = 0
+        meter.reset()
         synchronized(lock) {
             val m = marks.lastOrNull()
             marks.clear()
-            if (m != null) marks += Mark(0, m.token, m.mediaMs)
+            if (m != null) marks += Mark(0, m.token, m.mediaMs, m.speed)
         }
         line = l
         return l
@@ -384,6 +562,8 @@ class AudioEngine(private val listener: Listener) {
         private const val CHUNK_FRAMES = 1024
         private const val SILENCE_PEAK = 40
         private const val SILENCE_KEEP_FRAMES = RATE / 2L
+        /** A fade shorter than this would sound like a click rather than a crossfade. */
+        private const val MIN_FADE_MS = 1000L
 
         /** Names of the outputs that can take 48 kHz stereo, for the settings. */
         fun outputDevices(): List<String> {

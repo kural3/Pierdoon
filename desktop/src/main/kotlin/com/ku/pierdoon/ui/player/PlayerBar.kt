@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -52,13 +53,15 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.PositionSnapshot
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.Player
 import com.ku.pierdoon.playback.PlayerState
-import com.ku.pierdoon.playback.SleepTimer
 import com.ku.pierdoon.resources.*
 import com.ku.pierdoon.resources.Res
 import com.ku.pierdoon.ui.components.Artwork
@@ -69,6 +72,7 @@ import com.ku.pierdoon.ui.components.PlayPauseButton
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.components.glass
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 /**
  * The desktop's mini player: a frosted bar along the bottom of the window. Track on the left,
@@ -93,6 +97,7 @@ fun PlayerBar(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onToggleLyrics: () -> Unit,
+    onOpenDelicious: () -> Unit,
     onToggleQueue: () -> Unit,
     onVolume: (Float) -> Unit,
     onToggleMute: () -> Unit,
@@ -103,9 +108,6 @@ fun PlayerBar(
     val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(28.dp)
     val glassButton = colors.surfaceContainerHighest.copy(alpha = 0.55f)
-    val sleepTimer by SleepTimer.state.collectAsState()
-    var showSleepSheet by remember { mutableStateOf(false) }
-    if (showSleepSheet) SleepTimerSheet(sleepTimer, onDismiss = { showSleepSheet = false })
 
     Surface(
         shape = shape,
@@ -119,170 +121,220 @@ fun PlayerBar(
             fallback = colors.surfaceContainerHigh,
         ),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        BarLayout(
             // Own layer: the travelling wave and the clock redraw only it, never the glass blur.
             modifier = Modifier.graphicsLayer().padding(horizontal = 10.dp, vertical = 8.dp),
-        ) {
-            // Track ---------------------------------------------------------------------------
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(0.3f),
-            ) {
-                // A new track rises in from below, the old one leaves upwards.
-                val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-                val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-                AnimatedContent(
-                    targetState = nowPlaying,
-                    contentKey = { it.songId },
-                    transitionSpec = {
-                        (fadeIn(fade) + slideInVertically(spatialOffset) { it / 2 })
-                            .togetherWith(fadeOut(fade) + slideOutVertically(spatialOffset) { -it / 2 })
-                    },
-                    label = "barTrack",
-                    modifier = Modifier.weight(1f, fill = false),
-                ) { nowPlaying ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Artwork(
-                            songId = nowPlaying.songId,
-                            albumId = nowPlaying.albumId,
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable(onClick = onExpand),
-                        )
-                        Spacer(Modifier.width(14.dp))
-                        Column {
-                            Text(
-                                nowPlaying.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.clickable(onClick = onExpand),
+            start = {
+                // Track ---------------------------------------------------------------------------
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // A new track rises in from below, the old one leaves upwards.
+                    val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+                    val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                    AnimatedContent(
+                        targetState = nowPlaying,
+                        contentKey = { it.songId },
+                        transitionSpec = {
+                            (fadeIn(fade) + slideInVertically(spatialOffset) { it / 2 })
+                                .togetherWith(fadeOut(fade) + slideOutVertically(spatialOffset) { -it / 2 })
+                        },
+                        label = "barTrack",
+                        modifier = Modifier.weight(1f, fill = false),
+                    ) { nowPlaying ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Artwork(
+                                songId = nowPlaying.songId,
+                                albumId = nowPlaying.albumId,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable(onClick = onExpand),
                             )
-                            Text(
-                                nowPlaying.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = if (nowPlaying.artist.isNotEmpty()) {
-                                    Modifier.clickable { onOpenArtist(nowPlaying.artist) }
-                                } else {
-                                    Modifier
-                                },
-                            )
+                            Spacer(Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    nowPlaying.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.clickable(onClick = onExpand),
+                                )
+                                Text(
+                                    nowPlaying.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = if (nowPlaying.artist.isNotEmpty()) {
+                                        Modifier.clickable { onOpenArtist(nowPlaying.artist) }
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                            }
                         }
                     }
-                }
-                Spacer(Modifier.width(8.dp))
-                ExpressiveIconButton(
-                    onClick = onToggleFavorite,
-                    icon = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
-                    contentDescription = stringResource(if (isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites),
-                    containerColor = Color.Transparent,
-                    contentColor = if (isFavorite) colors.primary else colors.onSurfaceVariant,
-                    modifier = Modifier.size(40.dp),
-                )
-            }
-
-            // Transport -----------------------------------------------------------------------
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(0.4f).widthIn(min = 320.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ExpressiveToggleButton(
-                        checked = state.shuffle,
-                        onClick = onToggleShuffle,
-                        icon = PlayerIcons.Shuffle,
-                        contentDescription = stringResource(Res.string.shuffle),
-                        iconSize = 18.dp,
-                        uncheckedColor = Color.Transparent,
-                        modifier = Modifier.size(36.dp),
-                    )
+                    Spacer(Modifier.width(8.dp))
                     ExpressiveIconButton(
-                        onClick = onPrevious,
-                        icon = PlayerIcons.Previous,
-                        contentDescription = stringResource(Res.string.previous),
-                        containerColor = glassButton,
-                        contentColor = colors.onSurface,
+                        onClick = onToggleFavorite,
+                        icon = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
+                        contentDescription = stringResource(if (isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites),
+                        containerColor = Color.Transparent,
+                        contentColor = if (isFavorite) colors.primary else colors.onSurfaceVariant,
                         modifier = Modifier.size(40.dp),
                     )
-                    PlayPauseButton(
-                        isPlaying = state.isPlaying,
-                        onClick = onTogglePlay,
-                        playLabel = stringResource(Res.string.play),
-                        pauseLabel = stringResource(Res.string.pause),
-                        iconSize = 24.dp,
-                        modifier = Modifier.size(width = 56.dp, height = 40.dp),
-                    )
-                    ExpressiveIconButton(
-                        onClick = onNext,
-                        icon = PlayerIcons.Next,
-                        contentDescription = stringResource(Res.string.next),
-                        containerColor = glassButton,
-                        contentColor = colors.onSurface,
-                        modifier = Modifier.size(40.dp),
-                    )
-                    ExpressiveToggleButton(
-                        checked = state.repeatMode != Player.REPEAT_MODE_OFF,
-                        onClick = onCycleRepeat,
-                        icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
-                        contentDescription = stringResource(Res.string.repeat),
-                        iconSize = 18.dp,
-                        uncheckedColor = Color.Transparent,
-                        modifier = Modifier.size(36.dp),
-                    )
                 }
-                // Elapsed and total time either side of the bar.
-                WavySeekBar(
-                    position = position,
-                    durationMs = state.durationMs,
-                    isPlaying = state.isPlaying,
-                    onSeek = onSeek,
-                    compact = true,
+            },
+            center = {
+                // Transport -----------------------------------------------------------------------
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth(),
-                )
-            }
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ExpressiveToggleButton(
+                            checked = state.shuffle,
+                            onClick = onToggleShuffle,
+                            icon = PlayerIcons.Shuffle,
+                            contentDescription = stringResource(Res.string.shuffle),
+                            iconSize = 18.dp,
+                            uncheckedColor = Color.Transparent,
+                            modifier = Modifier.size(36.dp),
+                        )
+                        ExpressiveIconButton(
+                            onClick = onPrevious,
+                            icon = PlayerIcons.Previous,
+                            contentDescription = stringResource(Res.string.previous),
+                            containerColor = glassButton,
+                            contentColor = colors.onSurface,
+                            modifier = Modifier.size(40.dp),
+                        )
+                        PlayPauseButton(
+                            isPlaying = state.isPlaying,
+                            onClick = onTogglePlay,
+                            playLabel = stringResource(Res.string.play),
+                            pauseLabel = stringResource(Res.string.pause),
+                            iconSize = 24.dp,
+                            modifier = Modifier.size(width = 56.dp, height = 40.dp),
+                        )
+                        ExpressiveIconButton(
+                            onClick = onNext,
+                            icon = PlayerIcons.Next,
+                            contentDescription = stringResource(Res.string.next),
+                            containerColor = glassButton,
+                            contentColor = colors.onSurface,
+                            modifier = Modifier.size(40.dp),
+                        )
+                        ExpressiveToggleButton(
+                            checked = state.repeatMode != Player.REPEAT_MODE_OFF,
+                            onClick = onCycleRepeat,
+                            icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
+                            contentDescription = stringResource(Res.string.repeat),
+                            iconSize = 18.dp,
+                            uncheckedColor = Color.Transparent,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
+                    // Elapsed and total time either side of the bar.
+                    WavySeekBar(
+                        position = position,
+                        durationMs = state.durationMs,
+                        isPlaying = state.isPlaying,
+                        onSeek = onSeek,
+                        compact = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            end = {
+                // Extras --------------------------------------------------------------------------
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    LyricsPill(showLyrics, onToggleLyrics, onOpenDelicious)
+                    ExpressiveToggleButton(
+                        checked = showQueue,
+                        onClick = onToggleQueue,
+                        icon = PlayerIcons.Queue,
+                        contentDescription = stringResource(Res.string.queue),
+                        iconSize = 20.dp,
+                        uncheckedColor = Color.Transparent,
+                        modifier = Modifier.size(40.dp),
+                    )
+                    VolumeControl(volume, muted, onVolume, onToggleMute)
+                    ExpressiveIconButton(
+                        onClick = onExpand,
+                        icon = PlayerIcons.OpenInFull,
+                        contentDescription = stringResource(Res.string.open_full_player),
+                        containerColor = Color.Transparent,
+                        contentColor = colors.onSurfaceVariant,
+                        iconSize = 20.dp,
+                        modifier = Modifier.size(40.dp),
+                    )
+                }
+            },
+        )
+    }
+}
 
-            // Extras --------------------------------------------------------------------------
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
-                modifier = Modifier.weight(0.3f),
-            ) {
-                SleepTimerButton(active = sleepTimer != null, onClick = { showSleepSheet = true }, glass = Color.Transparent)
-                ExpressiveToggleButton(
-                    checked = showLyrics,
-                    onClick = onToggleLyrics,
-                    icon = PlayerIcons.Lyrics,
-                    contentDescription = stringResource(Res.string.lyrics),
-                    iconSize = 20.dp,
-                    uncheckedColor = Color.Transparent,
-                    modifier = Modifier.size(40.dp),
-                )
-                ExpressiveToggleButton(
-                    checked = showQueue,
-                    onClick = onToggleQueue,
-                    icon = PlayerIcons.Queue,
-                    contentDescription = stringResource(Res.string.queue),
-                    iconSize = 20.dp,
-                    uncheckedColor = Color.Transparent,
-                    modifier = Modifier.size(40.dp),
-                )
-                VolumeControl(volume, muted, onVolume, onToggleMute)
-                ExpressiveIconButton(
-                    onClick = onExpand,
-                    icon = PlayerIcons.OpenInFull,
-                    contentDescription = stringResource(Res.string.open_full_player),
-                    containerColor = Color.Transparent,
-                    contentColor = colors.onSurfaceVariant,
-                    iconSize = 20.dp,
-                    modifier = Modifier.size(40.dp),
-                )
-            }
+/**
+ * The bar's three parts: the transport exactly in the middle of the bar, whatever the track
+ * and the extras take, and the two sides sharing what is left equally.
+ */
+@Composable
+private fun BarLayout(
+    modifier: Modifier,
+    start: @Composable () -> Unit,
+    center: @Composable () -> Unit,
+    end: @Composable () -> Unit,
+) {
+    Layout(contents = listOf(start, center, end), modifier = modifier) { (s, c, e), constraints ->
+        val width = constraints.maxWidth
+        val middle = (width * CENTER_SHARE).roundToInt().coerceAtLeast(CENTER_MIN.roundToPx()).coerceAtMost(width)
+        val side = (width - middle) / 2
+        fun Measurable.exactly(w: Int) = measure(Constraints.fixedWidth(w).copy(maxHeight = constraints.maxHeight))
+        val startPlaced = s.first().exactly(side)
+        val centerPlaced = c.first().exactly(middle)
+        val endPlaced = e.first().exactly(side)
+        val height = maxOf(startPlaced.height, centerPlaced.height, endPlaced.height)
+        layout(width, height) {
+            startPlaced.place(0, (height - startPlaced.height) / 2)
+            centerPlaced.place(side, (height - centerPlaced.height) / 2)
+            endPlaced.place(side + middle, (height - endPlaced.height) / 2)
         }
+    }
+}
+
+private const val CENTER_SHARE = 0.4f
+private val CENTER_MIN = 320.dp
+
+/** Lyrics and the Delicious mode side by side in one pill: the panel on the left, the mode on the right. */
+@Composable
+private fun LyricsPill(showLyrics: Boolean, onToggleLyrics: () -> Unit, onOpenDelicious: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(colors.onSurface.copy(alpha = 0.07f)),
+    ) {
+        ExpressiveToggleButton(
+            checked = showLyrics,
+            onClick = onToggleLyrics,
+            icon = PlayerIcons.Lyrics,
+            contentDescription = stringResource(Res.string.lyrics),
+            iconSize = 20.dp,
+            uncheckedColor = Color.Transparent,
+            modifier = Modifier.size(40.dp),
+        )
+        ExpressiveIconButton(
+            onClick = onOpenDelicious,
+            icon = PlayerIcons.Sparkle,
+            contentDescription = stringResource(Res.string.delicious_open),
+            containerColor = Color.Transparent,
+            contentColor = colors.onSurface,
+            iconSize = 20.dp,
+            modifier = Modifier.size(40.dp),
+        )
     }
 }
 

@@ -1,14 +1,18 @@
 package com.ku.pierdoon.playback
 
+import com.ku.pierdoon.data.InterfaceLanguage
+import android.content.Context
 import com.ku.pierdoon.data.uriFor
 import com.ku.pierdoon.data.toMediaItem
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
@@ -32,6 +36,7 @@ import com.ku.pierdoon.MainActivity
 import com.ku.pierdoon.R
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.MusicRepository
+import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserLibrary
@@ -51,8 +56,12 @@ import kotlinx.coroutines.withContext
 // notification provider) as unstable API.
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
+    // Its notification buttons are labelled in the chosen language (Android 12 and older).
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(InterfaceLanguage.wrap(base))
+
 
     private var session: MediaSession? = null
+    private var crossfader: Crossfader? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private lateinit var queueStore: QueueStore
@@ -92,6 +101,7 @@ class PlaybackService : MediaSessionService() {
 
         // History lives here, not in the UI: tracks that play with the app closed count too.
         val library = UserLibrary.get(this)
+        val history = PlayHistory.get(this)
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 mediaItem?.mediaId?.toLongOrNull()?.let(library::recordPlayed)
@@ -106,6 +116,16 @@ class PlaybackService : MediaSessionService() {
             }
 
             override fun onEvents(player: Player, events: Player.Events) {
+                if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_IS_PLAYING_CHANGED)) {
+                    history.tracker.update(
+                        player.currentMediaItem?.mediaId?.toLongOrNull(),
+                        player.duration.takeIf { it != C.TIME_UNSET } ?: 0L,
+                        player.isPlaying,
+                        SystemClock.elapsedRealtime(),
+                        System.currentTimeMillis(),
+                        newItem = events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION),
+                    )
+                }
                 if (events.containsAny(*QUEUE_EVENTS)) scheduleSave(player)
                 if (events.containsAny(Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED, Player.EVENT_REPEAT_MODE_CHANGED)) {
                     session?.setMediaButtonPreferences(modeButtons(player))
@@ -116,13 +136,28 @@ class PlaybackService : MediaSessionService() {
         queueStore = QueueStore(this)
         restoreQueue(player)
 
+        val fader = Crossfader(this, player, scope).also { crossfader = it }
+        fader.start()
+        scope.launch {
+            SettingsStore.settings
+                .map { Triple(it.crossfadeSeconds, it.crossfadeAlbums, it.skipSilence) }
+                .distinctUntilChanged()
+                .collect { (seconds, albums, skipSilence) ->
+                    fader.fadeMs = seconds * 1000L
+                    fader.albumsGapless = !albums
+                    fader.skipSilence = skipSilence
+                }
+        }
+
         // Settings apply live; distinctUntilChanged keeps the player untouched by unrelated toggles.
         scope.launch {
             SettingsStore.settings
-                .map { it.skipSilence to it.audioOffload }
+                .map { Triple(it.skipSilence, it.audioOffload, it.playbackSpeed) }
                 .distinctUntilChanged()
-                .collect { (skipSilence, offload) ->
+                .collect { (skipSilence, offload, speed) ->
                     player.skipSilenceEnabled = skipSilence
+                    // Pitch moves with the speed, as on a turntable: slowed and nightcore.
+                    player.playbackParameters = PlaybackParameters(speed, speed)
                     // Hardware offload lets the DSP decode while the CPU sleeps —
                     // the single biggest battery win for long listening sessions.
                     player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
@@ -133,6 +168,8 @@ class PlaybackService : MediaSessionService() {
                                     else AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
                                 )
                                 .setIsGaplessSupportRequired(true)
+                                // Not every offloaded decoder can change speed; those that can't step aside then.
+                                .setIsSpeedChangeSupportRequired(speed != 1f)
                                 .build()
                         )
                         .build()
@@ -183,8 +220,11 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        PlayHistory.get(this).flush()
         UserLibrary.get(this).flush()
         scope.cancel()
+        crossfader?.release()
+        crossfader = null
         session?.run {
             // A few hundred bytes; written in place so it lands before the process can go.
             if (!restoring) queueStore.write(snapshot(player))

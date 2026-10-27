@@ -1,6 +1,5 @@
 package com.ku.pierdoon.ui.player
 
-import com.ku.pierdoon.playback.SleepTimer
 import androidx.compose.runtime.collectAsState
 
 import androidx.compose.runtime.rememberUpdatedState
@@ -151,6 +150,7 @@ fun FullPlayer(
     onCycleRepeat: () -> Unit,
     onOpenArtist: (String) -> Unit,
     onCollapse: () -> Unit,
+    onOpenDelicious: () -> Unit,
     modifier: Modifier = Modifier,
     /** The expanding sheet owns the vertical drag (swipe down shrinks the player back). */
     dragModifier: Modifier = Modifier,
@@ -161,9 +161,6 @@ fun FullPlayer(
 
     // Matte-glass tints over the frosted art: translucent containers pick up its colour.
     val glassButton = if (nothing) colors.surfaceContainerHigh else colors.surfaceContainerHighest.copy(alpha = 0.45f)
-    val sleepTimer by SleepTimer.state.collectAsState()
-    var showSleepSheet by remember { mutableStateOf(false) }
-    if (showSleepSheet) SleepTimerSheet(sleepTimer, onDismiss = { showSleepSheet = false })
 
     // Immersive lyrics: after a few idle seconds with lyrics open, the chrome steps aside and
     // the controls fold into a compact bar so the lyrics get the screen. Before that, touches
@@ -250,16 +247,17 @@ fun FullPlayer(
                         color = colors.onSurface,
                         textAlign = TextAlign.Center,
                     )
-                    sleepTimerLabel(sleepTimer)?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = colors.primary,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
                 }
-                SleepTimerButton(active = sleepTimer != null, onClick = { showSleepSheet = true }, glass = glassButton)
+                SpeedButton(glassButton)
+                Spacer(Modifier.width(8.dp))
+                ExpressiveIconButton(
+                    onClick = onOpenDelicious,
+                    icon = PlayerIcons.Sparkle,
+                    contentDescription = stringResource(Res.string.delicious_open),
+                    containerColor = glassButton,
+                    contentColor = colors.onSurface,
+                    modifier = Modifier.size(48.dp),
+                )
                 Spacer(Modifier.width(8.dp))
                 FavoriteButton(
                     isFavorite = isFavorite,

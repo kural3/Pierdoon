@@ -268,6 +268,8 @@ fun FullPlayer(
                 }
                 // The sleep timer stops the phone's player; it has nothing to do with the computer.
                 if (devices?.onPc != true) {
+                    SpeedButton(glassButton)
+                    Spacer(Modifier.width(8.dp))
                     SleepTimerButton(active = sleepTimer != null, onClick = { showSleepSheet = true }, glass = glassButton)
                     Spacer(Modifier.width(8.dp))
                 }

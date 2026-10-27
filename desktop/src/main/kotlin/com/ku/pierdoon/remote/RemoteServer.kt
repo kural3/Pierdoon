@@ -274,7 +274,7 @@ object RemoteServer {
         if (ok == null) return send(ex, 429, JSONObject().put("error", "too many attempts"))
         if (!ok) return send(ex, 403, JSONObject().put("error", "wrong code"))
         val token = ByteArray(32).also(random::nextBytes).joinToString("") { "%02x".format(it) }
-        val name = body.optString("name").take(60).ifBlank { "Телефон" }
+        val name = body.optString("name").take(60).ifBlank { "Android" }
         prefs.edit { putString(DEVICE + hash(token), "${System.currentTimeMillis()}|$name") }
         _status.update { it.copy(devices = loadDevices(), pairingCode = newCode()) }
         send(ex, 200, JSONObject().put("token", token).put("name", computerName()))

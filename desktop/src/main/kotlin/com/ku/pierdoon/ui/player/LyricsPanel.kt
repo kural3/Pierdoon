@@ -30,11 +30,13 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -124,8 +126,8 @@ fun LyricsPanel(
             is LyricsState.Ready -> when (val l = s.lyrics) {
                 is Lyrics.Synced -> SyncedLyrics(l, position, onSeek, offsetMs, onShift, onResetOffset)
                 is Lyrics.Plain -> PlainLyrics(l)
-                Lyrics.Instrumental -> Centered { Message(stringResource(Res.string.lyrics_instrumental)) }
-                Lyrics.NotFound -> Centered { Message(stringResource(Res.string.lyrics_not_found)) }
+                Lyrics.Instrumental -> Centered { Message(stringResource(Res.string.lyrics_instrumental)); SearchButton() }
+                Lyrics.NotFound -> Centered { Message(stringResource(Res.string.lyrics_not_found)); SearchButton() }
             }
             LyricsState.WifiOnly -> Centered { Message(stringResource(Res.string.lyrics_wifi_only)) }
         }
@@ -336,12 +338,35 @@ private fun PlainLyrics(lyrics: Lyrics.Plain) {
 
 @Composable
 private fun SourceLabel() {
-    Text(
-        text = stringResource(Res.string.lyrics_source),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 8.dp, vertical = 24.dp),
-    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(start = 8.dp, top = 16.dp, bottom = 16.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.lyrics_source),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // The wrong lyrics came up: the same search as when none did.
+        if (LocalLyricsSearch.current != null) {
+            Text(" · ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SearchButton(text = true)
+        }
+    }
+}
+
+/** Opens the lyrics search; nothing where the app gives none. */
+@Composable
+private fun SearchButton(text: Boolean = false) {
+    val search = LocalLyricsSearch.current ?: return
+    var open by remember { mutableStateOf(false) }
+    if (text) {
+        TextButton(onClick = { open = true }) { Text(stringResource(Res.string.lyrics_search)) }
+    } else {
+        Spacer(Modifier.height(16.dp))
+        FilledTonalButton(onClick = { open = true }) { Text(stringResource(Res.string.lyrics_search)) }
+    }
+    if (open) LyricsSearchDialog(search, onDismiss = { open = false })
 }
 
 @Composable

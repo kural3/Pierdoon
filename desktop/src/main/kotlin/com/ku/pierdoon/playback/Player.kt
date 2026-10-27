@@ -102,6 +102,34 @@ class Player {
         get() = engine.skipSilence
         set(value) { engine.skipSilence = value }
 
+    /** Playback speed, pitch following it (slowed, nightcore). */
+    var speed: Float = 1f
+        set(value) {
+            if (field == value) return
+            field = value
+            engine.setSpeed(value)
+        }
+
+    /** Loudness and beats of what's heard now; read every frame by the Delicious mode. */
+    fun levels(): AudioLevels = engine.levels()
+
+    /** How long one track fades into the next; 0 for none. */
+    var crossfadeMs: Long
+        get() = engine.crossfadeMs
+        set(value) {
+            if (engine.crossfadeMs == value) return
+            engine.crossfadeMs = value
+            updateNext()
+        }
+
+    /** Tracks of one album played in order run into each other without a fade, as on the record. */
+    var albumsGapless: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            updateNext()
+        }
+
     /** Item duration in ms, or [TIME_UNSET] when unknown. */
     val duration: Long get() = currentMediaItem?.song?.durationMs?.takeIf { it > 0 } ?: TIME_UNSET
 
@@ -421,7 +449,17 @@ class Player {
         val token = ++tokenSeq
         nextToken = token
         nextKeys[token] = items[n].queueKey
-        engine.setNext(items[n].song.file, token)
+        engine.setNext(items[n].song.file, token, crossfade = fadesInto(n))
+    }
+
+    /** Whether the current item should fade into [next] rather than run straight into it. */
+    private fun fadesInto(next: Int): Boolean {
+        val current = currentMediaItem?.song ?: return false
+        // Repeating one track: its end and start meet as they are.
+        if (engine.crossfadeMs <= 0 || next == currentMediaItemIndex) return false
+        // Tracks without an album share an empty one; that doesn't make them a record.
+        val sameAlbum = current.album.isNotBlank() && current.albumId == items[next].song.albumId
+        return !(albumsGapless && !shuffleModeEnabled && sameAlbum)
     }
 
     private fun stopEngine(): CompletableFuture<Unit> {

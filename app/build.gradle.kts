@@ -28,8 +28,8 @@ android {
         applicationId = "com.ku.pierdoon"
         minSdk = 24
         targetSdk = 37
-        versionCode = 10
-        versionName = "2.1"
+        versionCode = 11
+        versionName = "2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -88,6 +88,12 @@ android {
         compose = true
         // VERSION_NAME for the User-Agent and the updater.
         buildConfig = true
+    }
+    // The language is switched in the app, so a bundle must carry every one of them.
+    bundle {
+        language {
+            enableSplit = false
+        }
     }
 }
 

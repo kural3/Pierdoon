@@ -1,5 +1,6 @@
 package com.ku.pierdoon.data
 
+import com.ku.pierdoon.playback.PlaybackSpeed
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.Immutable
@@ -46,6 +47,12 @@ data class AppSettings(
     /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
     val lyricsSyncControls: Boolean = false,
     val skipSilence: Boolean = false,
+    /** Seconds one track fades into the next; 0 for none. */
+    val crossfadeSeconds: Int = 0,
+    /** Playback speed, pitch following it; one of [com.ku.pierdoon.playback.PlaybackSpeed.options]. */
+    val playbackSpeed: Float = 1f,
+    /** Fade between tracks of one album too; off keeps albums gapless, as recorded. */
+    val crossfadeAlbums: Boolean = false,
     val audioOffload: Boolean = true,
     /** Last choice on the track editor: the app's records or the file itself. */
     val editTarget: SaveTarget = SaveTarget.App,
@@ -91,6 +98,9 @@ object SettingsStore {
             lyricsWifiOnly = p.getBoolean(K_WIFI, d.lyricsWifiOnly),
             lyricsSyncControls = p.getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
             skipSilence = p.getBoolean(K_SILENCE, d.skipSilence),
+            crossfadeSeconds = p.getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
+            playbackSpeed = PlaybackSpeed.nearest(p.getFloat(K_SPEED, d.playbackSpeed)),
+            crossfadeAlbums = p.getBoolean(K_CROSSFADE_ALBUMS, d.crossfadeAlbums),
             audioOffload = p.getBoolean(K_OFFLOAD, d.audioOffload),
             editTarget = runCatching { SaveTarget.valueOf(p.getString(K_EDIT_TARGET, d.editTarget.name)!!) }
                 .getOrDefault(d.editTarget),
@@ -122,6 +132,9 @@ object SettingsStore {
             putBoolean(K_WIFI, s.lyricsWifiOnly)
             putBoolean(K_SYNC_CONTROLS, s.lyricsSyncControls)
             putBoolean(K_SILENCE, s.skipSilence)
+            putInt(K_CROSSFADE, s.crossfadeSeconds)
+            putFloat(K_SPEED, s.playbackSpeed)
+            putBoolean(K_CROSSFADE_ALBUMS, s.crossfadeAlbums)
             putBoolean(K_OFFLOAD, s.audioOffload)
             putString(K_EDIT_TARGET, s.editTarget.name)
             putBoolean(K_UPDATES, s.checkUpdates)
@@ -147,6 +160,9 @@ object SettingsStore {
     private const val K_WIFI = "lyrics_wifi_only"
     private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
     private const val K_SILENCE = "skip_silence"
+    private const val K_CROSSFADE = "crossfade_seconds"
+    private const val K_SPEED = "playback_speed"
+    private const val K_CROSSFADE_ALBUMS = "crossfade_albums"
     private const val K_OFFLOAD = "audio_offload"
     private const val K_EDIT_TARGET = "edit_target"
     private const val K_UPDATES = "check_updates"

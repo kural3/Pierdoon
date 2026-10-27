@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -50,7 +52,9 @@ import com.ku.pierdoon.data.Album
 import com.ku.pierdoon.data.MusicCollections
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.Song
+import com.ku.pierdoon.data.splitArtists
 import com.ku.pierdoon.ui.components.Artwork
+import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.components.animatePressAsState
 import com.ku.pierdoon.ui.components.scaleBy
@@ -63,6 +67,9 @@ fun HomeScreen(
     collections: MusicCollections,
     playlists: List<Playlist>,
     favoritesCount: Int,
+    dailyMix: List<Song>,
+    /** Time listened over the last seven days; null until the play log is read. */
+    weekListenedMs: Long?,
     resolveCover: (Playlist) -> Song?,
     onPlay: (List<Song>, Int) -> Unit,
     onShuffleAll: () -> Unit,
@@ -100,7 +107,7 @@ fun HomeScreen(
                 )
                 QuickCard(
                     title = stringResource(Res.string.favorites),
-                    subtitle = stringResource(Res.string.songs_count, favoritesCount),
+                    subtitle = pluralStringResource(Res.plurals.songs_count, favoritesCount, favoritesCount),
                     icon = PlayerIcons.Favorite,
                     shape = MaterialShapes.Sunny.toShape(),
                     container = MaterialTheme.colorScheme.tertiaryContainer,
@@ -108,6 +115,22 @@ fun HomeScreen(
                     onClick = { onOpen(Route.Favorites) },
                     modifier = Modifier.weight(1f),
                 )
+            }
+        }
+
+        if (dailyMix.isNotEmpty()) {
+            item(key = "mix") {
+                DailyMixCard(
+                    songs = dailyMix,
+                    onOpen = { onOpen(Route.DailyMix) },
+                    onPlay = { onPlay(dailyMix, 0) },
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                )
+            }
+        }
+        if (weekListenedMs != null) {
+            item(key = "stats") {
+                StatsCard(weekListenedMs, onClick = { onOpen(Route.Stats) }, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp))
             }
         }
 
@@ -157,7 +180,7 @@ fun HomeScreen(
                         val cover = resolveCover(p)
                         CoverCard(
                             title = p.name,
-                            subtitle = stringResource(Res.string.songs_count, p.songIds.size),
+                            subtitle = pluralStringResource(Res.plurals.songs_count, p.songIds.size, p.songIds.size),
                             songId = cover?.id ?: -1L,
                             albumId = cover?.albumId ?: -1L,
                             onClick = { onOpen(Route.PlaylistDetail(p.id)) },
@@ -341,4 +364,122 @@ fun AlbumCard(album: Album, onOpen: (Route) -> Unit, modifier: Modifier = Modifi
         width = width,
         modifier = modifier,
     )
+}
+
+/** The playlist of the day: its covers, a few of its artists and a play button. */
+@Composable
+private fun DailyMixCard(songs: List<Song>, onOpen: () -> Unit, onPlay: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val haptics = LocalHapticFeedback.current
+    val source = remember { MutableInteractionSource() }
+    val scale = animatePressAsState(source, 0.97f)
+    val artists = remember(songs) { songs.flatMap { splitArtists(it.artist) }.distinct().take(4).joinToString(", ") }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .scaleBy(scale)
+            .clip(RoundedCornerShape(28.dp))
+            .background(colors.secondaryContainer)
+            .clickable(interactionSource = source, indication = ripple()) {
+                haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                onOpen()
+            }
+            .padding(12.dp),
+    ) {
+        MixCollage(songs, Modifier.size(104.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(Res.string.daily_mix),
+                style = MaterialTheme.typography.titleLargeEmphasized,
+                color = colors.onSecondaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                artists.ifEmpty { stringResource(Res.string.daily_mix_desc) },
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSecondaryContainer.copy(alpha = 0.75f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        ExpressiveIconButton(
+            onClick = onPlay,
+            icon = PlayerIcons.Play,
+            contentDescription = stringResource(Res.string.play_all),
+            containerColor = colors.primary,
+            contentColor = colors.onPrimary,
+            iconSize = 28.dp,
+            haptic = HapticFeedbackType.Confirm,
+            modifier = Modifier.padding(end = 4.dp).size(56.dp),
+        )
+    }
+}
+
+/** Four covers of the mix in a square, or one when there are fewer. */
+@Composable
+fun MixCollage(songs: List<Song>, modifier: Modifier = Modifier) {
+    val shown = remember(songs) { songs.distinctBy { it.albumId }.take(4) }
+    Box(modifier.clip(RoundedCornerShape(20.dp))) {
+        if (shown.size < 4) {
+            val s = shown.firstOrNull()
+            Artwork(s?.id ?: -1L, s?.albumId ?: -1L, Modifier.fillMaxSize(), placeholderIconSize = 40.dp)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                for (row in 0..1) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                        for (col in 0..1) {
+                            val s = shown[row * 2 + col]
+                            Artwork(s.id, s.albumId, Modifier.weight(1f).fillMaxHeight(), placeholderIconSize = 20.dp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The way into the statistics, with the week's listening time as a teaser. */
+@Composable
+private fun StatsCard(weekListenedMs: Long, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val haptics = LocalHapticFeedback.current
+    val source = remember { MutableInteractionSource() }
+    val scale = animatePressAsState(source, 0.97f)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .scaleBy(scale)
+            .clip(RoundedCornerShape(28.dp))
+            .background(colors.surfaceContainerHigh)
+            .clickable(interactionSource = source, indication = ripple()) {
+                haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                onClick()
+            }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(MaterialShapes.Cookie6Sided.toShape())
+                .background(colors.tertiaryContainer),
+        ) {
+            Icon(PlayerIcons.BarChart, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(Res.string.stats), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+            Text(
+                stringResource(Res.string.stats_week_summary, listenedTime(weekListenedMs)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+            )
+        }
+        Icon(PlayerIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceVariant)
+    }
 }

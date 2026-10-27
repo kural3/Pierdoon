@@ -50,6 +50,33 @@ class LyricsRepository {
         }
     }
 
+    /**
+     * LRCLIB's search for any text, for picking lyrics by hand. Synced ones first.
+     * @throws IOException when the network is unavailable.
+     */
+    suspend fun search(text: String): List<LyricsCandidate> = withContext(Dispatchers.IO) {
+        val results = httpGet("$API/search?q=${enc(text.trim())}")?.let(::JSONArray) ?: return@withContext emptyList()
+        List(results.length()) { results.getJSONObject(it) }
+            .map { o ->
+                LyricsCandidate(
+                    title = o.optString("trackName"),
+                    artist = o.optString("artistName"),
+                    album = o.optString("albumName"),
+                    durationMs = (o.optDouble("duration", 0.0) * 1000).toLong(),
+                    lyrics = toLyrics(o),
+                )
+            }
+            .filter { it.lyrics !is Lyrics.NotFound }
+            .sortedBy { if (it.lyrics is Lyrics.Synced) 0 else 1 }
+            .take(MAX_SEARCH_RESULTS)
+    }
+
+    /** Lyrics picked by hand: kept for the track for good, "none" included. */
+    suspend fun choose(songId: Long, lyrics: Lyrics) = withContext(Dispatchers.IO) {
+        memory.put(songId, lyrics)
+        writeDisk(songId, lyrics, manual = true)
+    }
+
     /** The track's file is gone: its lyrics won't be asked for again. */
     suspend fun forget(songId: Long) = withContext(Dispatchers.IO) {
         memory.remove(songId)
@@ -126,15 +153,16 @@ class LyricsRepository {
                 "instrumental" -> Lyrics.Instrumental
                 else -> {
                     // Retry "not found" after a while: someone may have uploaded it since.
-                    if (System.currentTimeMillis() - o.optLong("t") > NOT_FOUND_TTL_MS) null
+                    if (!o.optBoolean("manual") && System.currentTimeMillis() - o.optLong("t") > NOT_FOUND_TTL_MS) null
                     else Lyrics.NotFound
                 }
             }
         }.getOrNull()
     }
 
-    private fun writeDisk(songId: Long, lyrics: Lyrics) {
+    private fun writeDisk(songId: Long, lyrics: Lyrics, manual: Boolean = false) {
         val o = JSONObject().put("t", System.currentTimeMillis())
+        if (manual) o.put("manual", true)
         when (lyrics) {
             is Lyrics.Synced -> o.put("kind", "synced").put("text", lyrics.toLrc())
             is Lyrics.Plain -> o.put("kind", "plain").put("text", lyrics.lines.joinToString("\n"))
@@ -184,6 +212,7 @@ class LyricsRepository {
         const val MAX_DURATION_DIFF_SEC = 5.0
         const val UNSYNCED_PENALTY = 3.0
         const val NOT_FOUND_TTL_MS = 3L * 24 * 60 * 60 * 1000
+        const val MAX_SEARCH_RESULTS = 30
 
         private val noise = Regex(
             """\s*[(\[](?:feat\.?|ft\.?|prod\.?|remaster(?:ed)?|official|lyrics?|audio|video)[^)\]]*[)\]]""",

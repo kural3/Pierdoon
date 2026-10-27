@@ -266,6 +266,25 @@ object PlayerIcons {
         )
     }
 
+    val Sparkle by lazy {
+        icon(
+            "Sparkle",
+            "M19,9l1.25,-2.75L23,5l-2.75,-1.25L19,1l-1.25,2.75L15,5l2.75,1.25L19,9zM11.5,9.5L9,4 6.5,9.5 1,12l5.5,2.5L9,20" +
+                "l2.5,-5.5L17,12l-5.5,-2.5zM19,15l-1.25,2.75L15,19l2.75,1.25L19,23l1.25,-2.75L23,19l-2.75,-1.25L19,15z",
+        )
+    }
+
+    val BarChart by lazy { icon("BarChart", "M5,9.2h3V19H5V9.2zM10.6,5h2.8v14h-2.8V5zM16.2,13H19v6h-2.8v-6z") }
+
+    val Speed by lazy {
+        icon(
+            "Speed",
+            "M20.38,8.57l-1.23,1.85a8,8 0 0,1 -0.22,7.58H5.07A8,8 0 0,1 15.58,6.85l1.85,-1.23A10,10 0 0,0 3.35,19" +
+                "a2,2 0 0,0 1.72,1h13.85a2,2 0 0,0 1.74,-1 10,10 0 0,0 -0.27,-10.44zM10.59,15.41a2,2 0 0,0 2.83,0" +
+                "l5.66,-8.49 -8.49,5.66a2,2 0 0,0 0,2.83z",
+        )
+    }
+
     private fun icon(name: String, path: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
             .addPath(pathData = addPathNodes(path), fill = SolidColor(Color.Black))

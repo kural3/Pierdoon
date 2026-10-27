@@ -51,6 +51,7 @@ import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsOffsets
+import com.ku.pierdoon.data.lyrics.LyricsCandidate
 import com.ku.pierdoon.data.lyrics.LyricsQuery
 import com.ku.pierdoon.data.lyrics.LyricsRepository
 import com.ku.pierdoon.data.lyrics.NetworkNotAllowedException
@@ -95,9 +96,15 @@ sealed interface LyricsState {
 
 /** Position sampled at [atRealtimeMs]; lets the UI extrapolate instead of polling faster. */
 @Immutable
-data class PositionSnapshot(val positionMs: Long = 0L, val atRealtimeMs: Long = 0L, val playing: Boolean = false) {
+data class PositionSnapshot(
+    val positionMs: Long = 0L,
+    val atRealtimeMs: Long = 0L,
+    val playing: Boolean = false,
+    /** How much faster than recorded the track plays: a second of it passes in 1 / speed seconds. */
+    val speed: Float = 1f,
+) {
     fun estimate(nowRealtimeMs: Long = SystemClock.elapsedRealtime()): Long =
-        if (playing) positionMs + (nowRealtimeMs - atRealtimeMs) else positionMs
+        if (playing) positionMs + ((nowRealtimeMs - atRealtimeMs) * speed).toLong() else positionMs
 }
 
 sealed interface LibraryState {
@@ -143,7 +150,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val tick = eventTick.value
             val c = controller
             val playing = c?.isPlaying == true
-            emit(PositionSnapshot(c?.currentPosition ?: 0L, SystemClock.elapsedRealtime(), playing))
+            emit(PositionSnapshot(c?.currentPosition ?: 0L, SystemClock.elapsedRealtime(), playing, c?.playbackParameters?.speed ?: 1f))
             if (playing) delay(POSITION_TICK_MS) else eventTick.first { it != tick }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PositionSnapshot())
@@ -425,6 +432,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setLyricsVisible(visible: Boolean) { lyricsVisible.value = visible }
     fun retryLyrics() { lyricsRetry.update { it + 1 } }
+
+    /** Where a lyrics search starts: the current track's artist and title. */
+    fun lyricsSearchText(): String {
+        val np = _player.value.nowPlaying ?: return ""
+        val song = songsById[np.songId]
+        return listOf(song?.artist ?: np.artist, song?.title ?: np.title).filter { it.isNotBlank() }.joinToString(" ")
+    }
+
+    suspend fun searchLyrics(text: String): List<LyricsCandidate> = lyricsRepository.search(text)
+
+    /** Puts lyrics picked by hand on the current track, for good. */
+    fun pickLyrics(lyrics: Lyrics) {
+        val id = _player.value.nowPlaying?.songId ?: return
+        viewModelScope.launch {
+            lyricsRepository.choose(id, lyrics)
+            lyricsRetry.update { it + 1 }
+        }
+    }
 
     fun toggleShuffle() {
         controller?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled }

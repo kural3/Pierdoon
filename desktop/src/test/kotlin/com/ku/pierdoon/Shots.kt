@@ -2,6 +2,8 @@ package com.ku.pierdoon
 
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.geometry.Offset
@@ -9,8 +11,10 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
+import com.ku.pierdoon.data.AppLanguage
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.SettingsStore
+import com.ku.pierdoon.platform.InterfaceLanguage
 import com.ku.pierdoon.playback.PlaybackController
 import com.ku.pierdoon.ui.PierdoonApp
 import com.ku.pierdoon.ui.navigation.Navigator
@@ -32,6 +36,7 @@ import kotlin.system.exitProcess
  *     size 1280 820      window size (first line only)
  *     wait 1500          let it run
  *     tab Settings       select a tab
+ *     lang en            interface language: en, ru or system
  *     click 300 400      press and release there
  *     rclick 300 400     right click
  *     move 300 400       hover
@@ -39,6 +44,7 @@ import kotlin.system.exitProcess
  *     drag 10 10 200 10  press, move, release
  *     shot home          save home.png
  *     shotnow mid        save mid.png at once, mid-animation
+ *     state              print whether it plays and how loud (the Delicious mode's levels)
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
@@ -60,7 +66,10 @@ fun main(args: Array<String>) {
             val nav = Navigator(listOf(Route.Home))
             val scene = ImageComposeScene(width, height, Density(1f), coroutineContext = Dispatchers.Main) {
                 val settings by SettingsStore.settings.collectAsState()
-                PierdoonTheme(settings) { PierdoonApp(vm, nav) }
+                // As in Main.kt: the language is applied before the strings are read, and a change reads them anew.
+                val language = settings.language
+                remember(language) { InterfaceLanguage.apply(language) }
+                PierdoonTheme(settings) { key(language) { PierdoonApp(vm, nav) } }
             }
             var time = 0L
             // Wall time of each rendered frame, for the `perf` step.
@@ -84,6 +93,7 @@ fun main(args: Array<String>) {
                     "size" -> Unit
                     "wait" -> run(p[1].toLong())
                     "tab" -> nav.selectTab(Route.tabs.first { it::class.simpleName == p[1] })
+                    "lang" -> SettingsStore.update { it.copy(language = if (p[1] == "system") AppLanguage.System else AppLanguage.fromTag(p[1])) }
                     "move" -> scene.sendPointerEvent(PointerEventType.Move, at(p[1], p[2]))
                     "click" -> {
                         val o = at(p[1], p[2])
@@ -119,6 +129,10 @@ fun main(args: Array<String>) {
                         val image = scene.render(time)
                         File(out, "${p[1]}.png").writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes)
                         println("shot ${p[1]}")
+                    }
+                    "state" -> PlaybackController.player.let { pl ->
+                        val l = pl.levels()
+                        println("state: playing ${pl.isPlaying} at ${pl.currentPosition} ms, energy ${l.energy}, bass ${l.bass}, beats ${l.beats}")
                     }
                     // Frame times since the previous `perf`: average, 95th percentile and worst.
                     "perf" -> {

@@ -1,5 +1,7 @@
 package com.ku.pierdoon.remote
 
+import com.ku.pierdoon.data.InterfaceLanguage
+import android.content.Context
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -27,6 +29,9 @@ import kotlinx.coroutines.launch
  * Once the queue is empty it leaves one line behind: how many arrived, and how many didn't.
  */
 class TransferService : Service() {
+    // The notification in the chosen language (Android 12 and older).
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(InterfaceLanguage.wrap(base))
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var watcher: Job? = null
 

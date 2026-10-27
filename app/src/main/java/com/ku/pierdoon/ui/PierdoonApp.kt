@@ -113,6 +113,8 @@ import com.ku.pierdoon.R
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.ColorSource
 import com.ku.pierdoon.data.CoverStore
+import com.ku.pierdoon.data.PlayHistory
+import com.ku.pierdoon.data.history.DailyMix
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.playback.NowPlaying
@@ -127,6 +129,8 @@ import com.ku.pierdoon.ui.components.rememberBackdrop
 import com.ku.pierdoon.ui.library.BulkActionsSheet
 import com.ku.pierdoon.ui.library.BulkTarget
 import com.ku.pierdoon.ui.library.CollectionScreen
+import com.ku.pierdoon.ui.library.MixCollage
+import com.ku.pierdoon.ui.library.StatsScreen
 import com.ku.pierdoon.ui.library.MenuEntry
 import com.ku.pierdoon.ui.library.SearchScreen
 import com.ku.pierdoon.ui.library.ConfirmDeleteDialog
@@ -157,6 +161,8 @@ import com.ku.pierdoon.ui.player.ExpandingPlayerEffect
 import com.ku.pierdoon.ui.player.ExpandingPlayerSheet
 import com.ku.pierdoon.ui.player.MINI_HANDOFF
 import com.ku.pierdoon.ui.player.FullPlayer
+import com.ku.pierdoon.ui.player.LocalLyricsSearch
+import com.ku.pierdoon.ui.player.LyricsSearch
 import com.ku.pierdoon.ui.player.expandingPlayerDrag
 import com.ku.pierdoon.ui.player.rememberExpandingPlayerState
 import com.ku.pierdoon.ui.player.MiniPlayer
@@ -194,6 +200,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     val queue by vm.queue.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
     val updatePrompt by vm.updatePrompt.collectAsStateWithLifecycle()
+    val lyricsSearch = remember(vm) { LyricsSearch(vm::lyricsSearchText, vm::searchLyrics, vm::pickLyrics) }
     val nowPlaying = rememberLastNonNull(player.nowPlaying)
     val backdrop = rememberBackdrop()
     val nav = rememberNavigator()
@@ -479,43 +486,46 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                         return@AnimatedContent
                     }
                     val np = nowPlaying ?: return@AnimatedContent
-                    FullPlayer(
-                        nowPlaying = np,
-                        state = player,
-                        position = { position.value },
-                        lyrics = lyrics,
-                        showLyrics = showLyrics,
-                        queue = queue,
-                        showQueue = showQueue,
-                        isFavorite = np.songId in userData.favorites,
-                        onToggleFavorite = { vm.toggleFavorite(np.songId) },
-                        // Lyrics and queue share the space above the controls: one at a time.
-                        onToggleLyrics = { showLyrics = !showLyrics; showQueue = false },
-                        onToggleQueue = { showQueue = !showQueue; showLyrics = false },
-                        onPlayQueueEntry = vm::playQueueEntry,
-                        onRemoveQueueEntry = vm::removeQueueEntry,
-                        onMoveQueueEntry = vm::moveQueueEntry,
-                        onSongLongPress = { songAction = SongActionTarget(it) },
-                        onRetryLyrics = vm::retryLyrics,
-                        lyricsOffsetMs = lyricsOffset,
-                        onShiftLyrics = vm::shiftLyrics,
-                        onResetLyricsOffset = vm::resetLyricsOffset,
-                        onTogglePlay = vm::togglePlay,
-                        onPrevious = vm::previous,
-                        onPreviousTrack = vm::previousTrack,
-                        onNext = vm::next,
-                        onSeek = vm::seekTo,
-                        onToggleShuffle = vm::toggleShuffle,
-                        onCycleRepeat = vm::cycleRepeat,
-                        onOpenArtist = { name ->
-                            expanded = false
-                            nav.push(Route.ArtistDetail(name))
-                        },
-                        onCollapse = { expanded = false },
-                        modifier = contentModifier,
-                        dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
-                        devices = devices,
-                    )
+                    // Lyrics picked by hand go on the phone's own track; the computer's player above gets none.
+                    CompositionLocalProvider(LocalLyricsSearch provides lyricsSearch) {
+                        FullPlayer(
+                            nowPlaying = np,
+                            state = player,
+                            position = { position.value },
+                            lyrics = lyrics,
+                            showLyrics = showLyrics,
+                            queue = queue,
+                            showQueue = showQueue,
+                            isFavorite = np.songId in userData.favorites,
+                            onToggleFavorite = { vm.toggleFavorite(np.songId) },
+                            // Lyrics and queue share the space above the controls: one at a time.
+                            onToggleLyrics = { showLyrics = !showLyrics; showQueue = false },
+                            onToggleQueue = { showQueue = !showQueue; showLyrics = false },
+                            onPlayQueueEntry = vm::playQueueEntry,
+                            onRemoveQueueEntry = vm::removeQueueEntry,
+                            onMoveQueueEntry = vm::moveQueueEntry,
+                            onSongLongPress = { songAction = SongActionTarget(it) },
+                            onRetryLyrics = vm::retryLyrics,
+                            lyricsOffsetMs = lyricsOffset,
+                            onShiftLyrics = vm::shiftLyrics,
+                            onResetLyricsOffset = vm::resetLyricsOffset,
+                            onTogglePlay = vm::togglePlay,
+                            onPrevious = vm::previous,
+                            onPreviousTrack = vm::previousTrack,
+                            onNext = vm::next,
+                            onSeek = vm::seekTo,
+                            onToggleShuffle = vm::toggleShuffle,
+                            onCycleRepeat = vm::cycleRepeat,
+                            onOpenArtist = { name ->
+                                expanded = false
+                                nav.push(Route.ArtistDetail(name))
+                            },
+                            onCollapse = { expanded = false },
+                            modifier = contentModifier,
+                            dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
+                            devices = devices,
+                        )
+                    }
                 }
             }
         }
@@ -646,6 +656,13 @@ private fun Screens(
     val onShuffle: (List<Song>) -> Unit = { list ->
         if (list.isNotEmpty()) vm.playSongs(list, list.indices.random(), shuffle = true)
     }
+    val plays by PlayHistory.get(LocalContext.current).plays.collectAsStateWithLifecycle()
+    // Built from plays up to last midnight, so it's the same all day; looked at again on each page change.
+    val today = remember(nav.current) { DailyMix.dayNumber(System.currentTimeMillis()) }
+    val playsLoaded = plays != null
+    val dailyMix = remember(songs, userData.favorites, today, playsLoaded) {
+        if (!playsLoaded) emptyList() else DailyMix.build(songs, plays.orEmpty(), userData.favorites, System.currentTimeMillis())
+    }
 
     // One page = its saved UI state + its content.
     val pageBody: @Composable (Route) -> Unit = { route ->
@@ -658,6 +675,11 @@ private fun Screens(
                         collections = collections,
                         playlists = userData.playlists,
                         favoritesCount = userData.favorites.size,
+                        dailyMix = dailyMix,
+                        weekListenedMs = plays?.let { p ->
+                            val since = System.currentTimeMillis() - WEEK_MS
+                            p.sumOf { if (it.atMs >= since) it.listenedMs else 0L }
+                        },
                         resolveCover = resolveCover,
                         onPlay = onPlay,
                         onShuffleAll = vm::shuffleAll,
@@ -755,9 +777,9 @@ private fun Screens(
                     )
                 }
                 is Route.ArtistDetail -> {
-                    val artist = collections.artists.firstOrNull { it.name == route.name }
+                    val artist = collections.artist(route.name)
                     CollectionScreen(
-                        title = route.name,
+                        title = artist?.name ?: route.name,
                         subtitle = "",
                         songs = artist?.songs.orEmpty(),
                         currentSongId = currentSongId,
@@ -814,6 +836,31 @@ private fun Screens(
                         LaunchedEffect(Unit) { nav.pop() }
                     }
                 }
+                Route.DailyMix -> CollectionScreen(
+                    title = stringResource(R.string.daily_mix),
+                    subtitle = stringResource(R.string.daily_mix_desc),
+                    songs = dailyMix,
+                    currentSongId = currentSongId,
+                    cover = { m -> MixCollage(dailyMix, m) },
+                    onBack = { nav.pop() },
+                    onPlay = onPlay,
+                    onShuffle = onShuffle,
+                    onSongLongPress = { onSongLongPress(it, null) },
+                    onBulk = { picked, done -> onBulk(picked, null, done) },
+                    onDelete = onDeleteSongs,
+                    bottomInset = bottomInset,
+                )
+                Route.Stats -> StatsScreen(
+                    plays = plays,
+                    songs = songs,
+                    currentSongId = currentSongId,
+                    onBack = { nav.pop() },
+                    onPlay = onPlay,
+                    onSongLongPress = { onSongLongPress(it, null) },
+                    onOpen = nav::push,
+                    onClear = PlayHistory.get(LocalContext.current)::clear,
+                    bottomInset = bottomInset,
+                )
                 Route.Favorites -> {
                     val tracks = remember(userData.favorites, songs) { vm.resolve(userData.favorites) }
                     CollectionScreen(
@@ -1010,6 +1057,7 @@ private fun DockedNavBar(nav: Navigator, backdrop: com.ku.pierdoon.ui.components
     }
 }
 
+private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
 private val FLOATING_NAV_HEIGHT = 72.dp
 private const val SELECTED_WEIGHT = 3f
 
