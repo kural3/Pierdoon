@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui
 
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -44,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -82,6 +84,8 @@ import com.ku.pierdoon.data.NAV_MAX_WIDTH
 import com.ku.pierdoon.data.NAV_MIN_WIDTH
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.Playlist
+import com.ku.pierdoon.data.PlayHistory
+import com.ku.pierdoon.data.history.DailyMix
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserData
@@ -109,6 +113,8 @@ import com.ku.pierdoon.ui.edit.EditSongScreen
 import com.ku.pierdoon.ui.library.BulkActionsSheet
 import com.ku.pierdoon.ui.library.BulkTarget
 import com.ku.pierdoon.ui.library.CollectionScreen
+import com.ku.pierdoon.ui.library.MixCollage
+import com.ku.pierdoon.ui.library.StatsScreen
 import com.ku.pierdoon.ui.library.ConfirmDeleteDialog
 import com.ku.pierdoon.ui.library.FavoritesCover
 import com.ku.pierdoon.ui.library.FillBox
@@ -136,7 +142,10 @@ import com.ku.pierdoon.ui.player.expandingPlayerDrag
 import com.ku.pierdoon.ui.player.MINI_HANDOFF
 import com.ku.pierdoon.ui.player.ExpandingPlayerSheet
 import com.ku.pierdoon.ui.player.ExpandingPlayerEffect
+import com.ku.pierdoon.ui.player.DeliciousScreen
 import com.ku.pierdoon.ui.player.LyricsPanel
+import com.ku.pierdoon.ui.player.LocalLyricsSearch
+import com.ku.pierdoon.ui.player.LyricsSearch
 import com.ku.pierdoon.ui.player.NowPlayingScreen
 import com.ku.pierdoon.ui.player.PlayerBar
 import com.ku.pierdoon.ui.player.QueuePanel
@@ -177,6 +186,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val queue by vm.queue.collectAsState()
     val update by vm.update.collectAsState()
     val updatePrompt by vm.updatePrompt.collectAsState()
+    val lyricsSearch = remember(vm) { LyricsSearch(vm::lyricsSearchText, vm::searchLyrics, vm::pickLyrics) }
     val settings by SettingsStore.settings.collectAsState()
     val nowPlaying = rememberLastNonNull(player.nowPlaying)
     val backdrop = rememberBackdrop()
@@ -199,14 +209,17 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     }
 
     var expanded by rememberSaveable { mutableStateOf(false) }
+    // The Delicious mode, over everything; opened from the bar or the full player.
+    var delicious by remember { mutableStateOf(false) }
     // The open player grows out of the bar and shrinks back into it, as on the phone; the bar can
     // also be dragged up (and the player down) with the mouse.
     val sheet = rememberExpandingPlayerState()
     ExpandingPlayerEffect(sheet, expanded && nowPlaying != null)
     val covered by remember { derivedStateOf { sheet.progress.value >= 1f && !sheet.isMoving } }
     var sidePanel by rememberSaveable { mutableStateOf<SidePanel?>(null) }
-    // Lyrics are fetched only while actually on screen: the side panel, or the open player's.
-    val lyricsOnScreen = (sidePanel == SidePanel.Lyrics && !expanded) || (expanded && sidePanel != SidePanel.Queue)
+    // Lyrics are fetched only while actually on screen: the side panel, the open player's, or the
+    // Delicious mode's.
+    val lyricsOnScreen = (sidePanel == SidePanel.Lyrics && !expanded) || (expanded && sidePanel != SidePanel.Queue) || delicious
     LaunchedEffect(lyricsOnScreen) { vm.setLyricsVisible(lyricsOnScreen) }
     BackHandler(enabled = expanded) { expanded = false }
     LaunchedEffect(player.nowPlaying == null) { if (player.nowPlaying == null) expanded = false }
@@ -239,169 +252,196 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val noFolders = settings.musicFolders.none { File(it).isDirectory }
     val chooseFolder = stringResource(Res.string.choose_folder)
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).trackPointer()) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = if (covered) 0f else 1f }
-                .backdropSource(backdrop)
-        ) {
-            Row(Modifier.fillMaxSize()) {
-                NavRail(
-                    nav = nav,
-                    width = settings.navWidth,
-                    onResize = { w -> SettingsStore.update { it.copy(navWidth = w) } },
-                    bottomInset = bottomInset,
-                )
-                Box(Modifier.weight(1f).fillMaxHeight()) {
-                    when {
-                        noFolders && (library as? LibraryState.Ready)?.songs.isNullOrEmpty() -> PermissionScreen(
-                            onGrant = { Files.pickFolder(chooseFolder)?.let(vm::addMusicFolder) },
-                        )
-                        library is LibraryState.Loading -> FillBox { LoadingIndicator(Modifier.size(64.dp)) }
-                        else -> Screens(
-                            nav = nav,
-                            vm = vm,
-                            songs = (library as LibraryState.Ready).songs,
-                            currentSongId = player.nowPlaying?.songId,
-                            userData = userData,
+    CompositionLocalProvider(LocalLyricsSearch provides lyricsSearch) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).trackPointer()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = if (covered) 0f else 1f }
+                    .backdropSource(backdrop)
+            ) {
+                Row(Modifier.fillMaxSize()) {
+                    NavRail(
+                        nav = nav,
+                        width = settings.navWidth,
+                        onResize = { w -> SettingsStore.update { it.copy(navWidth = w) } },
+                        bottomInset = bottomInset,
+                    )
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        when {
+                            noFolders && (library as? LibraryState.Ready)?.songs.isNullOrEmpty() -> PermissionScreen(
+                                onGrant = { Files.pickFolder(chooseFolder)?.let(vm::addMusicFolder) },
+                            )
+                            library is LibraryState.Loading -> FillBox { LoadingIndicator(Modifier.size(64.dp)) }
+                            else -> Screens(
+                                nav = nav,
+                                vm = vm,
+                                songs = (library as LibraryState.Ready).songs,
+                                currentSongId = player.nowPlaying?.songId,
+                                userData = userData,
+                                bottomInset = bottomInset,
+                                backEnabled = !expanded,
+                                onSongLongPress = { song, playlistId -> songAction = SongActionTarget(song, playlistId) },
+                                onBulk = { songs, playlistId, done -> bulk = BulkTarget(songs, playlistId, done) },
+                                onDeleteSongs = deleteSongs,
+                                onPlaylistLongPress = { playlistAction = it },
+                                onCreatePlaylist = { dialog = PlaylistDialog.Create(emptyList()) },
+                                onRenamePlaylist = { dialog = PlaylistDialog.Rename(it) },
+                                onDeletePlaylist = { dialog = PlaylistDialog.Delete(it) },
+                                onPlaylistCover = { coverSheetFor = it.id },
+                            )
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = sidePanel != null && nowPlaying != null && ready,
+                        enter = expandHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeIn(effects),
+                        exit = shrinkHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeOut(effects),
+                    ) {
+                        SidePanelContent(
+                            panel = sidePanel ?: SidePanel.Lyrics,
                             bottomInset = bottomInset,
-                            backEnabled = !expanded,
-                            onSongLongPress = { song, playlistId -> songAction = SongActionTarget(song, playlistId) },
-                            onBulk = { songs, playlistId, done -> bulk = BulkTarget(songs, playlistId, done) },
-                            onDeleteSongs = deleteSongs,
-                            onPlaylistLongPress = { playlistAction = it },
-                            onCreatePlaylist = { dialog = PlaylistDialog.Create(emptyList()) },
-                            onRenamePlaylist = { dialog = PlaylistDialog.Rename(it) },
-                            onDeletePlaylist = { dialog = PlaylistDialog.Delete(it) },
-                            onPlaylistCover = { coverSheetFor = it.id },
+                            lyrics = { modifier ->
+                                LyricsPanel(
+                                    state = lyrics,
+                                    position = { position.value },
+                                    onSeek = vm::seekTo,
+                                    onRetry = vm::retryLyrics,
+                                    offsetMs = lyricsOffset,
+                                    onShift = vm::shiftLyrics,
+                                    onResetOffset = vm::resetLyricsOffset,
+                                    modifier = modifier,
+                                )
+                            },
+                            queue = { modifier ->
+                                QueuePanel(
+                                    queue = queue,
+                                    onPlay = vm::playQueueEntry,
+                                    onRemove = vm::removeQueueEntry,
+                                    onMove = vm::moveQueueEntry,
+                                    onLongPress = { songAction = SongActionTarget(it) },
+                                    modifier = modifier,
+                                )
+                            },
                         )
                     }
                 }
+            }
+
+            if (ready) {
                 AnimatedVisibility(
-                    visible = sidePanel != null && nowPlaying != null && ready,
-                    enter = expandHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeIn(effects),
-                    exit = shrinkHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeOut(effects),
+                    visible = player.nowPlaying != null,
+                    enter = slideInVertically(spatialOffset) { it } + fadeIn(effects),
+                    exit = slideOutVertically(spatialOffset) { it } + fadeOut(effects),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .onSizeChanged { barHeightPx = it.height },
                 ) {
-                    SidePanelContent(
-                        panel = sidePanel ?: SidePanel.Lyrics,
-                        bottomInset = bottomInset,
-                        lyrics = { modifier ->
-                            LyricsPanel(
-                                state = lyrics,
-                                position = { position.value },
-                                onSeek = vm::seekTo,
-                                onRetry = vm::retryLyrics,
-                                offsetMs = lyricsOffset,
-                                onShift = vm::shiftLyrics,
-                                onResetOffset = vm::resetLyricsOffset,
-                                modifier = modifier,
-                            )
-                        },
-                        queue = { modifier ->
-                            QueuePanel(
-                                queue = queue,
-                                onPlay = vm::playQueueEntry,
-                                onRemove = vm::removeQueueEntry,
-                                onMove = vm::moveQueueEntry,
-                                onLongPress = { songAction = SongActionTarget(it) },
-                                modifier = modifier,
-                            )
-                        },
-                    )
+                    nowPlaying?.let { np ->
+                        PlayerBar(
+                            nowPlaying = np,
+                            state = player,
+                            position = { position.value },
+                            isFavorite = np.songId in userData.favorites,
+                            volume = settings.volume,
+                            muted = settings.muted,
+                            showLyrics = sidePanel == SidePanel.Lyrics,
+                            showQueue = sidePanel == SidePanel.Queue,
+                            backdrop = backdrop,
+                            onToggleFavorite = { vm.toggleFavorite(np.songId) },
+                            onTogglePlay = vm::togglePlay,
+                            onPrevious = vm::previous,
+                            onNext = vm::next,
+                            onSeek = vm::seekTo,
+                            onToggleShuffle = vm::toggleShuffle,
+                            onCycleRepeat = vm::cycleRepeat,
+                            onToggleLyrics = { sidePanel = if (sidePanel == SidePanel.Lyrics) null else SidePanel.Lyrics },
+                            onOpenDelicious = { delicious = true },
+                            onToggleQueue = { sidePanel = if (sidePanel == SidePanel.Queue) null else SidePanel.Queue },
+                            onVolume = vm::setVolume,
+                            onToggleMute = vm::toggleMute,
+                            onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
+                            onExpand = { expanded = true },
+                            modifier = Modifier
+                                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                                .onGloballyPositioned { sheet.onMiniBounds(it.boundsInRoot()) }
+                                // Hands over to the growing player in the first quarter of the way.
+                                .graphicsLayer { alpha = (1f - sheet.progress.value / MINI_HANDOFF).coerceIn(0f, 1f) }
+                                .expandingPlayerDrag(sheet, expanded) { expanded = it },
+                        )
+                    }
                 }
             }
-        }
 
-        if (ready) {
-            AnimatedVisibility(
-                visible = player.nowPlaying != null,
-                enter = slideInVertically(spatialOffset) { it } + fadeIn(effects),
-                exit = slideOutVertically(spatialOffset) { it } + fadeOut(effects),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .onSizeChanged { barHeightPx = it.height },
-            ) {
+            ExpandingPlayerSheet(sheet) { contentModifier ->
                 nowPlaying?.let { np ->
-                    PlayerBar(
+                    NowPlayingScreen(
                         nowPlaying = np,
                         state = player,
                         position = { position.value },
+                        lyrics = lyrics,
+                        showLyrics = sidePanel != SidePanel.Queue,
+                        queue = queue,
+                        showQueue = sidePanel == SidePanel.Queue,
                         isFavorite = np.songId in userData.favorites,
                         volume = settings.volume,
                         muted = settings.muted,
-                        showLyrics = sidePanel == SidePanel.Lyrics,
-                        showQueue = sidePanel == SidePanel.Queue,
-                        backdrop = backdrop,
                         onToggleFavorite = { vm.toggleFavorite(np.songId) },
+                        onToggleLyrics = { sidePanel = SidePanel.Lyrics },
+                        onToggleQueue = { sidePanel = if (sidePanel == SidePanel.Queue) SidePanel.Lyrics else SidePanel.Queue },
+                        onPlayQueueEntry = vm::playQueueEntry,
+                        onRemoveQueueEntry = vm::removeQueueEntry,
+                        onMoveQueueEntry = vm::moveQueueEntry,
+                        onSongLongPress = { songAction = SongActionTarget(it) },
+                        onRetryLyrics = vm::retryLyrics,
+                        lyricsOffsetMs = lyricsOffset,
+                        onShiftLyrics = vm::shiftLyrics,
+                        onResetLyricsOffset = vm::resetLyricsOffset,
                         onTogglePlay = vm::togglePlay,
                         onPrevious = vm::previous,
                         onNext = vm::next,
                         onSeek = vm::seekTo,
                         onToggleShuffle = vm::toggleShuffle,
                         onCycleRepeat = vm::cycleRepeat,
-                        onToggleLyrics = { sidePanel = if (sidePanel == SidePanel.Lyrics) null else SidePanel.Lyrics },
-                        onToggleQueue = { sidePanel = if (sidePanel == SidePanel.Queue) null else SidePanel.Queue },
                         onVolume = vm::setVolume,
                         onToggleMute = vm::toggleMute,
-                        onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
-                        onExpand = { expanded = true },
-                        modifier = Modifier
-                            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-                            .onGloballyPositioned { sheet.onMiniBounds(it.boundsInRoot()) }
-                            // Hands over to the growing player in the first quarter of the way.
-                            .graphicsLayer { alpha = (1f - sheet.progress.value / MINI_HANDOFF).coerceIn(0f, 1f) }
-                            .expandingPlayerDrag(sheet, expanded) { expanded = it },
+                        onOpenArtist = { name ->
+                            expanded = false
+                            nav.push(Route.ArtistDetail(name))
+                        },
+                        onCollapse = { expanded = false },
+                        onOpenDelicious = { delicious = true },
+                        modifier = contentModifier,
+                        dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
                     )
                 }
             }
-        }
 
-        ExpandingPlayerSheet(sheet) { contentModifier ->
-            nowPlaying?.let { np ->
-                NowPlayingScreen(
-                    nowPlaying = np,
-                    state = player,
-                    position = { position.value },
-                    lyrics = lyrics,
-                    showLyrics = sidePanel != SidePanel.Queue,
-                    queue = queue,
-                    showQueue = sidePanel == SidePanel.Queue,
-                    isFavorite = np.songId in userData.favorites,
-                    volume = settings.volume,
-                    muted = settings.muted,
-                    onToggleFavorite = { vm.toggleFavorite(np.songId) },
-                    onToggleLyrics = { sidePanel = SidePanel.Lyrics },
-                    onToggleQueue = { sidePanel = if (sidePanel == SidePanel.Queue) SidePanel.Lyrics else SidePanel.Queue },
-                    onPlayQueueEntry = vm::playQueueEntry,
-                    onRemoveQueueEntry = vm::removeQueueEntry,
-                    onMoveQueueEntry = vm::moveQueueEntry,
-                    onSongLongPress = { songAction = SongActionTarget(it) },
-                    onRetryLyrics = vm::retryLyrics,
-                    lyricsOffsetMs = lyricsOffset,
-                    onShiftLyrics = vm::shiftLyrics,
-                    onResetLyricsOffset = vm::resetLyricsOffset,
-                    onTogglePlay = vm::togglePlay,
-                    onPrevious = vm::previous,
-                    onNext = vm::next,
-                    onSeek = vm::seekTo,
-                    onToggleShuffle = vm::toggleShuffle,
-                    onCycleRepeat = vm::cycleRepeat,
-                    onVolume = vm::setVolume,
-                    onToggleMute = vm::toggleMute,
-                    onOpenArtist = { name ->
-                        expanded = false
-                        nav.push(Route.ArtistDetail(name))
-                    },
-                    onCollapse = { expanded = false },
-                    modifier = contentModifier,
-                    dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
-                )
+            AnimatedVisibility(
+                visible = delicious && nowPlaying != null,
+                enter = fadeIn(tween(500)),
+                exit = fadeOut(tween(350)),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                nowPlaying?.let { np ->
+                    DeliciousScreen(
+                        nowPlaying = np,
+                        isPlaying = player.isPlaying,
+                        position = { position.value },
+                        durationMs = player.durationMs,
+                        lyrics = lyrics,
+                        lyricsOffsetMs = lyricsOffset,
+                        levels = PlaybackController.player::levels,
+                        onTogglePlay = vm::togglePlay,
+                        onPrevious = vm::previous,
+                        onNext = vm::next,
+                        onClose = { delicious = false },
+                    )
+                }
             }
-        }
 
-        ToastHost(Modifier.align(Alignment.BottomCenter).padding(bottom = bottomInset + 16.dp))
+            ToastHost(Modifier.align(Alignment.BottomCenter).padding(bottom = bottomInset + 16.dp))
+        }
     }
 
     songAction?.let { target ->
@@ -589,6 +629,13 @@ private fun Screens(
     val onShuffle: (List<Song>) -> Unit = { list ->
         if (list.isNotEmpty()) vm.playSongs(list, list.indices.random(), shuffle = true)
     }
+    val plays by PlayHistory.plays.collectAsState()
+    // Built from plays up to last midnight, so it's the same all day; looked at again on each page change.
+    val today = remember(nav.current) { DailyMix.dayNumber(System.currentTimeMillis()) }
+    val playsLoaded = plays != null
+    val dailyMix = remember(songs, userData.favorites, today, playsLoaded) {
+        if (!playsLoaded) emptyList() else DailyMix.build(songs, plays.orEmpty(), userData.favorites, System.currentTimeMillis())
+    }
 
     // One page = its saved UI state + its content.
     val pageBody: @Composable (Route) -> Unit = { route ->
@@ -601,6 +648,11 @@ private fun Screens(
                         collections = collections,
                         playlists = userData.playlists,
                         favoritesCount = userData.favorites.size,
+                        dailyMix = dailyMix,
+                        weekListenedMs = plays?.let { p ->
+                            val since = System.currentTimeMillis() - WEEK_MS
+                            p.sumOf { if (it.atMs >= since) it.listenedMs else 0L }
+                        },
                         resolveCover = resolveCover,
                         onPlay = onPlay,
                         onShuffleAll = vm::shuffleAll,
@@ -694,9 +746,9 @@ private fun Screens(
                     )
                 }
                 is Route.ArtistDetail -> {
-                    val artist = collections.artists.firstOrNull { it.name == route.name }
+                    val artist = collections.artist(route.name)
                     CollectionScreen(
-                        title = route.name,
+                        title = artist?.name ?: route.name,
                         subtitle = "",
                         songs = artist?.songs.orEmpty(),
                         currentSongId = currentSongId,
@@ -753,6 +805,31 @@ private fun Screens(
                         LaunchedEffect(Unit) { nav.pop() }
                     }
                 }
+                Route.DailyMix -> CollectionScreen(
+                    title = stringResource(Res.string.daily_mix),
+                    subtitle = stringResource(Res.string.daily_mix_desc),
+                    songs = dailyMix,
+                    currentSongId = currentSongId,
+                    cover = { m -> MixCollage(dailyMix, m) },
+                    onBack = { nav.pop() },
+                    onPlay = onPlay,
+                    onShuffle = onShuffle,
+                    onSongLongPress = { onSongLongPress(it, null) },
+                    onBulk = { picked, done -> onBulk(picked, null, done) },
+                    onDelete = onDeleteSongs,
+                    bottomInset = bottomInset,
+                )
+                Route.Stats -> StatsScreen(
+                    plays = plays,
+                    songs = songs,
+                    currentSongId = currentSongId,
+                    onBack = { nav.pop() },
+                    onPlay = onPlay,
+                    onSongLongPress = { onSongLongPress(it, null) },
+                    onOpen = nav::push,
+                    onClear = PlayHistory::clear,
+                    bottomInset = bottomInset,
+                )
                 Route.Favorites -> {
                     val tracks = remember(userData.favorites, songs) { vm.resolve(userData.favorites) }
                     CollectionScreen(
@@ -785,6 +862,8 @@ private fun Screens(
             val to = targetState
             val direction = when {
                 from is Route.Tab && to is Route.Tab -> NavDirection.Tab
+                // Settings and its pages change in place, as tabs do, rather than sliding.
+                from.isSettings() && to.isSettings() -> NavDirection.Tab
                 nav.forward -> NavDirection.Forward
                 else -> NavDirection.Back
             }
@@ -796,6 +875,8 @@ private fun Screens(
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) { pageBody(route) }
     }
 }
+
+private fun Route.isSettings() = this == Route.Settings || this is Route.SettingsPage
 
 /**
  * The phone's tab bar turned on its side: a column of pills, the selected one filled. Its right
@@ -938,6 +1019,7 @@ private fun RailItem(tab: Route.Tab, selected: Boolean, compact: Boolean, onClic
     }
 }
 
+private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
 private val SIDE_PANEL_WIDTH = 380.dp
 /** Narrower than this the rail hides its labels. */
 private val NAV_LABEL_WIDTH = 160.dp

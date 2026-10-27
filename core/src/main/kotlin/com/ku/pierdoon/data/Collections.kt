@@ -32,6 +32,11 @@ data class MusicCollections(
     val artists: List<Artist> = emptyList(),
     val recentlyAdded: List<Song> = emptyList(),
 ) {
+    /** The artist [name] names, or the first one of it when it's a whole tag like "A, B". */
+    fun artist(name: String): Artist? =
+        artists.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            ?: leadArtist(name).let { lead -> artists.firstOrNull { it.name.equals(lead, ignoreCase = true) } }
+
     companion object {
         private const val RECENTLY_ADDED = 15
 
@@ -53,7 +58,13 @@ data class MusicCollections(
                 )
             }.sortedWith { a, b -> collator.compare(a.title, b.title) }
 
-            val artists = songs.filter { it.artist.isNotBlank() }.groupBy { it.artist }.map { (name, tracks) ->
+            // A track of "A, B" is both A's and B's; names that differ only in case are one artist,
+            // under the spelling met first.
+            val byArtist = LinkedHashMap<String, Pair<String, MutableList<Song>>>()
+            for (song in songs) for (name in splitArtists(song.artist)) {
+                byArtist.getOrPut(name.lowercase()) { name to ArrayList() }.second += song
+            }
+            val artists = byArtist.values.map { (name, tracks) ->
                 Artist(name, tracks, tracks.distinctBy { it.albumId to it.album }.size)
             }.sortedWith { a, b -> collator.compare(a.name, b.name) }
 

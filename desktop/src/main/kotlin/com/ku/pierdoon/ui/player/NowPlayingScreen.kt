@@ -76,7 +76,6 @@ import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.Player
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.playback.QueueState
-import com.ku.pierdoon.playback.SleepTimer
 import com.ku.pierdoon.resources.*
 import com.ku.pierdoon.resources.Res
 import com.ku.pierdoon.ui.components.BlurredArtwork
@@ -125,6 +124,7 @@ fun NowPlayingScreen(
     onToggleMute: () -> Unit,
     onOpenArtist: (String) -> Unit,
     onCollapse: () -> Unit,
+    onOpenDelicious: () -> Unit,
     modifier: Modifier = Modifier,
     /** The expanding sheet's drag: pulling the player down shrinks it back into the bar. */
     dragModifier: Modifier = Modifier,
@@ -159,6 +159,7 @@ fun NowPlayingScreen(
                 onCycleRepeat = onCycleRepeat,
                 onOpenArtist = onOpenArtist,
                 onCollapse = onCollapse,
+                onOpenDelicious = onOpenDelicious,
                 dragModifier = dragModifier,
             )
         } else {
@@ -167,7 +168,7 @@ fun NowPlayingScreen(
                 onToggleFavorite, onToggleLyrics, onToggleQueue, onPlayQueueEntry, onRemoveQueueEntry,
                 onMoveQueueEntry, onSongLongPress, onRetryLyrics, lyricsOffsetMs, onShiftLyrics,
                 onResetLyricsOffset, onTogglePlay, onPrevious, onNext, onSeek, onToggleShuffle,
-                onCycleRepeat, onVolume, onToggleMute, onOpenArtist, onCollapse, dragModifier,
+                onCycleRepeat, onVolume, onToggleMute, onOpenArtist, onCollapse, onOpenDelicious, dragModifier,
             )
         }
     }
@@ -207,16 +208,13 @@ private fun WideNowPlaying(
     onToggleMute: () -> Unit,
     onOpenArtist: (String) -> Unit,
     onCollapse: () -> Unit,
+    onOpenDelicious: () -> Unit,
     dragModifier: Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     val nothing = LocalUiPrefs.current.nothing
     val glassButton = if (nothing) colors.surfaceContainerHigh else colors.surfaceContainerHighest.copy(alpha = 0.45f)
-    val sleepTimer by SleepTimer.state.collectAsState()
-    var showSleepSheet by remember { mutableStateOf(false) }
-    if (showSleepSheet) SleepTimerSheet(sleepTimer, onDismiss = { showSleepSheet = false })
     val panel = if (showQueue) PlayerPanel.Queue else PlayerPanel.Lyrics
-
     // Immersive lyrics, as on the phone: after a few idle seconds with lyrics showing, the top
     // bar and the tabs fold away, the controls shrink to a compact bar and the art grows. Clicks
     // restart the countdown until then; afterwards a new track, switching to the queue or a
@@ -287,14 +285,18 @@ private fun WideNowPlaying(
                         contentColor = colors.onSurface,
                         modifier = Modifier.size(44.dp),
                     )
-                    Column(Modifier.padding(horizontal = 14.dp)) {
-                        Text(stringResource(Res.string.now_playing), style = MaterialTheme.typography.titleSmall)
-                        sleepTimerLabel(sleepTimer)?.let {
-                            Text(it, style = MaterialTheme.typography.labelMedium, color = colors.primary)
-                        }
-                    }
+                    Text(stringResource(Res.string.now_playing), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 14.dp))
                     Spacer(Modifier.weight(1f))
-                    SleepTimerButton(active = sleepTimer != null, onClick = { showSleepSheet = true }, glass = glassButton)
+                    SpeedButton(glassButton)
+                    Spacer(Modifier.width(8.dp))
+                    ExpressiveIconButton(
+                        onClick = onOpenDelicious,
+                        icon = PlayerIcons.Sparkle,
+                        contentDescription = stringResource(Res.string.delicious_open),
+                        containerColor = glassButton,
+                        contentColor = colors.onSurface,
+                        modifier = Modifier.size(48.dp),
+                    )
                 }
             }
 
@@ -481,6 +483,7 @@ private fun WideNowPlaying(
                 }
             }
         }
+
     }
 }
 

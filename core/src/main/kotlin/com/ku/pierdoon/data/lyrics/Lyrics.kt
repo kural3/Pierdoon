@@ -33,6 +33,16 @@ sealed interface Lyrics {
     data object NotFound : Lyrics
 }
 
+/** A search result to pick by hand when the automatic match found nothing, or the wrong thing. */
+@Immutable
+data class LyricsCandidate(
+    val title: String,
+    val artist: String,
+    val album: String,
+    val durationMs: Long,
+    val lyrics: Lyrics,
+)
+
 /** Minimal LRC parser: multiple stamps per line, 1–3 digit fractions and the [offset:] tag. */
 object LrcParser {
     private val stamp = Regex("""\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?]""")

@@ -5,6 +5,7 @@ import java.awt.Frame
 import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
 import java.io.File
+import java.util.Locale
 import javax.swing.JFileChooser
 import javax.swing.SwingUtilities
 import javax.swing.UIManager
@@ -54,8 +55,10 @@ object Files {
 
 /** "1.4 MB", as Android's Formatter.formatShortFileSize puts it. */
 fun formatFileSize(bytes: Long): String {
-    if (bytes < 1024) return "$bytes Б"
-    val units = listOf("КБ", "МБ", "ГБ")
+    // Follows the interface language, which sets the default locale (see AppLanguage).
+    val russian = Locale.getDefault().language == "ru"
+    if (bytes < 1024) return if (russian) "$bytes Б" else "$bytes B"
+    val units = if (russian) listOf("КБ", "МБ", "ГБ") else listOf("KB", "MB", "GB")
     var value = bytes / 1024.0
     var unit = 0
     while (value >= 1024 && unit < units.lastIndex) {

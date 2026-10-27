@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
@@ -115,7 +116,7 @@ fun SearchScreen(
                 items(found.artists.take(MAX_COLLECTIONS), key = { "artist:" + it.name }) { artist ->
                     CollectionRow(
                         title = artist.name,
-                        subtitle = stringResource(Res.string.songs_count, artist.songs.size),
+                        subtitle = pluralStringResource(Res.plurals.songs_count, artist.songs.size, artist.songs.size),
                         cover = {
                             Artwork(artist.coverSong.id, artist.coverSong.albumId, Modifier.size(56.dp).clip(CircleShape))
                         },

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.Dp
 import com.ku.pierdoon.resources.Res
@@ -64,7 +65,7 @@ fun CollectionScreen(
             item(key = "header") {
                 CollectionHeader(
                     cover = cover,
-                    subtitle = subtitle.ifEmpty { stringResource(Res.string.songs_count, songs.size) },
+                    subtitle = subtitle.ifEmpty { pluralStringResource(Res.plurals.songs_count, songs.size, songs.size) },
                     onPlay = { onPlay(songs, 0) },
                     onShuffle = { onShuffle(songs) },
                     enabled = songs.isNotEmpty(),

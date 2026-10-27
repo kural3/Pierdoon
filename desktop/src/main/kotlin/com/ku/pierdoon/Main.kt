@@ -13,6 +13,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,6 +47,7 @@ import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.data.download.findUrl
 import com.ku.pierdoon.data.update.Updater
+import com.ku.pierdoon.platform.InterfaceLanguage
 import com.ku.pierdoon.platform.Prefs
 import com.ku.pierdoon.platform.WinShell
 import com.ku.pierdoon.playback.DiscordPresence
@@ -77,6 +79,7 @@ fun main(args: Array<String>) {
     if (!SingleInstance.claim(args)) exitProcess(0)
 
     SettingsStore.init()
+    InterfaceLanguage.apply(SettingsStore.settings.value.language)
     CoverStore.init()
     Downloader.init()
     PlaybackController.start()
@@ -100,6 +103,9 @@ fun main(args: Array<String>) {
             },
         ) {
             val settings by SettingsStore.settings.collectAsState()
+            // Before anything below reads a string; a change composes the strings again (the keys below).
+            val language = settings.language
+            remember(language) { InterfaceLanguage.apply(language) }
             var visible by remember { mutableStateOf(true) }
             SingleInstance.onActivate = { visible = true; SingleInstance.bringToFront() }
             val state = rememberWindowState(
@@ -137,9 +143,11 @@ fun main(args: Array<String>) {
                 tooltip = stringResource(Res.string.app_name),
                 onAction = { visible = true; SingleInstance.bringToFront() },
                 menu = {
-                    Item(stringResource(Res.string.tray_show), onClick = { visible = true; SingleInstance.bringToFront() })
-                    Separator()
-                    Item(stringResource(Res.string.tray_quit), onClick = { quit(vm) })
+                    key(language) {
+                        Item(stringResource(Res.string.tray_show), onClick = { visible = true; SingleInstance.bringToFront() })
+                        Separator()
+                        Item(stringResource(Res.string.tray_quit), onClick = { quit(vm) })
+                    }
                 },
             )
 
@@ -181,7 +189,7 @@ fun main(args: Array<String>) {
                                 target = remember { LinkDropTarget() },
                             ),
                     ) {
-                        PierdoonApp(vm, nav)
+                        key(language) { PierdoonApp(vm, nav) }
                     }
                 }
             }
@@ -220,9 +228,8 @@ private fun globalShortcut(e: androidx.compose.ui.input.key.KeyEvent, vm: MainVi
     else -> false
 }
 
-/** Keys nothing focused wanted: Space and the arrows act on the player, Esc goes back. */
+/** Keys nothing focused wanted: the arrows seek, Esc goes back. */
 private fun unhandledShortcut(e: androidx.compose.ui.input.key.KeyEvent, vm: MainViewModel): Boolean = when (e.key) {
-    Key.Spacebar -> { vm.togglePlay(); true }
     Key.Escape -> BackDispatcher.dispatch()
     Key.DirectionRight -> { vm.seekBy(5_000); true }
     Key.DirectionLeft -> { vm.seekBy(-5_000); true }

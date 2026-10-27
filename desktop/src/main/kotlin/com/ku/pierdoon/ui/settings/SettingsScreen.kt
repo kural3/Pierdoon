@@ -56,8 +56,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.resources.Res
 import com.ku.pierdoon.resources.*
+import androidx.compose.material3.Slider
 import com.ku.pierdoon.data.AppFont
+import com.ku.pierdoon.data.AppLanguage
 import com.ku.pierdoon.data.AppSettings
+import com.ku.pierdoon.data.MAX_CROSSFADE_SECONDS
+import kotlin.math.roundToInt
 import com.ku.pierdoon.data.ColorSource
 import com.ku.pierdoon.data.NAV_MAX_WIDTH
 import com.ku.pierdoon.data.NAV_MIN_WIDTH
@@ -66,6 +70,7 @@ import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.data.download.DownloadFormat
 import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.playback.DiscordPresence
+import com.ku.pierdoon.playback.PlaybackSpeed
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.library.AppScaffold
@@ -271,6 +276,13 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
             )
         }
     }
+    item(key = "language") {
+        Group(stringResource(Res.string.settings_language)) {
+            listOf<@Composable (Shape) -> Unit>(
+                { shape -> LanguageItem(shape, settings.language) { l -> onUpdate { it.copy(language = l) } } },
+            )
+        }
+    }
     item(key = "font") {
         Group(stringResource(Res.string.settings_font)) {
             AppFont.entries.map { font ->
@@ -335,6 +347,79 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                     )
                 }
             }
+        }
+    }
+}
+
+/** System, Russian, English: each language under its own name, so it can be found from the other one. */
+@Composable
+private fun LanguageItem(shape: Shape, language: AppLanguage, onSelect: (AppLanguage) -> Unit) {
+    ItemContainer(shape) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            ConnectedChoice(
+                options = listOf(
+                    stringResource(Res.string.language_system),
+                    stringResource(Res.string.language_russian),
+                    stringResource(Res.string.language_english),
+                ),
+                selected = language.ordinal,
+                onSelect = { i -> onSelect(AppLanguage.entries[i]) },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            )
+        }
+    }
+}
+
+/** Slowed, as recorded or nightcore: the speed, pitch going along with it. */
+@Composable
+private fun SpeedItem(shape: Shape, speed: Float, onChange: (Float) -> Unit) {
+    ItemContainer(shape) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Text(
+                stringResource(Res.string.speed_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            ConnectedChoice(
+                options = PlaybackSpeed.options.map(PlaybackSpeed::label),
+                selected = PlaybackSpeed.options.indexOf(speed),
+                onSelect = { i -> onChange(PlaybackSpeed.options[i]) },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            )
+        }
+    }
+}
+
+/** The crossfade length: off, or 1 to [MAX_CROSSFADE_SECONDS] seconds. */
+@Composable
+private fun CrossfadeItem(shape: Shape, seconds: Int, onChange: (Int) -> Unit) {
+    // Follows the drag; the setting (and the player) only takes the value on release.
+    var dragged by remember(seconds) { mutableIntStateOf(seconds) }
+    ItemContainer(shape) {
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(Res.string.settings_crossfade_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(16.dp))
+                Text(
+                    if (dragged == 0) stringResource(Res.string.crossfade_off)
+                    else stringResource(Res.string.crossfade_seconds, dragged),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Slider(
+                value = dragged.toFloat(),
+                onValueChange = { dragged = it.roundToInt() },
+                onValueChangeFinished = { onChange(dragged) },
+                valueRange = 0f..MAX_CROSSFADE_SECONDS.toFloat(),
+                steps = MAX_CROSSFADE_SECONDS - 1,
+            )
         }
     }
 }
@@ -437,6 +522,30 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
                     )
                 }
             }
+        }
+    }
+    item(key = "speed") {
+        Group(stringResource(Res.string.speed)) {
+            listOf<@Composable (Shape) -> Unit>({ shape -> SpeedItem(shape, settings.playbackSpeed) { v -> onUpdate { it.copy(playbackSpeed = v) } } })
+        }
+    }
+    item(key = "crossfade") {
+        Group(stringResource(Res.string.settings_crossfade)) {
+            listOf<@Composable (Shape) -> Unit>(
+                { shape ->
+                    CrossfadeItem(shape, settings.crossfadeSeconds) { s -> onUpdate { it.copy(crossfadeSeconds = s) } }
+                },
+                { shape ->
+                    SwitchItem(
+                        shape = shape,
+                        title = stringResource(Res.string.settings_crossfade_albums),
+                        subtitle = stringResource(Res.string.settings_crossfade_albums_desc),
+                        checked = settings.crossfadeAlbums,
+                        enabled = settings.crossfadeSeconds > 0,
+                        onChange = { v -> onUpdate { it.copy(crossfadeAlbums = v) } },
+                    )
+                },
+            )
         }
     }
     item(key = "playback") {

@@ -1,5 +1,6 @@
 package com.ku.pierdoon.data
 
+import com.ku.pierdoon.playback.PlaybackSpeed
 import androidx.compose.runtime.Immutable
 import com.ku.pierdoon.data.download.DownloadFormat
 import com.ku.pierdoon.data.metadata.SaveTarget
@@ -22,6 +23,9 @@ enum class ColorSource { Wallpaper, AlbumArt, Custom }
 
 /** Typeface for the whole app. */
 enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono }
+
+/** How the Delicious mode draws the music. */
+enum class DeliciousStyle { Aura, Waves, Dust, Calm }
 
 const val DEFAULT_SEED: Int = 0xFF6750A4.toInt()
 
@@ -47,11 +51,18 @@ data class AppSettings(
     /** Nothing-style look: monochrome with a red accent, dot-matrix headings, dotted progress. */
     val nothingStyle: Boolean = false,
     val font: AppFont = AppFont.System,
+    val language: AppLanguage = AppLanguage.System,
     /** Lyrics from the cache only, never downloaded. */
     val lyricsWifiOnly: Boolean = false,
     /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
     val lyricsSyncControls: Boolean = false,
     val skipSilence: Boolean = false,
+    /** Seconds one track fades into the next; 0 for none. */
+    val crossfadeSeconds: Int = 0,
+    /** Playback speed, pitch following it; one of [com.ku.pierdoon.playback.PlaybackSpeed.options]. */
+    val playbackSpeed: Float = 1f,
+    /** Fade between tracks of one album too; off keeps albums gapless, as recorded. */
+    val crossfadeAlbums: Boolean = false,
     /** Unused on the desktop; kept so the settings screens read the same. */
     val audioOffload: Boolean = false,
     /** Last choice on the track editor: the app's records or the file itself. */
@@ -77,6 +88,8 @@ data class AppSettings(
     val remoteControl: Boolean = false,
     /** What's playing shows on the user's Discord profile. */
     val discordPresence: Boolean = false,
+    /** The picture behind the Delicious mode's lyrics. */
+    val deliciousStyle: DeliciousStyle = DeliciousStyle.Aura,
 )
 
 /**
@@ -110,9 +123,13 @@ object SettingsStore {
             wavyProgress = p.getBoolean(K_WAVY, d.wavyProgress),
             nothingStyle = p.getBoolean(K_NOTHING, d.nothingStyle),
             font = enumOr(p.getString(K_FONT, null), d.font),
+            language = AppLanguage.fromTag(p.getString(K_LANGUAGE, null)),
             lyricsWifiOnly = p.getBoolean(K_WIFI, d.lyricsWifiOnly),
             lyricsSyncControls = p.getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
             skipSilence = p.getBoolean(K_SILENCE, d.skipSilence),
+            crossfadeSeconds = p.getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
+            playbackSpeed = PlaybackSpeed.nearest(p.getFloat(K_SPEED, d.playbackSpeed)),
+            crossfadeAlbums = p.getBoolean(K_CROSSFADE_ALBUMS, d.crossfadeAlbums),
             audioOffload = p.getBoolean(K_OFFLOAD, d.audioOffload),
             editTarget = enumOr(p.getString(K_EDIT_TARGET, null), d.editTarget),
             checkUpdates = p.getBoolean(K_UPDATES, d.checkUpdates),
@@ -130,6 +147,7 @@ object SettingsStore {
             outputDevice = p.getString(K_OUTPUT, null),
             remoteControl = p.getBoolean(K_REMOTE, d.remoteControl),
             discordPresence = p.getBoolean(K_DISCORD, d.discordPresence),
+            deliciousStyle = enumOr(p.getString(K_DELICIOUS, null), d.deliciousStyle),
         )
     }
 
@@ -166,9 +184,13 @@ object SettingsStore {
             putBoolean(K_WAVY, s.wavyProgress)
             putBoolean(K_NOTHING, s.nothingStyle)
             putString(K_FONT, s.font.name)
+            putString(K_LANGUAGE, s.language.tag)
             putBoolean(K_WIFI, s.lyricsWifiOnly)
             putBoolean(K_SYNC_CONTROLS, s.lyricsSyncControls)
             putBoolean(K_SILENCE, s.skipSilence)
+            putInt(K_CROSSFADE, s.crossfadeSeconds)
+            putFloat(K_SPEED, s.playbackSpeed)
+            putBoolean(K_CROSSFADE_ALBUMS, s.crossfadeAlbums)
             putBoolean(K_OFFLOAD, s.audioOffload)
             putString(K_EDIT_TARGET, s.editTarget.name)
             putBoolean(K_UPDATES, s.checkUpdates)
@@ -184,6 +206,7 @@ object SettingsStore {
             putString(K_OUTPUT, s.outputDevice)
             putBoolean(K_REMOTE, s.remoteControl)
             putBoolean(K_DISCORD, s.discordPresence)
+            putString(K_DELICIOUS, s.deliciousStyle.name)
         }
     }
 
@@ -206,9 +229,13 @@ object SettingsStore {
     private const val K_WAVY = "wavy_progress"
     private const val K_NOTHING = "nothing_style"
     private const val K_FONT = "font"
+    private const val K_LANGUAGE = "language"
     private const val K_WIFI = "lyrics_wifi_only"
     private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
     private const val K_SILENCE = "skip_silence"
+    private const val K_CROSSFADE = "crossfade_seconds"
+    private const val K_SPEED = "playback_speed"
+    private const val K_CROSSFADE_ALBUMS = "crossfade_albums"
     private const val K_OFFLOAD = "audio_offload"
     private const val K_EDIT_TARGET = "edit_target"
     private const val K_UPDATES = "check_updates"
@@ -224,4 +251,5 @@ object SettingsStore {
     private const val K_OUTPUT = "output_device"
     private const val K_REMOTE = "remote_control"
     private const val K_DISCORD = "discord_presence"
+    private const val K_DELICIOUS = "delicious_style"
 }

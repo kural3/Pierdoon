@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -123,7 +124,7 @@ fun ArtistsList(artists: List<Artist>, onOpen: (Route) -> Unit, topPadding: Dp, 
         items(artists, key = { it.name }) { artist ->
             CollectionRow(
                 title = artist.name,
-                subtitle = stringResource(R.string.songs_count, artist.songs.size) + " · " +
+                subtitle = pluralStringResource(R.plurals.songs_count, artist.songs.size, artist.songs.size) + " · " +
                     stringResource(R.string.albums_count, artist.albumCount),
                 cover = {
                     Artwork(
@@ -173,7 +174,7 @@ fun PlaylistsScreen(
             item(key = "favorites") {
                 CollectionRow(
                     title = stringResource(R.string.favorites),
-                    subtitle = stringResource(R.string.songs_count, favoritesCount),
+                    subtitle = pluralStringResource(R.plurals.songs_count, favoritesCount, favoritesCount),
                     cover = { FavoritesCover(Modifier.size(56.dp)) },
                     onClick = { onOpen(Route.Favorites) },
                 )
@@ -181,7 +182,7 @@ fun PlaylistsScreen(
             items(playlists, key = { it.id }) { p ->
                 CollectionRow(
                     title = p.name,
-                    subtitle = stringResource(R.string.songs_count, p.songIds.size),
+                    subtitle = pluralStringResource(R.plurals.songs_count, p.songIds.size, p.songIds.size),
                     cover = { PlaylistCover(p, resolveCover(p), Modifier.size(56.dp)) },
                     onClick = { onOpen(Route.PlaylistDetail(p.id)) },
                     onLongClick = { onPlaylistLongPress(p) },

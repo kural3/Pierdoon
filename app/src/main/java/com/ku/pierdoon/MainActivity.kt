@@ -1,5 +1,7 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.data.InterfaceLanguage
+import android.content.Context
 import android.Manifest
 import android.view.KeyEvent
 import com.ku.pierdoon.remote.PcRemote
@@ -36,6 +38,9 @@ import com.ku.pierdoon.ui.theme.PierdoonTheme
 import com.ku.pierdoon.ui.theme.isDarkTheme
 
 class MainActivity : ComponentActivity() {
+    // The chosen language on Android 12 and older; the system applies it on 13+.
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(InterfaceLanguage.wrap(base))
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SettingsStore.init(this)

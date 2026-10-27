@@ -85,6 +85,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -972,7 +973,7 @@ private fun LazyListScope.libraryItems(
             CollectionRow(
                 modifier = Modifier.animateItem(),
                 title = a.title,
-                subtitle = a.artist.ifBlank { stringResource(R.string.songs_count, a.songIds.size) },
+                subtitle = a.artist.ifBlank { pluralStringResource(R.plurals.songs_count, a.songIds.size, a.songIds.size) },
                 cover = a.songIds.firstOrNull()?.let(library.byId::get),
                 onClick = { onOpen(OpenCollection(a.title, a.songIds)) },
             )
@@ -981,7 +982,7 @@ private fun LazyListScope.libraryItems(
             CollectionRow(
                 modifier = Modifier.animateItem(),
                 title = a.name,
-                subtitle = stringResource(R.string.songs_count, a.songIds.size),
+                subtitle = pluralStringResource(R.plurals.songs_count, a.songIds.size, a.songIds.size),
                 cover = a.songIds.firstOrNull()?.let(library.byId::get),
                 round = true,
                 onClick = { onOpen(OpenCollection(a.name, a.songIds)) },
@@ -993,7 +994,7 @@ private fun LazyListScope.libraryItems(
                 CollectionRow(
                     modifier = Modifier.animateItem(),
                     title = title,
-                    subtitle = stringResource(R.string.songs_count, library.favorites.size),
+                    subtitle = pluralStringResource(R.plurals.songs_count, library.favorites.size, library.favorites.size),
                     cover = library.favorites.firstOrNull()?.let(library.byId::get),
                     onClick = { onOpen(OpenCollection(title, library.favorites)) },
                 )
@@ -1002,7 +1003,7 @@ private fun LazyListScope.libraryItems(
                 CollectionRow(
                     modifier = Modifier.animateItem(),
                     title = p.name,
-                    subtitle = stringResource(R.string.songs_count, p.songIds.size),
+                    subtitle = pluralStringResource(R.plurals.songs_count, p.songIds.size, p.songIds.size),
                     cover = p.songIds.firstOrNull()?.let(library.byId::get),
                     onClick = { onOpen(OpenCollection(p.name, p.songIds)) },
                 )
