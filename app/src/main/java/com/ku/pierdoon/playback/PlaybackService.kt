@@ -14,12 +14,8 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.RenderersFactory
-import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
-import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -52,7 +48,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// Media3 marks much of what a player service needs (custom renderers, offload, shuffle orders,
+// Media3 marks much of what a player service needs (custom renderers, shuffle orders,
 // notification provider) as unstable API.
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
@@ -79,15 +75,7 @@ class PlaybackService : MediaSessionService() {
             DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_notification) }
         )
 
-        // Audio-only renderers: no video/text/metadata pipelines are created,
-        // which keeps memory low and lets R8 drop the unused code.
-        val audioOnly = RenderersFactory { handler, _, audioListener, _, _ ->
-            arrayOf(
-                MediaCodecAudioRenderer(this, MediaCodecSelector.DEFAULT, handler, audioListener)
-            )
-        }
-
-        val player = ExoPlayer.Builder(this, audioOnly)
+        val player = ExoPlayer.Builder(this, audioRenderers(this))
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -152,27 +140,14 @@ class PlaybackService : MediaSessionService() {
         // Settings apply live; distinctUntilChanged keeps the player untouched by unrelated toggles.
         scope.launch {
             SettingsStore.settings
-                .map { Triple(it.skipSilence, it.audioOffload, it.playbackSpeed) }
+                .map { Triple(it.skipSilence, it.playbackSpeed, if (it.eqEnabled) it.eqGains else null) }
                 .distinctUntilChanged()
-                .collect { (skipSilence, offload, speed) ->
+                .collect { (skipSilence, speed, eqGains) ->
                     player.skipSilenceEnabled = skipSilence
                     // Pitch moves with the speed, as on a turntable: slowed and nightcore.
                     player.playbackParameters = PlaybackParameters(speed, speed)
-                    // Hardware offload lets the DSP decode while the CPU sleeps —
-                    // the single biggest battery win for long listening sessions.
-                    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                        .setAudioOffloadPreferences(
-                            AudioOffloadPreferences.Builder()
-                                .setAudioOffloadMode(
-                                    if (offload) AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
-                                    else AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
-                                )
-                                .setIsGaplessSupportRequired(true)
-                                // Not every offloaded decoder can change speed; those that can't step aside then.
-                                .setIsSpeedChangeSupportRequired(speed != 1f)
-                                .build()
-                        )
-                        .build()
+                    // Read by the processors in this player and the crossfade's: both sound the same.
+                    EqualizerSettings.gains = eqGains
                 }
         }
 

@@ -102,6 +102,9 @@ class Player {
         get() = engine.skipSilence
         set(value) { engine.skipSilence = value }
 
+    /** Band gains in dB, or null with the equalizer off. */
+    fun setEqualizer(gains: List<Float>?) = engine.setEqualizer(gains)
+
     /** Playback speed, pitch following it (slowed, nightcore). */
     var speed: Float = 1f
         set(value) {

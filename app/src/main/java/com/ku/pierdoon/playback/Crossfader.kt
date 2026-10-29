@@ -8,9 +8,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.RenderersFactory
-import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
-import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import com.ku.pierdoon.data.ALBUM_ID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -185,10 +182,8 @@ class Crossfader(private val context: Context, private val player: ExoPlayer, pr
     }
 
     private fun newTail(): ExoPlayer {
-        val audioOnly = RenderersFactory { handler, _, audioListener, _, _ ->
-            arrayOf(MediaCodecAudioRenderer(context, MediaCodecSelector.DEFAULT, handler, audioListener))
-        }
-        return ExoPlayer.Builder(context, audioOnly)
+        // Equalized like the main player, or the fading track would change sound as it goes.
+        return ExoPlayer.Builder(context, audioRenderers(context))
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)

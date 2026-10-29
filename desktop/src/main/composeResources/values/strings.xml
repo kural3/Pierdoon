@@ -56,7 +56,7 @@
     <string name="settings_floating_nav_desc">Icons only, no labels. Drag the sidebar edge to change its width</string>
     <string name="settings_appearance_summary">Theme, language, font, colors, Nothing style</string>
     <string name="settings_feedback_summary">Smooth animations</string>
-    <string name="settings_playback_summary">Crossfade, output device, skipping silence</string>
+    <string name="settings_playback_summary">Crossfade, equalizer, output device</string>
     <string name="settings_lyrics_summary">Downloading, sync, cache</string>
     <string name="settings_font">Font</string>
     <string name="settings_interface">Interface</string>
@@ -76,8 +76,14 @@
     <string name="settings_smooth_desc">Animations at the monitor's refresh rate</string>
     <string name="settings_smooth_unavailable">Available from Android 15</string>
     <string name="settings_playback">Playback</string>
-    <string name="settings_offload">Exclusive mode</string>
-    <string name="settings_offload_desc">Send the sound straight to the device, bypassing the system mixer</string>
+    <string name="settings_equalizer">Equalizer</string>
+    <string name="settings_equalizer_desc">Ten bands, from deep bass to the top end</string>
+    <string name="eq_preset_flat">Flat</string>
+    <string name="eq_preset_bass">Bass</string>
+    <string name="eq_preset_vocal">Vocal</string>
+    <string name="eq_preset_rock">Rock</string>
+    <string name="eq_preset_electronic">Electronic</string>
+    <string name="eq_preset_custom">Custom</string>
     <string name="settings_silence">Skip silence</string>
     <string name="settings_silence_desc">Skip the silent parts of tracks</string>
     <string name="settings_lyrics">Lyrics</string>

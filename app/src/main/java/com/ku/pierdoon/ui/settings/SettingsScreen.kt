@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -62,6 +64,9 @@ import kotlin.math.roundToInt
 import com.ku.pierdoon.data.ColorSource
 import com.ku.pierdoon.data.ThemeMode
 import com.ku.pierdoon.data.update.UpdateState
+import com.ku.pierdoon.playback.EQ_BANDS
+import com.ku.pierdoon.playback.EQ_MAX_DB
+import com.ku.pierdoon.playback.EqPreset
 import com.ku.pierdoon.playback.PlaybackSpeed
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
@@ -560,18 +565,25 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
             )
         }
     }
-    item(key = "playback") {
-        Group(null) {
+    item(key = "equalizer") {
+        Group(stringResource(R.string.settings_equalizer)) {
             listOf<@Composable (Shape) -> Unit>(
                 { shape ->
                     SwitchItem(
                         shape = shape,
-                        title = stringResource(R.string.settings_offload),
-                        subtitle = stringResource(R.string.settings_offload_desc),
-                        checked = settings.audioOffload,
-                        onChange = { v -> onUpdate { it.copy(audioOffload = v) } },
+                        title = stringResource(R.string.settings_equalizer),
+                        subtitle = stringResource(R.string.settings_equalizer_desc),
+                        checked = settings.eqEnabled,
+                        onChange = { v -> onUpdate { it.copy(eqEnabled = v) } },
                     )
                 },
+                { shape -> EqualizerItem(shape, settings, onUpdate) },
+            )
+        }
+    }
+    item(key = "playback") {
+        Group(null) {
+            listOf<@Composable (Shape) -> Unit>(
                 { shape ->
                     SwitchItem(
                         shape = shape,
@@ -584,6 +596,49 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
             )
         }
     }
+}
+
+/** Presets as chips over the bands; moving a band turns the preset into "Custom". */
+@Composable
+private fun EqualizerItem(shape: Shape, settings: AppSettings, onUpdate: Update) {
+    val on = settings.eqEnabled
+    ItemContainer(shape) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                EqPreset.entries.forEach { preset ->
+                    // "Custom" is where hand-moved bands end up, not something to pick.
+                    if (preset == EqPreset.Custom && settings.eqPreset != EqPreset.Custom) return@forEach
+                    FilterChip(
+                        selected = settings.eqPreset == preset,
+                        enabled = on,
+                        onClick = { onUpdate { it.copy(eqPreset = preset, eqGains = preset.gains ?: it.eqGains) } },
+                        label = { Text(stringResource(preset.label())) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            EqualizerBands(
+                frequencies = EQ_BANDS,
+                gains = settings.eqGains,
+                maxDb = EQ_MAX_DB,
+                enabled = on,
+                onChange = { band, db ->
+                    onUpdate { s ->
+                        s.copy(eqGains = s.eqGains.toMutableList().also { it[band] = db }, eqPreset = EqPreset.Custom)
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun EqPreset.label() = when (this) {
+    EqPreset.Flat -> R.string.eq_preset_flat
+    EqPreset.Bass -> R.string.eq_preset_bass
+    EqPreset.Vocal -> R.string.eq_preset_vocal
+    EqPreset.Rock -> R.string.eq_preset_rock
+    EqPreset.Electronic -> R.string.eq_preset_electronic
+    EqPreset.Custom -> R.string.eq_preset_custom
 }
 
 private fun LazyListScope.lyrics(

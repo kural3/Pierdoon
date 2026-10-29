@@ -30,7 +30,7 @@ What changed in each version is in its release notes.
 - Copies tracks between the phone and the computer over Wi-Fi, byte for byte: "Send to computer" on the phone's tracks and playlists, "Save to phone" on the computer's. Tracks that look like ones already there (same title, artist and length) are pointed out first
 
 **Android**
-- Media3 playback with notification and lock screen controls, hardware audio offload
+- Media3 playback with notification and lock screen controls
 - Sleep timer, by minutes or at the end of the track
 - Immersive lyrics mode, landscape player
 - Swipe the mini player or the cover sideways to change track

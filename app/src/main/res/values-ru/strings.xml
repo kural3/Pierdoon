@@ -56,7 +56,7 @@
     <string name="settings_floating_nav_desc">Скруглённая панель вкладок над контентом</string>
     <string name="settings_appearance_summary">Тема, язык, шрифт, цвета, стиль Nothing</string>
     <string name="settings_feedback_summary">Вибрация и плавность анимаций</string>
-    <string name="settings_playback_summary">Кроссфейд, аппаратное воспроизведение, пропуск тишины</string>
+    <string name="settings_playback_summary">Кроссфейд, эквалайзер, пропуск тишины</string>
     <string name="settings_lyrics_summary">Загрузка, синхронизация, кэш</string>
     <string name="settings_font">Шрифт</string>
     <string name="settings_interface">Интерфейс</string>
@@ -76,8 +76,14 @@
     <string name="settings_smooth_desc">Анимации на высшей частоте экрана (до 120 Гц). Чуть выше расход заряда во время анимаций</string>
     <string name="settings_smooth_unavailable">Доступно с Android 15</string>
     <string name="settings_playback">Воспроизведение</string>
-    <string name="settings_offload">Аппаратное декодирование</string>
-    <string name="settings_offload_desc">Меньше расход батареи. Отключите, если звук прерывается</string>
+    <string name="settings_equalizer">Эквалайзер</string>
+    <string name="settings_equalizer_desc">Десять полос, от глубокого баса до верхов</string>
+    <string name="eq_preset_flat">Ровно</string>
+    <string name="eq_preset_bass">Бас</string>
+    <string name="eq_preset_vocal">Вокал</string>
+    <string name="eq_preset_rock">Рок</string>
+    <string name="eq_preset_electronic">Электроника</string>
+    <string name="eq_preset_custom">Своё</string>
     <string name="settings_silence">Пропуск тишины</string>
     <string name="settings_silence_desc">Пропускать беззвучные фрагменты</string>
     <string name="settings_lyrics">Тексты песен</string>

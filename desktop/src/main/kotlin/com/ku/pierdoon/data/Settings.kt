@@ -1,6 +1,10 @@
 package com.ku.pierdoon.data
 
+import com.ku.pierdoon.playback.EQ_FLAT
+import com.ku.pierdoon.playback.EqPreset
 import com.ku.pierdoon.playback.PlaybackSpeed
+import com.ku.pierdoon.playback.formatEqGains
+import com.ku.pierdoon.playback.parseEqGains
 import androidx.compose.runtime.Immutable
 import com.ku.pierdoon.data.download.DownloadFormat
 import com.ku.pierdoon.data.metadata.SaveTarget
@@ -63,8 +67,11 @@ data class AppSettings(
     val playbackSpeed: Float = 1f,
     /** Fade between tracks of one album too; off keeps albums gapless, as recorded. */
     val crossfadeAlbums: Boolean = false,
-    /** Unused on the desktop; kept so the settings screens read the same. */
-    val audioOffload: Boolean = false,
+    val eqEnabled: Boolean = false,
+    /** Gain per band in dB, [com.ku.pierdoon.playback.EQ_BANDS] long; a preset copies its own in. */
+    val eqGains: List<Float> = EQ_FLAT,
+    /** The preset [eqGains] came from, or [EqPreset.Custom] once a band was moved by hand. */
+    val eqPreset: EqPreset = EqPreset.Flat,
     /** Last choice on the track editor: the app's records or the file itself. */
     val editTarget: SaveTarget = SaveTarget.App,
     /** Look for a new release on GitHub now and then (at most twice a day). */
@@ -130,7 +137,9 @@ object SettingsStore {
             crossfadeSeconds = p.getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
             playbackSpeed = PlaybackSpeed.nearest(p.getFloat(K_SPEED, d.playbackSpeed)),
             crossfadeAlbums = p.getBoolean(K_CROSSFADE_ALBUMS, d.crossfadeAlbums),
-            audioOffload = p.getBoolean(K_OFFLOAD, d.audioOffload),
+            eqEnabled = p.getBoolean(K_EQ, d.eqEnabled),
+            eqGains = parseEqGains(p.getString(K_EQ_GAINS, null)),
+            eqPreset = EqPreset.entries.firstOrNull { it.name == p.getString(K_EQ_PRESET, null) } ?: d.eqPreset,
             editTarget = enumOr(p.getString(K_EDIT_TARGET, null), d.editTarget),
             checkUpdates = p.getBoolean(K_UPDATES, d.checkUpdates),
             downloadFormat = enumOr(p.getString(K_DOWNLOAD_FORMAT, null), d.downloadFormat),
@@ -191,7 +200,9 @@ object SettingsStore {
             putInt(K_CROSSFADE, s.crossfadeSeconds)
             putFloat(K_SPEED, s.playbackSpeed)
             putBoolean(K_CROSSFADE_ALBUMS, s.crossfadeAlbums)
-            putBoolean(K_OFFLOAD, s.audioOffload)
+            putBoolean(K_EQ, s.eqEnabled)
+            putString(K_EQ_GAINS, formatEqGains(s.eqGains))
+            putString(K_EQ_PRESET, s.eqPreset.name)
             putString(K_EDIT_TARGET, s.editTarget.name)
             putBoolean(K_UPDATES, s.checkUpdates)
             putString(K_DOWNLOAD_FORMAT, s.downloadFormat.name)
@@ -236,7 +247,9 @@ object SettingsStore {
     private const val K_CROSSFADE = "crossfade_seconds"
     private const val K_SPEED = "playback_speed"
     private const val K_CROSSFADE_ALBUMS = "crossfade_albums"
-    private const val K_OFFLOAD = "audio_offload"
+    private const val K_EQ = "equalizer"
+    private const val K_EQ_GAINS = "equalizer_gains"
+    private const val K_EQ_PRESET = "equalizer_preset"
     private const val K_EDIT_TARGET = "edit_target"
     private const val K_UPDATES = "check_updates"
     private const val K_DOWNLOAD_FORMAT = "download_format"

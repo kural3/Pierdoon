@@ -56,7 +56,7 @@
     <string name="settings_floating_nav_desc">Только значки, без подписей. Ширину можно менять, потянув за край панели</string>
     <string name="settings_appearance_summary">Тема, язык, шрифт, цвета, стиль Nothing</string>
     <string name="settings_feedback_summary">Плавность анимаций</string>
-    <string name="settings_playback_summary">Кроссфейд, устройство вывода, пропуск тишины</string>
+    <string name="settings_playback_summary">Кроссфейд, эквалайзер, устройство вывода</string>
     <string name="settings_lyrics_summary">Загрузка, синхронизация, кэш</string>
     <string name="settings_font">Шрифт</string>
     <string name="settings_interface">Интерфейс</string>
@@ -76,8 +76,14 @@
     <string name="settings_smooth_desc">Анимации на частоте монитора</string>
     <string name="settings_smooth_unavailable">Доступно с Android 15</string>
     <string name="settings_playback">Воспроизведение</string>
-    <string name="settings_offload">Монопольный режим</string>
-    <string name="settings_offload_desc">Отдавать звук устройству напрямую, без системного микшера</string>
+    <string name="settings_equalizer">Эквалайзер</string>
+    <string name="settings_equalizer_desc">Десять полос, от глубокого баса до верхов</string>
+    <string name="eq_preset_flat">Ровно</string>
+    <string name="eq_preset_bass">Бас</string>
+    <string name="eq_preset_vocal">Вокал</string>
+    <string name="eq_preset_rock">Рок</string>
+    <string name="eq_preset_electronic">Электроника</string>
+    <string name="eq_preset_custom">Своё</string>
     <string name="settings_silence">Пропуск тишины</string>
     <string name="settings_silence_desc">Пропускать беззвучные фрагменты</string>
     <string name="settings_lyrics">Тексты песен</string>

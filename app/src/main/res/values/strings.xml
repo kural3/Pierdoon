@@ -56,7 +56,7 @@
     <string name="settings_floating_nav_desc">A rounded tab bar above the content</string>
     <string name="settings_appearance_summary">Theme, language, font, colors, Nothing style</string>
     <string name="settings_feedback_summary">Vibration and smooth animations</string>
-    <string name="settings_playback_summary">Crossfade, hardware playback, skipping silence</string>
+    <string name="settings_playback_summary">Crossfade, equalizer, skipping silence</string>
     <string name="settings_lyrics_summary">Downloading, sync, cache</string>
     <string name="settings_font">Font</string>
     <string name="settings_interface">Interface</string>
@@ -76,8 +76,14 @@
     <string name="settings_smooth_desc">Animations at the screen\'s top refresh rate (up to 120 Hz). Uses a little more battery while animating</string>
     <string name="settings_smooth_unavailable">Available from Android 15</string>
     <string name="settings_playback">Playback</string>
-    <string name="settings_offload">Hardware decoding</string>
-    <string name="settings_offload_desc">Uses less battery. Turn it off if the sound breaks up</string>
+    <string name="settings_equalizer">Equalizer</string>
+    <string name="settings_equalizer_desc">Ten bands, from deep bass to the top end</string>
+    <string name="eq_preset_flat">Flat</string>
+    <string name="eq_preset_bass">Bass</string>
+    <string name="eq_preset_vocal">Vocal</string>
+    <string name="eq_preset_rock">Rock</string>
+    <string name="eq_preset_electronic">Electronic</string>
+    <string name="eq_preset_custom">Custom</string>
     <string name="settings_silence">Skip silence</string>
     <string name="settings_silence_desc">Skip the silent parts of tracks</string>
     <string name="settings_lyrics">Lyrics</string>

@@ -70,6 +70,8 @@ class AudioEngine(private val listener: Listener) {
 
     private val commands = LinkedBlockingQueue<Command>()
     private val meter = LevelMeter(RATE)
+    /** On the mixed signal, so both tracks of a crossfade sound the same. */
+    private val equalizer = Equalizer(RATE, CHANNELS)
     private val marks = ArrayDeque<Mark>()
     private val lock = Any()
 
@@ -77,6 +79,9 @@ class AudioEngine(private val listener: Listener) {
     @Volatile var skipSilence: Boolean = false
     /** How long the end of a track and the start of the next overlap; 0 for none. */
     @Volatile var crossfadeMs: Long = 0
+
+    /** Band gains in dB, or null for the equalizer off; applies within a buffer's length. */
+    fun setEqualizer(gains: List<Float>?) = equalizer.setGains(gains)
 
     /** Set while [Command.Play] is in force; read by the UI thread. */
     @Volatile var isPlaying: Boolean = false
@@ -443,14 +448,17 @@ class AudioEngine(private val listener: Listener) {
      * written next, as dropping it would cut the audio and put the position behind the music.
      */
     private fun writeSamples(l: SourceDataLine, samples: ShortBuffer, gain: Float, chunk: ByteArray) {
+        val eq = equalizer.beginBlock()
         while (samples.hasRemaining()) {
+            // Whole frames per round, so sample i is always channel i % CHANNELS.
             val n = minOf(samples.remaining(), chunk.size / 2)
             var o = 0
-            repeat(n) {
+            repeat(n) { i ->
                 val raw = samples.get()
-                // Before the volume: the picture shouldn't fade with the sound turned down.
+                // Before the volume and the equalizer: the picture shouldn't follow either.
                 meter.sample(raw)
-                val s = (raw * gain).toInt().coerceIn(-32768, 32767)
+                val shaped = if (eq) equalizer.process(raw.toInt(), i % CHANNELS) else raw.toInt()
+                val s = (shaped * gain).toInt().coerceIn(-32768, 32767)
                 chunk[o++] = (s and 0xFF).toByte()
                 chunk[o++] = ((s shr 8) and 0xFF).toByte()
             }
@@ -516,6 +524,7 @@ class AudioEngine(private val listener: Listener) {
         }
         // Nothing buffered any more: what's written is what's heard.
         leftover = null
+        equalizer.reset()
         synchronized(lock) { marks.clear() }
         pendingMark = true
         announcedToken = -1L

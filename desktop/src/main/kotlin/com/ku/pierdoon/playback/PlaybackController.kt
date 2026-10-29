@@ -88,6 +88,13 @@ object PlaybackController {
             SettingsStore.settings.map { it.playbackSpeed }.distinctUntilChanged().collect { player.speed = it }
         }
 
+        scope.launch {
+            SettingsStore.settings
+                .map { if (it.eqEnabled) it.eqGains else null }
+                .distinctUntilChanged()
+                .collect { player.setEqualizer(it) }
+        }
+
         // The screenshot tool runs beside the real app and mustn't take its keys.
         if (System.getProperty("pierdoon.shots") == null) {
             MediaKeys.install(
