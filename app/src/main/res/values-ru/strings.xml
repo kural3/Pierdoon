@@ -126,6 +126,7 @@
     <string name="artists_count">Артистов: %1$d</string>
     <string name="new_playlist">Новый плейлист</string>
     <string name="playlist_name">Название</string>
+    <string name="car_tracks">Треки</string>
     <string name="widget_description">Обложка, трек и кнопки управления</string>
     <string name="playlist_import">Импорт из файла</string>
     <string name="playlist_export">Экспорт в файл</string>

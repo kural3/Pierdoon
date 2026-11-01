@@ -51,6 +51,12 @@
 
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- "Play ... on Pier.doon", said to the assistant in the car or on the phone. -->
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <service
@@ -60,8 +66,22 @@
             tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <!-- What Android Auto looks for. -->
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- Exported for Android Auto; it answers no one else. -->
+        <provider
+            android:name=".playback.CarArtworkProvider"
+            android:authorities="${applicationId}.carart"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
 
         <receiver
             android:name=".widget.PlayerWidget"

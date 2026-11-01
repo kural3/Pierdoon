@@ -19,11 +19,15 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.LibraryParams
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
+import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
@@ -52,13 +56,14 @@ import kotlinx.coroutines.withContext
 // Media3 marks much of what a player service needs (custom renderers, shuffle orders,
 // notification provider) as unstable API.
 @OptIn(UnstableApi::class)
-class PlaybackService : MediaSessionService() {
+class PlaybackService : MediaLibraryService() {
     // Its notification buttons are labelled in the chosen language (Android 12 and older).
     override fun attachBaseContext(base: Context) = super.attachBaseContext(InterfaceLanguage.wrap(base))
 
 
-    private var session: MediaSession? = null
+    private var session: MediaLibrarySession? = null
     private var widget: PlayerWidget.Updater? = null
+    private lateinit var carLibrary: CarLibrary
     private var crossfader: Crossfader? = null
     private var cassetteChange: CassetteChange? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -126,6 +131,7 @@ class PlaybackService : MediaSessionService() {
 
         queueStore = QueueStore(this)
         restoreQueue(player)
+        carLibrary = CarLibrary(this)
         widget = PlayerWidget.Updater(this, player, scope).also { it.start() }
 
         val fader = Crossfader(this, player, scope).also { crossfader = it }
@@ -194,14 +200,13 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        session = MediaSession.Builder(this, player)
+        session = MediaLibrarySession.Builder(this, player, SessionCallback())
             .setSessionActivity(openApp)
-            .setCallback(SessionCallback())
             .setMediaButtonPreferences(modeButtons(player))
             .build()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = session?.player
@@ -322,13 +327,13 @@ class PlaybackService : MediaSessionService() {
     )
 
     /** Controllers send only ids + metadata; the playable URI is resolved here. */
-    private inner class SessionCallback : MediaSession.Callback {
+    private inner class SessionCallback : MediaLibrarySession.Callback {
         override fun onConnect(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): MediaSession.ConnectionResult = MediaSession.ConnectionResult.AcceptedResultBuilder(session)
             .setAvailableSessionCommands(
-                MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                     .add(TOGGLE_SHUFFLE)
                     .add(CYCLE_REPEAT)
                     .build()
@@ -357,9 +362,104 @@ class PlaybackService : MediaSessionService() {
         ): ListenableFuture<MutableList<MediaItem>> = Futures.immediateFuture(
             mediaItems.mapTo(ArrayList(mediaItems.size)) { item ->
                 if (item.localConfiguration != null) item
-                else item.buildUpon().setUri(Song.uriFor(item.mediaId)).build()
+                else item.mediaId.substringAfterLast('/').let { id -> item.buildUpon().setMediaId(id).setUri(Song.uriFor(id)).build() }
             }
         )
+
+        /** The service is open to every app; the library is what the audio permission guards. */
+        private fun canBrowse(controller: MediaSession.ControllerInfo) =
+            controller.isTrusted || controller.packageName == packageName || controller.packageName in CarLibrary.CAR_PACKAGES
+
+        private fun <T : Any> browsing(controller: MediaSession.ControllerInfo, read: suspend () -> LibraryResult<T>): ListenableFuture<LibraryResult<T>> {
+            if (!canBrowse(controller)) return Futures.immediateFuture(LibraryResult.ofError<T>(SessionError.ERROR_PERMISSION_DENIED))
+            val result = SettableFuture.create<LibraryResult<T>>()
+            scope.launch {
+                runCatching { read() }
+                    .onSuccess { result.set(it) }
+                    .onFailure { result.set(LibraryResult.ofError<T>(SessionError.ERROR_UNKNOWN)) }
+            }
+            return result
+        }
+
+        private fun page(items: List<MediaItem>, page: Int, pageSize: Int): ImmutableList<MediaItem> {
+            val from = (page.toLong() * pageSize).coerceAtMost(items.size.toLong()).toInt()
+            val to = (from.toLong() + pageSize).coerceAtMost(items.size.toLong()).toInt()
+            return ImmutableList.copyOf(items.subList(from, to))
+        }
+
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            params: LibraryParams?,
+        ) = browsing(browser) {
+            val extras = Bundle().apply { putBoolean(SEARCH_SUPPORTED, true) }
+            LibraryResult.ofItem(carLibrary.root, LibraryParams.Builder().setExtras(extras).build())
+        }
+
+        override fun onGetItem(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            mediaId: String,
+        ) = browsing(browser) {
+            carLibrary.item(mediaId)?.let { LibraryResult.ofItem(it, null) }
+                ?: LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
+        }
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            parentId: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?,
+        ) = browsing(browser) {
+            LibraryResult.ofItemList(page(carLibrary.children(parentId), page, pageSize), params)
+        }
+
+        override fun onSearch(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            params: LibraryParams?,
+        ) = browsing<Void>(browser) {
+            session.notifySearchResultChanged(browser, query, carLibrary.search(query).size, params)
+            LibraryResult.ofVoid()
+        }
+
+        override fun onGetSearchResult(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?,
+        ) = browsing(browser) {
+            LibraryResult.ofItemList(page(carLibrary.search(query), page, pageSize), params)
+        }
+
+        /** A track picked in the car brings its list along; "play ..." said aloud finds what to play. */
+        override fun onSetMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long,
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            val item = mediaItems.singleOrNull()
+            val query = item?.requestMetadata?.searchQuery
+            val fromCar = item != null && canBrowse(controller) && (query != null || CarLibrary.isTrack(item.mediaId))
+            if (!fromCar) return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
+            val result = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+            scope.launch {
+                runCatching {
+                    val (songs, index) =
+                        if (query != null) carLibrary.songsForVoice(query) to 0
+                        else carLibrary.queueFor(item.mediaId) ?: (emptyList<Song>() to 0)
+                    MediaSession.MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, index, C.TIME_UNSET)
+                }.onSuccess { result.set(it) }.onFailure { result.setException(it) }
+            }
+            return result
+        }
 
         /** Play pressed on an empty player (headset button, system media controls): resume the saved queue. */
         override fun onPlaybackResumption(
@@ -375,6 +475,7 @@ class PlaybackService : MediaSessionService() {
 
     private companion object {
         const val SAVE_DELAY_MS = 1_000L
+        const val SEARCH_SUPPORTED = "android.media.browse.SEARCH_SUPPORTED"
         const val SLEEP_FADE_MS = 10_000L
         val TOGGLE_SHUFFLE = SessionCommand("com.ku.pierdoon.TOGGLE_SHUFFLE", Bundle.EMPTY)
         val CYCLE_REPEAT = SessionCommand("com.ku.pierdoon.CYCLE_REPEAT", Bundle.EMPTY)

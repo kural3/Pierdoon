@@ -27,6 +27,13 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.download.DownloadService
+import android.app.SearchManager
+import android.content.ComponentName
+import android.provider.MediaStore
+import androidx.media3.common.MediaItem
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.ku.pierdoon.playback.PlaybackService
 import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.data.download.findUrl
 import com.ku.pierdoon.data.update.Updater
@@ -124,7 +131,24 @@ class MainActivity : ComponentActivity() {
                 Downloader.openRequest.value = true
             }
             DownloadService.ACTION_OPEN_DOWNLOADS -> Downloader.openRequest.value = true
+            MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH -> playFromSearch(intent.getStringExtra(SearchManager.QUERY).orEmpty())
         }
+    }
+
+    /** Hands a spoken request to the service, which finds what to play, as it does for the car. */
+    private fun playFromSearch(query: String) {
+        val future = MediaController.Builder(this, SessionToken(this, ComponentName(this, PlaybackService::class.java))).buildAsync()
+        future.addListener({
+            val controller = runCatching { future.get() }.getOrNull() ?: return@addListener
+            controller.setMediaItem(
+                MediaItem.Builder()
+                    .setRequestMetadata(MediaItem.RequestMetadata.Builder().setSearchQuery(query).build())
+                    .build()
+            )
+            controller.prepare()
+            controller.play()
+            MediaController.releaseFuture(future)
+        }, ContextCompat.getMainExecutor(this))
     }
 
     // Backgrounded apps can be killed at any time: don't leave edits waiting on a timer.

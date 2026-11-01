@@ -56,6 +56,11 @@ android {
         // (and the in-app updater works on the development phone too).
         debug {
             signingConfigs.findByName("release")?.let { signingConfig = it }
+            // Instrumented tests on a phone with a release installed, which a debug key can't replace.
+            if (providers.gradleProperty("sideBySideTests").isPresent) {
+                applicationIdSuffix = ".test"
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
         release {
             optimization {
