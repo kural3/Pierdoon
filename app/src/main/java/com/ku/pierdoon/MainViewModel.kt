@@ -566,7 +566,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (ok) {
             tagOverrides.set(song.id, null)
             CoverStore.removeSongCover(song.id)
-            ArtworkCache.invalidateAlbum(song.albumId)
+            ArtworkCache.invalidate(song.id, song.albumId)
         }
         if (c != null && resume != null) {
             val (index, positionMs, playWhenReady) = resume

@@ -63,8 +63,13 @@ object ArtworkCache {
     private val missing = HashSet<String>()
     private val io = Dispatchers.IO.limitedParallelism(3)
 
+    /**
+     * From Android 10 the art is each track's own thumbnail, so it's keyed by track: tracks
+     * filed under one album (every untagged file of a folder is) can have different covers.
+     */
     private fun source(songId: Long, albumId: Long): String =
-        CoverStore.songVersion(songId)?.let { "c$songId.$it" } ?: "a$albumId"
+        CoverStore.songVersion(songId)?.let { "c$songId.$it" }
+            ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "s$songId" else "a$albumId"
 
     private fun key(source: String, large: Boolean) = if (large) "L$source" else "S$source"
 
@@ -101,20 +106,21 @@ object ArtworkCache {
 
     fun peekFile(file: File, version: Long, large: Boolean): ImageBitmap? = cache.get(key("f${file.name}.$version", large))
 
-    /** Bumped by [invalidateAlbum]; artwork on screen reads it to reload. */
+    /** Bumped by [invalidate]; artwork on screen reads it to reload. */
     private val albumRevisions = mutableStateMapOf<Long, Int>()
     fun albumRevision(albumId: Long): Int = albumRevisions[albumId] ?: 0
 
     /**
-     * Forgets an album's art after its file changed (tags written by the app). MediaStore
+     * Forgets a track's art after its file changed (tags written by the app). MediaStore
      * regenerates its thumbnails on rescan; this drops our copies so they're loaded again.
      */
-    fun invalidateAlbum(albumId: Long) {
+    fun invalidate(songId: Long, albumId: Long) {
         albumRevisions[albumId] = albumRevision(albumId) + 1
-        val source = "a$albumId"
-        cache.snapshot().keys.filter { it.endsWith(source) && it.length == source.length + 1 }.forEach(cache::remove)
-        synchronized(missing) { missing.removeAll { it.endsWith(source) && it.length == source.length + 1 } }
-        synchronized(seeds) { seeds.remove(source) }
+        for (source in listOf("s$songId", "a$albumId")) {
+            cache.snapshot().keys.filter { it.endsWith(source) && it.length == source.length + 1 }.forEach(cache::remove)
+            synchronized(missing) { missing.removeAll { it.endsWith(source) && it.length == source.length + 1 } }
+            synchronized(seeds) { seeds.remove(source) }
+        }
     }
 
     /**

@@ -287,7 +287,7 @@ class MainViewModel {
             val first = _library.value !is LibraryState.Ready
             if (!first && (_library.value as? LibraryState.Ready)?.songs == songs) return@launch
             songsById = songs.associateBy { it.id }
-            ArtworkCache.registerAlbumFiles(songs.associate { it.albumId to it.path })
+            ArtworkCache.registerFiles(songs)
             _collections.value = withContext(Dispatchers.Default) { MusicCollections.from(songs) }
             _library.value = LibraryState.Ready(songs)
             if (first) PlaybackController.restore(songsById)
@@ -581,7 +581,7 @@ class MainViewModel {
         if (ok) {
             tagOverrides.set(song.id, null)
             CoverStore.removeSongCover(song.id)
-            ArtworkCache.invalidateAlbum(song.albumId)
+            ArtworkCache.invalidate(song.id, song.albumId)
         }
         if (c != null && resume != null) {
             val (index, positionMs, playWhenReady) = resume

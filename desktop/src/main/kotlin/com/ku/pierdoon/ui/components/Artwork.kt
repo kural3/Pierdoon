@@ -30,6 +30,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.data.CoverStore
+import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.platform.Images
 import com.ku.pierdoon.platform.LruCache
 import com.ku.pierdoon.platform.MediaProbe
@@ -68,14 +69,27 @@ object ArtworkCache {
     /** Album id -> a file of that album, so art can be found from the ids alone. */
     private val albumFiles = HashMap<Long, String>()
 
+    /**
+     * Track id -> its file, for tracks without an album tag. They're filed under their folder,
+     * but each shows its own art: one file's cover mustn't become the whole folder's.
+     */
+    private val looseFiles = HashMap<Long, String>()
+
     /** Called with every library load: which file stands for which album's art. */
-    fun registerAlbumFiles(map: Map<Long, String>) = synchronized(albumFiles) {
+    fun registerFiles(songs: List<Song>) = synchronized(albumFiles) {
         albumFiles.clear()
-        albumFiles.putAll(map)
+        looseFiles.clear()
+        for (song in songs) {
+            val folderAlbum = Song.albumIdFor("", "", song.file.parentFile?.absolutePath.orEmpty())
+            if (song.albumId == folderAlbum) looseFiles[song.id] = song.path else albumFiles[song.albumId] = song.path
+        }
     }
 
+    private fun looseFile(songId: Long): String? = synchronized(albumFiles) { looseFiles[songId] }
+
     private fun source(songId: Long, albumId: Long): String =
-        CoverStore.songVersion(songId)?.let { "c$songId.$it" } ?: "a$albumId"
+        CoverStore.songVersion(songId)?.let { "c$songId.$it" }
+            ?: if (looseFile(songId) != null) "s$songId" else "a$albumId"
 
     private fun key(source: String, large: Boolean) = if (large) "L$source" else "S$source"
 
@@ -94,7 +108,7 @@ object ArtworkCache {
         return withContext(io) {
             coroutineContext.ensureActive()
             val px = if (large) LARGE_PX else SMALL_PX
-            val image = if (custom != null) decodeFile(custom) else decodeAlbum(albumId)
+            val image = if (custom != null) decodeFile(custom) else decodeArt(songId, albumId)
             val bitmap = image?.let { Images.scaledBitmap(it, px) }
             if (bitmap != null) cache.put(key, bitmap) else synchronized(missing) { missing += key }
             bitmap
@@ -121,18 +135,19 @@ object ArtworkCache {
         cache.evictAll()
     }
 
-    /** Bumped by [invalidateAlbum]; artwork on screen reads it to reload. */
+    /** Bumped by [invalidate]; artwork on screen reads it to reload. */
     private val albumRevisions = mutableStateMapOf<Long, Int>()
     fun albumRevision(albumId: Long): Int = albumRevisions[albumId] ?: 0
 
-    /** Forgets an album's art after its file changed (tags written by the app). */
-    fun invalidateAlbum(albumId: Long) {
+    /** Forgets a track's art after its file changed (tags written by the app). */
+    fun invalidate(songId: Long, albumId: Long) {
         albumRevisions[albumId] = albumRevision(albumId) + 1
-        val source = "a$albumId"
-        cache.snapshot().keys.filter { it.endsWith(source) && it.length == source.length + 1 }.forEach(cache::remove)
-        synchronized(missing) { missing.removeAll { it.endsWith(source) && it.length == source.length + 1 } }
-        synchronized(seeds) { seeds.remove(source) }
-        synchronized(smallImages) { smallImages.remove(source) }
+        for (source in listOf("s$songId", "a$albumId")) {
+            cache.snapshot().keys.filter { it.endsWith(source) && it.length == source.length + 1 }.forEach(cache::remove)
+            synchronized(missing) { missing.removeAll { it.endsWith(source) && it.length == source.length + 1 } }
+            synchronized(seeds) { seeds.remove(source) }
+            synchronized(smallImages) { smallImages.remove(source) }
+        }
     }
 
     /** Small Skia copies kept for blurring and colour picking. */
@@ -143,7 +158,7 @@ object ArtworkCache {
         synchronized(smallImages) { if (source in smallImages) return smallImages[source] }
         val image = withContext(io) {
             val custom = CoverStore.songFile(songId)
-            (if (custom != null) decodeFile(custom) else decodeAlbum(albumId))?.use { Images.resized(it, BLUR_PX, BLUR_PX) }
+            (if (custom != null) decodeFile(custom) else decodeArt(songId, albumId))?.use { Images.resized(it, BLUR_PX, BLUR_PX) }
         }
         synchronized(smallImages) { smallImages[source] = image }
         return image
@@ -213,13 +228,17 @@ object ArtworkCache {
     /** The cover as stored (custom, embedded or the folder's picture), undecoded. Blocking. */
     fun coverBytes(songId: Long, albumId: Long): ByteArray? = runCatching {
         CoverStore.songFile(songId)?.let { return@runCatching it.readBytes() }
-        val path = synchronized(albumFiles) { albumFiles[albumId] } ?: return@runCatching null
+        val path = artFile(songId, albumId) ?: return@runCatching null
         val audio = File(path)
         MediaProbe.embeddedCover(audio) ?: folderCover(audio.parentFile)?.readBytes()
     }.getOrNull()
 
-    private fun decodeAlbum(albumId: Long): SkImage? {
-        val path = synchronized(albumFiles) { albumFiles[albumId] } ?: return null
+    /** The file whose art the track shows: its own if it has no album tag, else its album's. */
+    private fun artFile(songId: Long, albumId: Long): String? =
+        synchronized(albumFiles) { looseFiles[songId] ?: albumFiles[albumId] }
+
+    private fun decodeArt(songId: Long, albumId: Long): SkImage? {
+        val path = artFile(songId, albumId) ?: return null
         val audio = File(path)
         MediaProbe.embeddedCover(audio)?.let(Images::decode)?.let { return it }
         return folderCover(audio.parentFile)?.let(::decodeFile)
