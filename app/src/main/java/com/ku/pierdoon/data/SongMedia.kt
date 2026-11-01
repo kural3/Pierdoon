@@ -2,6 +2,7 @@ package com.ku.pierdoon.data
 
 import android.content.ContentUris
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.core.net.toUri
@@ -13,9 +14,14 @@ import androidx.media3.common.MediaMetadata
 val Song.uri: Uri
     get() = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
 
-/** A cover picked in the app wins over the file's own. */
+/**
+ * A cover picked in the app wins over the file's own. From Android 10 that's the track's own art,
+ * as on screen: tracks filed under one album (every untagged file of a folder is) can differ.
+ */
 val Song.artworkUri: Uri
-    get() = CoverStore.songUri(id) ?: ContentUris.withAppendedId(Song.ALBUM_ART_URI, albumId)
+    get() = CoverStore.songUri(id)
+        ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) uri.buildUpon().appendPath("albumart").build()
+        else ContentUris.withAppendedId(Song.ALBUM_ART_URI, albumId)
 
 /** Each call is a new queue entry with its own [QUEUE_KEY], so a song can be queued twice. */
 fun Song.toMediaItem(): MediaItem = toMediaItem(Song.newQueueKey())
