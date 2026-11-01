@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -68,6 +67,7 @@ import com.ku.pierdoon.playback.EQ_BANDS
 import com.ku.pierdoon.playback.EQ_MAX_DB
 import com.ku.pierdoon.playback.EqPreset
 import com.ku.pierdoon.playback.PlaybackSpeed
+import com.ku.pierdoon.ui.components.ChoiceChip
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.remote.PcRemote
@@ -604,15 +604,16 @@ private fun EqualizerItem(shape: Shape, settings: AppSettings, onUpdate: Update)
     val on = settings.eqEnabled
     ItemContainer(shape) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 EqPreset.entries.forEach { preset ->
                     // "Custom" is where hand-moved bands end up, not something to pick.
                     if (preset == EqPreset.Custom && settings.eqPreset != EqPreset.Custom) return@forEach
-                    FilterChip(
+                    ChoiceChip(
                         selected = settings.eqPreset == preset,
-                        enabled = on,
+                        label = stringResource(preset.label()),
                         onClick = { onUpdate { it.copy(eqPreset = preset, eqGains = preset.gains ?: it.eqGains) } },
-                        label = { Text(stringResource(preset.label())) },
+                        enabled = on,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     )
                 }
             }

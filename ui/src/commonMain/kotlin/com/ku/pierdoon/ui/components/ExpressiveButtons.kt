@@ -12,10 +12,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -103,6 +105,43 @@ fun ExpressiveIconButton(
                     scaleY = s
                 },
         )
+    }
+}
+
+/** [ExpressiveIconButton] with a short text in place of the icon, for a value such as "1×". */
+@Composable
+fun ExpressiveTextButton(
+    onClick: () -> Unit,
+    text: String,
+    onClickLabel: String?,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    restCorner: Int = 50,
+    pressedCorner: Int = 24,
+    haptic: HapticFeedbackType = HapticFeedbackType.VirtualKey,
+) {
+    val haptics = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val press = rememberPressProgress(interactionSource)
+    val rest = animateRestCorner(restCorner)
+    Box(
+        modifier = modifier
+            .expressiveLayer(press, rest, pressedCorner, pressedScale = 0.9f)
+            .background(containerColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(),
+                role = Role.Button,
+                onClickLabel = onClickLabel,
+            ) {
+                haptics.performHapticFeedback(haptic)
+                onClick()
+            }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, color = contentColor, maxLines = 1)
     }
 }
 

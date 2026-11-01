@@ -1,6 +1,7 @@
 package com.ku.pierdoon.ui.remote
 
 import com.ku.pierdoon.ui.components.MenuAction
+import com.ku.pierdoon.ui.components.ChoiceChip
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.AppMenu
 import com.ku.pierdoon.remote.PcDownload
@@ -55,7 +56,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Icon
@@ -938,21 +938,17 @@ private fun LazyListScope.libraryItems(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 LibraryTab.entries.forEach { t ->
-                    FilterChip(
+                    ChoiceChip(
                         selected = t == tab,
+                        label = stringResource(
+                            when (t) {
+                                LibraryTab.Songs -> R.string.nav_songs
+                                LibraryTab.Albums -> R.string.nav_albums
+                                LibraryTab.Artists -> R.string.nav_artists
+                                LibraryTab.Playlists -> R.string.nav_playlists
+                            }
+                        ),
                         onClick = { onTab(t) },
-                        label = {
-                            Text(
-                                stringResource(
-                                    when (t) {
-                                        LibraryTab.Songs -> R.string.nav_songs
-                                        LibraryTab.Albums -> R.string.nav_albums
-                                        LibraryTab.Artists -> R.string.nav_artists
-                                        LibraryTab.Playlists -> R.string.nav_playlists
-                                    }
-                                )
-                            )
-                        },
                     )
                 }
             }

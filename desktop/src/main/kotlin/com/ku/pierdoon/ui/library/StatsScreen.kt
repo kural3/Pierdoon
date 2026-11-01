@@ -76,7 +76,7 @@ fun StatsScreen(
         onBack = onBack,
         actions = {
             if (!plays.isNullOrEmpty()) {
-                OverflowMenu(listOf(listOf(MenuEntry(stringResource(Res.string.stats_clear), PlayerIcons.Delete) { confirmClear = true })))
+                OverflowMenu(listOf(listOf(MenuEntry(stringResource(Res.string.stats_clear), PlayerIcons.Delete, destructive = true) { confirmClear = true })))
             }
         },
     ) { inner ->

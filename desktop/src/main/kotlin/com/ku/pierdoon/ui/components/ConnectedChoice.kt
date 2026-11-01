@@ -19,6 +19,37 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 
 /**
+ * One of several choices too many or too long for [ConnectedChoice]: looks and morphs like its
+ * segments, but stands alone, so a row of these can wrap or scroll.
+ */
+@Composable
+fun ChoiceChip(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    /** Unchecked colour; pick one that contrasts with whatever sits behind it. */
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+) {
+    val haptics = LocalHapticFeedback.current
+    ToggleButton(
+        checked = selected,
+        onCheckedChange = {
+            if (!selected) {
+                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                onClick()
+            }
+        },
+        enabled = enabled,
+        colors = ToggleButtonDefaults.toggleButtonColors(containerColor = containerColor),
+        modifier = modifier.semantics { role = Role.RadioButton },
+    ) {
+        Text(label, maxLines = 1, softWrap = false)
+    }
+}
+
+/**
  * M3 Expressive connected button group used as a single-choice selector: outer corners are
  * round, inner ones tight, and the checked segment morphs into a full pill.
  */

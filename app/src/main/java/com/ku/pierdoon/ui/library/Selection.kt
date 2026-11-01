@@ -138,6 +138,7 @@ class MenuEntry(
     val icon: ImageVector? = null,
     val selected: Boolean? = null,
     val checked: Boolean? = null,
+    val destructive: Boolean = false,
     val onClick: () -> Unit,
 )
 
@@ -194,12 +195,20 @@ fun OverflowMenu(
                                 leadingIcon = icon,
                                 checkedLeadingIcon = tick,
                             )
-                            else -> DropdownMenuItem(
-                                onClick = click,
-                                text = { Text(e.label) },
-                                shape = shapes.shape,
-                                leadingIcon = icon,
-                            )
+                            else -> {
+                                val error = MaterialTheme.colorScheme.error
+                                DropdownMenuItem(
+                                    onClick = click,
+                                    text = { Text(e.label) },
+                                    shape = shapes.shape,
+                                    leadingIcon = icon,
+                                    colors = if (e.destructive) {
+                                        MenuDefaults.itemColors(textColor = error, leadingIconColor = error)
+                                    } else {
+                                        MenuDefaults.itemColors()
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -266,7 +275,7 @@ fun BulkActionsSheet(
                             ActionItem(PlayerIcons.Remove, stringResource(R.string.remove_from_playlist)) { act(onRemoveFromPlaylist) }
                         }
                         if (onDelete != null) {
-                            ActionItem(PlayerIcons.Delete, stringResource(R.string.delete_from_device)) {
+                            ActionItem(PlayerIcons.Delete, stringResource(R.string.delete_from_device), destructive = true) {
                                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                                 onDismiss()
                                 onDelete()

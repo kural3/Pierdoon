@@ -136,6 +136,7 @@ class MenuEntry(
     val icon: ImageVector? = null,
     val selected: Boolean? = null,
     val checked: Boolean? = null,
+    val destructive: Boolean = false,
     val onClick: () -> Unit,
 )
 
@@ -147,8 +148,6 @@ fun OverflowMenu(
     size: Dp = 48.dp,
 ) {
     var open by remember { mutableStateOf(false) }
-    val haptics = LocalHapticFeedback.current
-    val shown = groups.filter { it.isNotEmpty() }
     Box {
         ExpressiveIconButton(
             onClick = { open = true },
@@ -158,45 +157,61 @@ fun OverflowMenu(
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(size),
         )
-        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
-            shown.forEachIndexed { g, group ->
-                if (g > 0) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
-                DropdownMenuGroup(shapes = MenuDefaults.groupShape(g, shown.size)) {
-                    group.forEachIndexed { i, e ->
-                        val shapes = MenuDefaults.itemShape(i, group.size)
-                        val icon: (@Composable () -> Unit)? = e.icon?.let {
-                            { Icon(it, contentDescription = null, modifier = Modifier.size(MenuDefaults.LeadingIconSize)) }
-                        }
-                        val tick: @Composable () -> Unit = {
-                            Icon(PlayerIcons.Check, contentDescription = null, modifier = Modifier.size(MenuDefaults.LeadingIconSize))
-                        }
-                        val click = {
-                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                            open = false
-                            e.onClick()
-                        }
-                        when {
-                            e.selected != null -> DropdownMenuItem(
-                                selected = e.selected,
-                                onClick = click,
-                                text = { Text(e.label) },
-                                shapes = shapes,
-                                leadingIcon = icon,
-                                selectedLeadingIcon = tick,
-                            )
-                            e.checked != null -> DropdownMenuItem(
-                                checked = e.checked,
-                                onCheckedChange = { click() },
-                                text = { Text(e.label) },
-                                shapes = shapes,
-                                leadingIcon = icon,
-                                checkedLeadingIcon = tick,
-                            )
-                            else -> DropdownMenuItem(
+        EntryMenu(open, { open = false }, groups)
+    }
+}
+
+/** The menu itself, for putting under a button of another kind. Closes itself on a pick. */
+@Composable
+fun EntryMenu(expanded: Boolean, onDismiss: () -> Unit, groups: List<List<MenuEntry>>) {
+    val haptics = LocalHapticFeedback.current
+    val shown = groups.filter { it.isNotEmpty() }
+    DropdownMenuPopup(expanded = expanded, onDismissRequest = onDismiss) {
+        shown.forEachIndexed { g, group ->
+            if (g > 0) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            DropdownMenuGroup(shapes = MenuDefaults.groupShape(g, shown.size)) {
+                group.forEachIndexed { i, e ->
+                    val shapes = MenuDefaults.itemShape(i, group.size)
+                    val icon: (@Composable () -> Unit)? = e.icon?.let {
+                        { Icon(it, contentDescription = null, modifier = Modifier.size(MenuDefaults.LeadingIconSize)) }
+                    }
+                    val tick: @Composable () -> Unit = {
+                        Icon(PlayerIcons.Check, contentDescription = null, modifier = Modifier.size(MenuDefaults.LeadingIconSize))
+                    }
+                    val click = {
+                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        onDismiss()
+                        e.onClick()
+                    }
+                    when {
+                        e.selected != null -> DropdownMenuItem(
+                            selected = e.selected,
+                            onClick = click,
+                            text = { Text(e.label) },
+                            shapes = shapes,
+                            leadingIcon = icon,
+                            selectedLeadingIcon = tick,
+                        )
+                        e.checked != null -> DropdownMenuItem(
+                            checked = e.checked,
+                            onCheckedChange = { click() },
+                            text = { Text(e.label) },
+                            shapes = shapes,
+                            leadingIcon = icon,
+                            checkedLeadingIcon = tick,
+                        )
+                        else -> {
+                            val error = MaterialTheme.colorScheme.error
+                            DropdownMenuItem(
                                 onClick = click,
                                 text = { Text(e.label) },
                                 shape = shapes.shape,
                                 leadingIcon = icon,
+                                colors = if (e.destructive) {
+                                    MenuDefaults.itemColors(textColor = error, leadingIconColor = error)
+                                } else {
+                                    MenuDefaults.itemColors()
+                                },
                             )
                         }
                     }
@@ -260,7 +275,7 @@ fun BulkActionsSheet(
                             ActionItem(PlayerIcons.Remove, stringResource(Res.string.remove_from_playlist)) { act(onRemoveFromPlaylist) }
                         }
                         if (onDelete != null) {
-                            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete_from_device)) {
+                            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete_from_device), destructive = true) {
                                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                                 onDismiss()
                                 onDelete()

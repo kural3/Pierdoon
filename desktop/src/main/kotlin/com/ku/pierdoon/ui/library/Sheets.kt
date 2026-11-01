@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -149,7 +150,7 @@ fun SongActionsSheet(
                             }
                         }
                         if (onDelete != null) {
-                            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete_from_device)) {
+                            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete_from_device), destructive = true) {
                                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                                 onDismiss()
                                 onDelete()
@@ -195,7 +196,7 @@ fun PlaylistActionsSheet(
                 onDismiss()
                 onCover()
             }
-            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete)) {
+            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete), destructive = true) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onDismiss()
                 onDelete()
@@ -205,7 +206,8 @@ fun PlaylistActionsSheet(
 }
 
 @Composable
-internal fun ActionItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+internal fun ActionItem(icon: ImageVector, label: String, destructive: Boolean = false, onClick: () -> Unit) {
+    val error = MaterialTheme.colorScheme.error
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -216,9 +218,15 @@ internal fun ActionItem(icon: ImageVector, label: String, onClick: () -> Unit) {
             .pointerHoverIcon(PointerIcon.Hand)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = if (destructive) error else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
-        Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (destructive) error else Color.Unspecified,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
