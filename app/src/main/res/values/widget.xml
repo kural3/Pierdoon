@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_background">#FFF3F4F2</color>
+    <color name="widget_on_background">#FF191C1B</color>
+    <color name="widget_on_background_variant">#FF3F4947</color>
+    <color name="widget_accent_container">#FFB2DFDB</color>
+    <color name="widget_on_accent_container">#FF00201E</color>
+    <dimen name="widget_corner">24dp</dimen>
+</resources>

@@ -33,6 +33,7 @@ What changed in each version is in its release notes.
 
 **Android**
 - Media3 playback with notification and lock screen controls
+- Home screen widget with the cover and playback buttons
 - Sleep timer, by minutes or at the end of the track
 - Immersive lyrics mode, landscape player
 - Swipe the mini player or the cover sideways to change track

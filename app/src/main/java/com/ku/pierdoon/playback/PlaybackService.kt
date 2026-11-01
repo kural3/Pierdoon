@@ -36,6 +36,7 @@ import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserLibrary
+import com.ku.pierdoon.widget.PlayerWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -57,6 +58,7 @@ class PlaybackService : MediaSessionService() {
 
 
     private var session: MediaSession? = null
+    private var widget: PlayerWidget.Updater? = null
     private var crossfader: Crossfader? = null
     private var cassetteChange: CassetteChange? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -124,6 +126,7 @@ class PlaybackService : MediaSessionService() {
 
         queueStore = QueueStore(this)
         restoreQueue(player)
+        widget = PlayerWidget.Updater(this, player, scope).also { it.start() }
 
         val fader = Crossfader(this, player, scope).also { crossfader = it }
         fader.start()
@@ -210,6 +213,8 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         PlayHistory.get(this).flush()
         UserLibrary.get(this).flush()
+        widget?.release()
+        widget = null
         scope.cancel()
         crossfader?.release()
         crossfader = null

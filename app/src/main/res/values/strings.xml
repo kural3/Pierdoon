@@ -124,6 +124,7 @@
     <string name="artists_count">Artists: %1$d</string>
     <string name="new_playlist">New playlist</string>
     <string name="playlist_name">Name</string>
+    <string name="widget_description">Cover, the track and buttons to control it</string>
     <string name="playlist_import">Import from file</string>
     <string name="playlist_export">Export to file</string>
     <string name="playlist_exported">Playlist saved</string>
