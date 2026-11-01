@@ -581,6 +581,24 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
                         onChange = { v -> onUpdate { it.copy(skipSilence = v) } },
                     )
                 },
+                { shape ->
+                    SwitchItem(
+                        shape = shape,
+                        title = stringResource(Res.string.settings_cassette),
+                        subtitle = stringResource(Res.string.settings_cassette_desc),
+                        checked = settings.cassetteChange,
+                        onChange = { v -> onUpdate { it.copy(cassetteChange = v) } },
+                    )
+                },
+                { shape ->
+                    SwitchItem(
+                        shape = shape,
+                        title = stringResource(Res.string.settings_cassette_mode),
+                        subtitle = stringResource(Res.string.settings_cassette_mode_desc),
+                        checked = settings.cassetteMode,
+                        onChange = { v -> onUpdate { it.copy(cassetteMode = v) } },
+                    )
+                },
             )
         }
     }

@@ -77,6 +77,7 @@ import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.Player
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.playback.QueueState
+import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.resources.*
 import com.ku.pierdoon.resources.Res
 import com.ku.pierdoon.ui.components.BlurredArtwork
@@ -325,6 +326,7 @@ private fun WideNowPlaying(
                             durationMs = state.durationMs,
                             onTap = onTogglePlay,
                             onSeek = onSeek,
+                            tape = queue.tape.takeIf { SettingsStore.settings.collectAsState().value.cassetteMode },
                             modifier = Modifier.align(Alignment.CenterHorizontally).scaledSquare(normal, roomy) { grow.value },
                         )
                         Spacer(Modifier.height(20.dp))
@@ -466,6 +468,7 @@ private fun WideNowPlaying(
                                     onRemove = onRemoveQueueEntry,
                                     onMove = onMoveQueueEntry,
                                     onLongPress = onSongLongPress,
+                                    tapeMode = SettingsStore.settings.collectAsState().value.cassetteMode,
                                     modifier = Modifier.fillMaxSize(),
                                 )
                                 else -> LyricsPanel(

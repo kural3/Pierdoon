@@ -3,6 +3,7 @@ package com.ku.pierdoon.playback
 import androidx.compose.runtime.Immutable
 import androidx.media3.common.Player
 import com.ku.pierdoon.data.Song
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @Immutable
 data class NowPlaying(
@@ -23,6 +24,10 @@ data class QueueState(
     val upcoming: List<QueueEntry> = emptyList(),
     /** Under shuffle the play order isn't the list order, so dragging would land somewhere else. */
     val canReorder: Boolean = true,
+    /** The queue as a cassette, for cassette mode. */
+    val tape: TapeSides? = null,
+    /** Entries a side of the tape starts at, by key: "A" or "B". */
+    val sideStarts: Map<String, String> = emptyMap(),
 )
 
 @Immutable
@@ -35,6 +40,11 @@ data class PlayerState(
     val shuffle: Boolean = false,
     @param:Player.RepeatMode val repeatMode: Int = Player.REPEAT_MODE_OFF,
 )
+
+/** The tape running back between two sides, for the reels on screen. */
+object TapeRewind {
+    val running = MutableStateFlow(false)
+}
 
 /** Off → all → one → off, the order of the player's repeat button. */
 @Player.RepeatMode

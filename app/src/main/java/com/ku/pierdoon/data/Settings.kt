@@ -57,6 +57,10 @@ data class AppSettings(
     val playbackSpeed: Float = 1f,
     /** Fade between tracks of one album too; off keeps albums gapless, as recorded. */
     val crossfadeAlbums: Boolean = false,
+    /** The sound of a cassette being changed between tracks; takes the crossfade's place. */
+    val cassetteChange: Boolean = false,
+    /** The queue as a tape: its sound, a cassette in the player, two sides, a rewind between them. */
+    val cassetteMode: Boolean = false,
     val eqEnabled: Boolean = false,
     /** Gain per band in dB, [com.ku.pierdoon.playback.EQ_BANDS] long; a preset copies its own in. */
     val eqGains: List<Float> = EQ_FLAT,
@@ -109,6 +113,8 @@ object SettingsStore {
             crossfadeSeconds = p.getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
             playbackSpeed = PlaybackSpeed.nearest(p.getFloat(K_SPEED, d.playbackSpeed)),
             crossfadeAlbums = p.getBoolean(K_CROSSFADE_ALBUMS, d.crossfadeAlbums),
+            cassetteChange = p.getBoolean(K_CASSETTE, d.cassetteChange),
+            cassetteMode = p.getBoolean(K_CASSETTE_MODE, d.cassetteMode),
             eqEnabled = p.getBoolean(K_EQ, d.eqEnabled),
             eqGains = parseEqGains(p.getString(K_EQ_GAINS, null)),
             eqPreset = EqPreset.entries.firstOrNull { it.name == p.getString(K_EQ_PRESET, null) } ?: d.eqPreset,
@@ -145,6 +151,8 @@ object SettingsStore {
             putInt(K_CROSSFADE, s.crossfadeSeconds)
             putFloat(K_SPEED, s.playbackSpeed)
             putBoolean(K_CROSSFADE_ALBUMS, s.crossfadeAlbums)
+            putBoolean(K_CASSETTE, s.cassetteChange)
+            putBoolean(K_CASSETTE_MODE, s.cassetteMode)
             putBoolean(K_EQ, s.eqEnabled)
             putString(K_EQ_GAINS, formatEqGains(s.eqGains))
             putString(K_EQ_PRESET, s.eqPreset.name)
@@ -175,6 +183,8 @@ object SettingsStore {
     private const val K_CROSSFADE = "crossfade_seconds"
     private const val K_SPEED = "playback_speed"
     private const val K_CROSSFADE_ALBUMS = "crossfade_albums"
+    private const val K_CASSETTE = "cassette_change"
+    private const val K_CASSETTE_MODE = "cassette_mode"
     private const val K_EQ = "equalizer"
     private const val K_EQ_GAINS = "equalizer_gains"
     private const val K_EQ_PRESET = "equalizer_preset"

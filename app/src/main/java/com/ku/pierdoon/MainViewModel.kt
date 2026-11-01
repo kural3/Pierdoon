@@ -3,6 +3,7 @@ package com.ku.pierdoon
 import com.ku.pierdoon.data.M3uMatch
 import com.ku.pierdoon.data.M3uMatcher
 import com.ku.pierdoon.data.MusicFolder
+import com.ku.pierdoon.playback.tapeSides
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.decodeM3u
 import com.ku.pierdoon.data.parseM3u
@@ -727,7 +728,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val key = queueKeyOf(item, index).let { if (seen.add(it)) it else "slot:$index" }
             QueueEntry(key, songsById[item.mediaId.toLongOrNull()] ?: item.toSong())
         }
-        _queue.value = QueueState(entries.first(), entries.drop(1), canReorder = !p.shuffleModeEnabled)
+        val tapeOrder = ArrayList<Int>(timeline.windowCount)
+        var t = timeline.getFirstWindowIndex(p.shuffleModeEnabled)
+        while (t != C.INDEX_UNSET) {
+            tapeOrder += t
+            t = timeline.getNextWindowIndex(t, Player.REPEAT_MODE_OFF, p.shuffleModeEnabled)
+        }
+        val tape = tapeSides(tapeOrder.map { p.getMediaItemAt(it).mediaMetadata.durationMs ?: 0L }, tapeOrder.indexOf(p.currentMediaItemIndex))
+        val sideStarts = buildMap {
+            tapeOrder.firstOrNull()?.let { put(queueKeyOf(p.getMediaItemAt(it), it), "A") }
+            tapeOrder.getOrNull(tape.sideBStart)?.let { put(queueKeyOf(p.getMediaItemAt(it), it), "B") }
+        }
+        _queue.value = QueueState(entries.first(), entries.drop(1), !p.shuffleModeEnabled, tape, sideStarts)
     }
 
     override fun onCleared() {

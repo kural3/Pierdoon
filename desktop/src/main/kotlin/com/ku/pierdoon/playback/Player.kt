@@ -3,6 +3,12 @@ package com.ku.pierdoon.playback
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.platform.ErrorLog
 import java.util.concurrent.CompletableFuture
+import kotlinx.coroutines.flow.MutableStateFlow
+
+/** The tape running back between two sides, for the reels on screen. */
+object TapeRewind {
+    val running = MutableStateFlow(false)
+}
 
 /** One entry of the queue: a song and the key that identifies this entry while it moves. */
 data class MediaItem(val song: Song, val queueKey: Long = Song.newQueueKey()) {
@@ -64,6 +70,8 @@ class Player {
                 engine.play()
             } else {
                 engine.pause()
+                // No tape left to wait for: paused on the next track.
+                if (changingCassette) finishCassetteChange()
             }
             emit(Event.IsPlaying)
         }
@@ -105,6 +113,15 @@ class Player {
     /** Band gains in dB, or null with the equalizer off. */
     fun setEqualizer(gains: List<Float>?) = engine.setEqualizer(gains)
 
+    /** Cassette mode: the queue is a tape with its sound, and running off a side rewinds it. */
+    var tapeMode: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            engine.setTape(value)
+            updateNext()
+        }
+
     /** Playback speed, pitch following it (slowed, nightcore). */
     var speed: Float = 1f
         set(value) {
@@ -132,6 +149,19 @@ class Player {
             field = value
             updateNext()
         }
+
+    /** The sound of a cassette being changed where one track runs out and another follows; no crossfade then. */
+    var cassetteChange: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            updateNext()
+        }
+
+    private val cassette = CassetteChange()
+    /** Set while [cassette] plays: the track has run out and the next isn't loaded yet. */
+    private var changingCassette = false
+    private var outputDevice: String? = null
 
     /** Item duration in ms, or [TIME_UNSET] when unknown. */
     val duration: Long get() = currentMediaItem?.song?.durationMs?.takeIf { it > 0 } ?: TIME_UNSET
@@ -173,6 +203,13 @@ class Player {
                 }
                 emit(Event.IsPlaying)
                 onPausedAtEnd?.invoke()
+                return
+            }
+            val rewinding = atSideEnd()
+            if ((cassetteChange || rewinding) && nextIndexFor(currentMediaItemIndex, repeatMode) >= 0) {
+                changingCassette = true
+                TapeRewind.running.value = rewinding
+                cassette.play(outputDevice, volume, rewinding) { finishCassetteChange() }
                 return
             }
             playbackState = STATE_ENDED
@@ -322,7 +359,8 @@ class Player {
     fun seekTo(positionMs: Long) {
         if (currentMediaItemIndex < 0) return
         lastPositionMs = positionMs.coerceAtLeast(0)
-        if (playbackState == STATE_ENDED) {
+        // Mid-change the engine has let go of the track: back into it means opening it again.
+        if (playbackState == STATE_ENDED || changingCassette) {
             load(play = playWhenReady, startMs = lastPositionMs)
         } else if (loadedToken >= 0) {
             engine.seek(lastPositionMs)
@@ -363,9 +401,34 @@ class Player {
         if (p >= 0) seekToDefaultPosition(p) else seekTo(0)
     }
 
-    fun release() = engine.release()
+    fun release() {
+        cancelCassetteChange()
+        engine.release()
+    }
 
-    fun setOutputDevice(name: String?) = engine.setDevice(name)
+    fun setOutputDevice(name: String?) {
+        outputDevice = name
+        engine.setDevice(name)
+    }
+
+    /** The change of cassette is over: on to the next track, or stopped if the queue changed under it. */
+    private fun finishCassetteChange() {
+        val n = nextIndexFor(currentMediaItemIndex, repeatMode)
+        cancelCassetteChange()
+        if (n >= 0) {
+            seekToDefaultPosition(n)
+        } else {
+            playbackState = STATE_ENDED
+            playWhenReadyInternal(false)
+            emit(Event.State, Event.IsPlaying)
+        }
+    }
+
+    private fun cancelCassetteChange() {
+        changingCassette = false
+        TapeRewind.running.value = false
+        cassette.cancel()
+    }
 
     // Play order ---------------------------------------------------------------------------
 
@@ -380,6 +443,17 @@ class Player {
             repeat == REPEAT_MODE_ALL -> order[0]
             else -> -1
         }
+    }
+
+    /** Whether what plays next is across the end of a side of the tape. */
+    private fun atSideEnd(): Boolean {
+        if (!tapeMode) return false
+        val next = nextIndexFor(currentMediaItemIndex, repeatMode)
+        if (next < 0) return false
+        val order = playOrder()
+        val current = order.indexOf(currentMediaItemIndex)
+        val sides = tapeSides(order.map { items[it].song.durationMs }, current)
+        return isSideEnd(current, order.indexOf(next), order.size, sides.sideBStart)
     }
 
     private fun previousIndexFor(index: Int): Int {
@@ -405,6 +479,9 @@ class Player {
         emit(Event.Timeline)
     }
 
+    /** Play order as a list, for the tape's sides on screen. */
+    fun playOrderSnapshot(): List<Int> = playOrder().toList()
+
     private fun playOrder(): IntArray =
         if (shuffleModeEnabled && shuffleOrder.size == items.size) shuffleOrder else IntArray(items.size) { it }
 
@@ -429,6 +506,7 @@ class Player {
 
     private fun load(play: Boolean, startMs: Long) {
         val item = currentMediaItem ?: return
+        cancelCassetteChange()
         val token = ++tokenSeq
         loadedToken = token
         nextToken = -1
@@ -443,7 +521,9 @@ class Player {
     /** Tells the engine what follows, so it can switch without a gap. */
     private fun updateNext() {
         if (loadedToken < 0) return
-        val n = if (pauseAtEndOfMediaItems) -1 else nextIndexFor(currentMediaItemIndex, repeatMode)
+        val following = if (pauseAtEndOfMediaItems) -1 else nextIndexFor(currentMediaItemIndex, repeatMode)
+        // Nothing queued in the engine, so it reports the end and the cassette gets changed there.
+        val n = if ((cassetteChange || atSideEnd()) && following != currentMediaItemIndex) -1 else following
         if (n < 0) {
             if (nextToken != -1L) engine.setNext(null, -1)
             nextToken = -1
@@ -466,6 +546,7 @@ class Player {
     }
 
     private fun stopEngine(): CompletableFuture<Unit> {
+        cancelCassetteChange()
         val closed = engine.stop()
         loadedToken = -1
         nextToken = -1

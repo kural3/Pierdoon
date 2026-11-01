@@ -5,6 +5,7 @@ import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.M3uMatch
 import com.ku.pierdoon.data.M3uMatcher
 import com.ku.pierdoon.data.MusicCollections
+import com.ku.pierdoon.playback.tapeSides
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.decodeM3u
 import com.ku.pierdoon.data.parseM3u
@@ -732,7 +733,13 @@ class MainViewModel {
             val key = "q:${item.queueKey}".let { if (seen.add(it)) it else "slot:$index" }
             QueueEntry(key, songsById[item.song.id] ?: item.song)
         }
-        _queue.value = QueueState(entries.first(), entries.drop(1), canReorder = !p.shuffleModeEnabled)
+        val tapeOrder = p.playOrderSnapshot()
+        val tape = tapeSides(tapeOrder.map { p.getMediaItemAt(it).song.durationMs }, tapeOrder.indexOf(p.currentMediaItemIndex))
+        val sideStarts = buildMap {
+            tapeOrder.firstOrNull()?.let { put("q:${p.getMediaItemAt(it).queueKey}", "A") }
+            tapeOrder.getOrNull(tape.sideBStart)?.let { put("q:${p.getMediaItemAt(it).queueKey}", "B") }
+        }
+        _queue.value = QueueState(entries.first(), entries.drop(1), !p.shuffleModeEnabled, tape, sideStarts)
     }
 
     fun dispose() {

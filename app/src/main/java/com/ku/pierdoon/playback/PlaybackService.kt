@@ -58,6 +58,7 @@ class PlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null
     private var crossfader: Crossfader? = null
+    private var cassetteChange: CassetteChange? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private lateinit var queueStore: QueueStore
@@ -126,6 +127,17 @@ class PlaybackService : MediaSessionService() {
 
         val fader = Crossfader(this, player, scope).also { crossfader = it }
         fader.start()
+        val cassette = CassetteChange(player, scope).also { cassetteChange = it }
+        cassette.start()
+        scope.launch {
+            SettingsStore.settings.map { it.cassetteChange }.distinctUntilChanged().collect { cassette.enabled = it }
+        }
+        scope.launch {
+            SettingsStore.settings.map { it.cassetteMode }.distinctUntilChanged().collect {
+                cassette.tapeMode = it
+                EqualizerSettings.tape = it
+            }
+        }
         scope.launch {
             SettingsStore.settings
                 .map { Triple(it.crossfadeSeconds, it.crossfadeAlbums, it.skipSilence) }
@@ -153,7 +165,7 @@ class PlaybackService : MediaSessionService() {
 
         scope.launch {
             SleepTimer.state.collectLatest { timer ->
-                player.pauseAtEndOfMediaItems = timer == SleepTimerState.EndOfTrack
+                cassette.stopAtEnd = timer == SleepTimerState.EndOfTrack
                 if (timer !is SleepTimerState.At) return@collectLatest
                 // The last seconds fade out instead of cutting off mid-phrase.
                 delay((timer.remainingMs - SLEEP_FADE_MS).coerceAtLeast(0))
@@ -163,6 +175,7 @@ class PlaybackService : MediaSessionService() {
                         player.volume = i / steps.toFloat()
                         delay(SLEEP_FADE_MS / steps)
                     }
+                    cassette.cancel()
                     player.pause()
                     SleepTimer.fired()
                 } finally {
@@ -200,6 +213,8 @@ class PlaybackService : MediaSessionService() {
         scope.cancel()
         crossfader?.release()
         crossfader = null
+        cassetteChange?.release()
+        cassetteChange = null
         session?.run {
             // A few hundred bytes; written in place so it lands before the process can go.
             if (!restoring) queueStore.write(snapshot(player))

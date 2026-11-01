@@ -89,6 +89,13 @@ object PlaybackController {
         }
 
         scope.launch {
+            SettingsStore.settings.map { it.cassetteChange }.distinctUntilChanged().collect { player.cassetteChange = it }
+        }
+        scope.launch {
+            SettingsStore.settings.map { it.cassetteMode }.distinctUntilChanged().collect { player.tapeMode = it }
+        }
+
+        scope.launch {
             SettingsStore.settings
                 .map { if (it.eqEnabled) it.eqGains else null }
                 .distinctUntilChanged()

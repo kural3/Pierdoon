@@ -112,7 +112,11 @@ import com.ku.pierdoon.PositionSnapshot
 import com.ku.pierdoon.R
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlayerState
+import com.ku.pierdoon.data.SettingsStore
+import com.ku.pierdoon.playback.CASSETTE_REWIND_MS
 import com.ku.pierdoon.playback.QueueState
+import com.ku.pierdoon.playback.TapeRewind
+import com.ku.pierdoon.playback.TapeSides
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.BlurredArtwork
@@ -173,6 +177,7 @@ fun FullPlayer(
     val colors = MaterialTheme.colorScheme
     // Nothing style: flat black page, no frosted art, no immersive lyrics.
     val nothing = LocalUiPrefs.current.nothing
+    val cassetteMode = SettingsStore.settings.collectAsStateWithLifecycle().value.cassetteMode
 
     // Matte-glass tints over the frosted art: translucent containers pick up its colour.
     val glassButton = if (nothing) colors.surfaceContainerHigh else colors.surfaceContainerHighest.copy(alpha = 0.45f)
@@ -318,6 +323,7 @@ fun FullPlayer(
                             onRemove = onRemoveQueueEntry,
                             onMove = onMoveQueueEntry,
                             onLongPress = onSongLongPress,
+                            tapeMode = cassetteMode,
                             // The column's side padding is for the art; rows bring their own inset.
                             modifier = Modifier.horizontalBleed(12.dp),
                         )
@@ -333,6 +339,7 @@ fun FullPlayer(
                                 onSeek = onSeek,
                                 onNext = onNext,
                                 onPrevious = onPreviousTrack,
+                                tape = queue.tape.takeIf { cassetteMode },
                                 modifier = Modifier
                                     .widthIn(max = minOf(maxWidth, maxHeight))
                                     .fillMaxWidth()
@@ -741,6 +748,8 @@ private fun PlayerArtwork(
     onSeek: (Long) -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    /** Cassette mode: where the track is on the tape; a cassette takes the cover's place. */
+    tape: TapeSides?,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -749,7 +758,9 @@ private fun PlayerArtwork(
     val press = animatePressAsState(source, 0.94f)
     val slowSpatial = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     val morph = animateFloatAsState(if (isPlaying) 0f else 1f, slowSpatial, label = "artMorph")
-    val restScale = animateFloatAsState(if (isPlaying) 1f else 0.86f, slowSpatial, label = "artScale")
+    val rewinding by TapeRewind.running.collectAsStateWithLifecycle()
+    // The player is paused through a rewind, but the tape is still moving.
+    val restScale = animateFloatAsState(if (isPlaying || rewinding) 1f else 0.86f, slowSpatial, label = "artScale")
     val scale = remember { derivedStateOf { press.value * restScale.value } }
 
     // Current skip streak: side (-1 back, 1 forward, 0 none), seconds so far, and where it got to.
@@ -793,16 +804,7 @@ private fun PlayerArtwork(
     val backLabel = stringResource(R.string.seek_back)
     val forwardLabel = stringResource(R.string.seek_forward)
     Box(modifier.trackSwipe(swipe, onNext, onPrevious), contentAlignment = Alignment.Center) {
-        Artwork(
-            songId = nowPlaying.songId,
-            albumId = nowPlaying.albumId,
-            large = true,
-            placeholderIconSize = 96.dp,
-            modifier = Modifier
-                .fillMaxSize()
-                .trackSwipeOffset(swipe)
-                .scaleBy(scale)
-                .morphClip(ArtworkMorph, morph)
+        val gestures = Modifier
                 .semantics {
                     role = Role.Button
                     onClick { toggle(); true }
@@ -841,8 +843,36 @@ private fun PlayerArtwork(
                             }
                         }
                     }
+                }
+        if (tape != null) {
+            CassetteDeck(
+                title = nowPlaying.title,
+                artist = nowPlaying.artist,
+                side = if (tape.onSideB) "B" else "A",
+                isPlaying = isPlaying,
+                rewinding = rewinding,
+                rewindMs = CASSETTE_REWIND_MS.toInt(),
+                sideProgress = {
+                    if (tape.sideLengthMs <= 0) 0f else (tape.elapsedMs + position().estimate()).toFloat() / tape.sideLengthMs
                 },
-        )
+                modifier = Modifier.fillMaxWidth().aspectRatio(CASSETTE_SHAPE).trackSwipeOffset(swipe).scaleBy(scale).then(gestures),
+            ) { cover ->
+                Artwork(nowPlaying.songId, nowPlaying.albumId, placeholderIconSize = 24.dp, modifier = cover)
+            }
+        } else {
+            Artwork(
+                songId = nowPlaying.songId,
+                albumId = nowPlaying.albumId,
+                large = true,
+                placeholderIconSize = 96.dp,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .trackSwipeOffset(swipe)
+                    .scaleBy(scale)
+                    .morphClip(ArtworkMorph, morph)
+                    .then(gestures),
+            )
+        }
         SeekHint(side = -1, activeSide = seekSide, seconds = seekSeconds, Modifier.align(Alignment.CenterStart))
         SeekHint(side = 1, activeSide = seekSide, seconds = seekSeconds, Modifier.align(Alignment.CenterEnd))
     }
@@ -880,6 +910,7 @@ private fun SeekHint(side: Int, activeSide: Int, seconds: Int, modifier: Modifie
     }
 }
 
+private const val CASSETTE_SHAPE = 1.58f
 private const val SEEK_STEP_S = 10
 private const val SEEK_STEP_MS = SEEK_STEP_S * 1000L
 /** How long after the last skip further single taps keep adding to it. */

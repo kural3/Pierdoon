@@ -22,6 +22,10 @@ data class QueueState(
     val upcoming: List<QueueEntry> = emptyList(),
     /** Under shuffle the play order isn't the list order, so dragging would land somewhere else. */
     val canReorder: Boolean = true,
+    /** The queue as a cassette, for cassette mode. */
+    val tape: TapeSides? = null,
+    /** Entries a side of the tape starts at, by key: "A" or "B". */
+    val sideStarts: Map<String, String> = emptyMap(),
 )
 
 @Immutable

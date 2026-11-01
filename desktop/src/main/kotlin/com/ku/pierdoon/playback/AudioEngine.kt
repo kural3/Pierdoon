@@ -72,6 +72,7 @@ class AudioEngine(private val listener: Listener) {
     private val meter = LevelMeter(RATE)
     /** On the mixed signal, so both tracks of a crossfade sound the same. */
     private val equalizer = Equalizer(RATE, CHANNELS)
+    private val tape = TapeEffect(RATE, CHANNELS)
     private val marks = ArrayDeque<Mark>()
     private val lock = Any()
 
@@ -82,6 +83,9 @@ class AudioEngine(private val listener: Listener) {
 
     /** Band gains in dB, or null for the equalizer off; applies within a buffer's length. */
     fun setEqualizer(gains: List<Float>?) = equalizer.setGains(gains)
+
+    /** Cassette mode: the tape's sound over everything. */
+    fun setTape(on: Boolean) { tape.enabled = on }
 
     /** Set while [Command.Play] is in force; read by the UI thread. */
     @Volatile var isPlaying: Boolean = false
@@ -449,6 +453,7 @@ class AudioEngine(private val listener: Listener) {
      */
     private fun writeSamples(l: SourceDataLine, samples: ShortBuffer, gain: Float, chunk: ByteArray) {
         val eq = equalizer.beginBlock()
+        val onTape = tape.beginBlock()
         while (samples.hasRemaining()) {
             // Whole frames per round, so sample i is always channel i % CHANNELS.
             val n = minOf(samples.remaining(), chunk.size / 2)
@@ -458,7 +463,8 @@ class AudioEngine(private val listener: Listener) {
                 // Before the volume and the equalizer: the picture shouldn't follow either.
                 meter.sample(raw)
                 val shaped = if (eq) equalizer.process(raw.toInt(), i % CHANNELS) else raw.toInt()
-                val s = (shaped * gain).toInt().coerceIn(-32768, 32767)
+                val taped = if (onTape) tape.process(shaped, i % CHANNELS) else shaped
+                val s = (taped * gain).toInt().coerceIn(-32768, 32767)
                 chunk[o++] = (s and 0xFF).toByte()
                 chunk[o++] = ((s shr 8) and 0xFF).toByte()
             }
@@ -525,6 +531,7 @@ class AudioEngine(private val listener: Listener) {
         // Nothing buffered any more: what's written is what's heard.
         leftover = null
         equalizer.reset()
+        tape.reset()
         synchronized(lock) { marks.clear() }
         pendingMark = true
         announcedToken = -1L

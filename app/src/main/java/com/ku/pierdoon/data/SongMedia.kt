@@ -39,6 +39,8 @@ fun Song.mediaMetadata(queueKey: Long): MediaMetadata = MediaMetadata.Builder()
     .setArtist(artist)
     .setAlbumTitle(album)
     .setArtworkUri(artworkUri)
+    // The tape's sides are cut by it before the player has opened the files.
+    .setDurationMs(durationMs)
     .setIsPlayable(true)
     .setIsBrowsable(false)
     .setExtras(Bundle().apply {

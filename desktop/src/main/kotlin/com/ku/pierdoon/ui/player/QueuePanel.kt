@@ -77,6 +77,8 @@ fun QueuePanel(
     onMove: (key: String, position: Int) -> Unit,
     onLongPress: (Song) -> Unit,
     modifier: Modifier = Modifier,
+    /** Cassette mode: the queue under the sides of its tape. */
+    tapeMode: Boolean = false,
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -164,7 +166,10 @@ fun QueuePanel(
         modifier = modifier.fillMaxSize().fadingEdges(),
     ) {
         queue.current?.let { current ->
-            item(key = "label:now") { Label(stringResource(Res.string.now_playing)) }
+            item(key = "label:now") {
+                val onSide = queue.tape?.takeIf { tapeMode }?.let { if (it.onSideB) "B" else "A" }
+                Label(if (onSide != null) stringResource(Res.string.queue_now_on_side, onSide) else stringResource(Res.string.now_playing))
+            }
             item(key = current.key) {
                 SongRow(
                     song = current.song,
@@ -198,7 +203,13 @@ fun QueuePanel(
                 )
             }
         }
-        items(upcoming, key = { it.key }) { entry ->
+        upcoming.forEach { entry ->
+            if (tapeMode) queue.sideStarts[entry.key]?.let { side ->
+                item(key = "side:$side") {
+                    Label(stringResource(Res.string.queue_side, side), Modifier.animateItem(fade, placement, fade))
+                }
+            }
+            item(key = entry.key) {
             val dragging = entry.key == draggingKey
             UpcomingRow(
                 entry = entry,
@@ -226,6 +237,7 @@ fun QueuePanel(
                 // The dragged row follows the finger, not the placement spring.
                 modifier = Modifier.animateItem(fade, if (dragging) null else placement, fade),
             )
+            }
         }
     }
 }

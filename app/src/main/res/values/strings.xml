@@ -379,6 +379,12 @@
     <string name="crossfade_seconds">%1$d s</string>
     <string name="settings_crossfade_albums">Within albums too</string>
     <string name="settings_crossfade_albums_desc">When off, tracks of one album play back to back, as recorded</string>
+    <string name="settings_cassette_mode">Cassette mode</string>
+    <string name="settings_cassette_mode_desc">Tape hiss and wow, a cassette instead of the cover, the queue on two sides with a rewind between them</string>
+    <string name="queue_side">Side %1$s</string>
+    <string name="queue_now_on_side">Now playing · side %1$s</string>
+    <string name="settings_cassette">Cassette change</string>
+    <string name="settings_cassette_desc">The sound of a cassette being changed between songs. Replaces the crossfade</string>
     <string name="daily_mix">Playlist of the day</string>
     <string name="daily_mix_desc">A new one every day</string>
     <string name="stats">Listening stats</string>

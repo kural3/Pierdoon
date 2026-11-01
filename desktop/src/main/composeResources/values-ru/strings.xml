@@ -337,6 +337,12 @@
     <string name="crossfade_seconds">%1$d с</string>
     <string name="settings_crossfade_albums">И внутри альбома</string>
     <string name="settings_crossfade_albums_desc">Если выключено, треки одного альбома идут встык, как записаны</string>
+    <string name="settings_cassette_mode">Кассетный режим</string>
+    <string name="settings_cassette_mode_desc">Шипение и плавание плёнки, кассета вместо обложки, очередь на двух сторонах и перемотка между ними</string>
+    <string name="queue_side">Сторона %1$s</string>
+    <string name="queue_now_on_side">Сейчас играет · сторона %1$s</string>
+    <string name="settings_cassette">Смена кассеты</string>
+    <string name="settings_cassette_desc">Между песнями слышно, как меняют кассету. Вместо кроссфейда</string>
     <string name="delicious_open">Режим Delicious (бета)</string>
     <string name="delicious_close">Выйти из Delicious</string>
     <string name="delicious_beta">бета</string>
