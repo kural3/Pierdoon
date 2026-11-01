@@ -45,12 +45,14 @@ fun Song.mediaMetadata(queueKey: Long): MediaMetadata = MediaMetadata.Builder()
         putLong(QUEUE_KEY, queueKey)
         // The artwork URI may point at a custom cover file, so the album travels on its own.
         putLong(ALBUM_ID, albumId)
+        putBoolean(ALBUM_FROM_FOLDER, albumFromFolder)
     })
     .build()
 
 /** Metadata extra: stable identity of a queue entry while it moves around. */
 const val QUEUE_KEY = "com.ku.pierdoon.queue_key"
 const val ALBUM_ID = "com.ku.pierdoon.album_id"
+const val ALBUM_FROM_FOLDER = "com.ku.pierdoon.album_from_folder"
 
 val Song.Companion.ALBUM_ART_URI: Uri get() = albumArtUri
 private val albumArtUri: Uri by lazy { "content://media/external/audio/albumart".toUri() }

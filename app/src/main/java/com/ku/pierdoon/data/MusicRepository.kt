@@ -62,6 +62,7 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.TRACK,
             FOLDER_COLUMN,
         )
         // MediaProvider rejects "COLLATE LOCALIZED", so loadSongs() sorts by locale itself.
@@ -78,18 +79,23 @@ class MusicRepository(private val context: Context) {
             val albumIdCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val durationCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val addedCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+            val trackCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
             val folderCol = c.getColumnIndexOrThrow(FOLDER_COLUMN)
             songs.ensureCapacity(c.count)
             while (c.moveToNext()) {
-                if (skip.isNotEmpty() && folderOf(c.getString(folderCol)) in skip) continue
+                val folder = folderOf(c.getString(folderCol))
+                if (skip.isNotEmpty() && folder in skip) continue
+                val album = c.getString(albumCol).orEmpty()
                 val song = Song(
                     id = c.getLong(idCol),
                     title = c.getString(titleCol).orEmpty(),
                     artist = c.getString(artistCol)?.takeUnless { it == UNKNOWN }.orEmpty(),
-                    album = c.getString(albumCol).orEmpty(),
+                    album = album,
                     albumId = c.getLong(albumIdCol),
                     durationMs = c.getLong(durationCol),
                     dateAdded = c.getLong(addedCol),
+                    // A real album in a folder of its name has track numbers; untagged files don't.
+                    albumFromFolder = c.getInt(trackCol) == 0 && album == folder.substringAfterLast('/'),
                 )
                 songs += if (withOverrides) overrides.apply(song) else song
             }
