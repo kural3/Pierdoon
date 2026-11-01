@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -510,18 +511,12 @@ private fun TrackTitle(nowPlaying: NowPlaying, onOpenArtist: (String) -> Unit, m
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val artist = np.artist
-            Text(
-                text = artist.ifEmpty { stringResource(Res.string.unknown_artist) },
+            ArtistLink(
+                artist = np.artist,
                 style = MaterialTheme.typography.titleMedium,
-                color = colors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .offset(x = (-6).dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(enabled = artist.isNotEmpty()) { onOpenArtist(artist) }
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                onOpen = onOpenArtist,
+                modifier = Modifier.offset(x = (-6).dp).clip(RoundedCornerShape(8.dp)),
+                padding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
             )
         }
     }

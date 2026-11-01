@@ -73,6 +73,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -158,6 +159,8 @@ fun FullPlayer(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onOpenArtist: (String) -> Unit,
+    /** False where the artist line leads to the same place whoever is chosen. */
+    pickArtist: Boolean = true,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
     /** Swiping the art back: the track before, where the button may restart this one instead. */
@@ -357,22 +360,14 @@ fun FullPlayer(
                             modifier = Modifier.basicMarquee(iterations = 2),
                         )
                     }
-                    val artist = nowPlaying.artist
-                    Text(
-                        text = artist.ifEmpty { stringResource(R.string.unknown_artist) },
+                    ArtistLink(
+                        artist = nowPlaying.artist,
                         style = MaterialTheme.typography.titleMedium,
-                        color = colors.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            // Pulled back by its own padding so the text still lines up with the title.
-                            .offset(x = (-6).dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(
-                                enabled = artist.isNotEmpty(),
-                                onClickLabel = stringResource(R.string.open_artist),
-                            ) { onOpenArtist(artist) }
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        onOpen = onOpenArtist,
+                        // Pulled back by its own padding so the text still lines up with the title.
+                        modifier = Modifier.offset(x = (-6).dp).clip(RoundedCornerShape(8.dp)),
+                        padding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                        pick = pickArtist,
                     )
                 }
 

@@ -477,6 +477,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                                 expanded = false
                                 nav.push(Route.Computer)
                             },
+                            pickArtist = false,
                             onCollapse = { expanded = false },
                             modifier = contentModifier,
                             dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },

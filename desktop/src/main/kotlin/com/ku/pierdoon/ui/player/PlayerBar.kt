@@ -158,17 +158,10 @@ fun PlayerBar(
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.clickable(onClick = onExpand),
                                 )
-                                Text(
-                                    nowPlaying.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
+                                ArtistLink(
+                                    artist = nowPlaying.artist,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = if (nowPlaying.artist.isNotEmpty()) {
-                                        Modifier.clickable { onOpenArtist(nowPlaying.artist) }
-                                    } else {
-                                        Modifier
-                                    },
+                                    onOpen = onOpenArtist,
                                 )
                             }
                         }
