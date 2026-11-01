@@ -181,11 +181,12 @@ fun PlaylistActionsSheet(
     onRename: () -> Unit,
     onCover: () -> Unit,
     onDelete: () -> Unit,
+    onExport: () -> Unit,
     /** Its tracks to the paired computer; null without one. */
     onSendToComputer: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Text(
                 playlist.name,
@@ -208,6 +209,11 @@ fun PlaylistActionsSheet(
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onDismiss()
                 onCover()
+            }
+            ActionItem(PlayerIcons.Upload, stringResource(R.string.playlist_export)) {
+                haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                onDismiss()
+                onExport()
             }
             ActionItem(PlayerIcons.Delete, stringResource(R.string.delete), destructive = true) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)

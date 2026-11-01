@@ -31,6 +31,20 @@ class MusicRepository(private val context: Context) {
         return query("${MediaStore.Audio.Media._ID} IN (${ids.distinct().joinToString(",")})", null)
     }
 
+    /** Where each track's file is, for playlist files. Off the main thread. */
+    @Suppress("DEPRECATION")
+    fun paths(): Map<Long, String> {
+        val paths = HashMap<Long, String>()
+        context.contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DATA),
+            MUSIC, arrayOf(MIN_DURATION_MS.toString()), null,
+        )?.use { c ->
+            while (c.moveToNext()) c.getString(1)?.let { paths[c.getLong(0)] = it }
+        }
+        return paths
+    }
+
     /** The track as its file tags it, without the user's in-app edits. */
     suspend fun fileTags(id: Long): Song? = withContext(Dispatchers.IO) {
         query("${MediaStore.Audio.Media._ID} = $id", null, withOverrides = false).firstOrNull()

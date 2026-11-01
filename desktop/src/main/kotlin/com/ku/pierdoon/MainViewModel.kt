@@ -2,7 +2,13 @@ package com.ku.pierdoon
 
 import androidx.compose.runtime.Immutable
 import com.ku.pierdoon.data.CoverStore
+import com.ku.pierdoon.data.M3uMatch
+import com.ku.pierdoon.data.M3uMatcher
 import com.ku.pierdoon.data.MusicCollections
+import com.ku.pierdoon.data.Playlist
+import com.ku.pierdoon.data.decodeM3u
+import com.ku.pierdoon.data.parseM3u
+import com.ku.pierdoon.data.writeM3u
 import com.ku.pierdoon.data.MusicRepository
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
@@ -416,6 +422,25 @@ class MainViewModel {
         }
     }
     fun removePlaylistCover(id: Long) = CoverStore.removePlaylistCover(id)
+
+    /** Makes a playlist of a file's tracks found in the library; null if the file can't be read. */
+    suspend fun importPlaylist(source: File): M3uMatch? = withContext(Dispatchers.IO) {
+        val bytes = runCatching { source.readBytes() }.getOrNull() ?: return@withContext null
+        val songs = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
+        val file = parseM3u(decodeM3u(bytes))
+        val match = M3uMatcher(songs, { it.path }, source.absoluteFile.parent).match(file)
+        if (match.songIds.isNotEmpty()) {
+            userLibrary.createPlaylist(file.name ?: source.nameWithoutExtension, match.songIds)
+        }
+        match
+    }
+
+    /** Writes [playlist] to [target]; false if it couldn't be. */
+    suspend fun exportPlaylist(playlist: Playlist, target: File): Boolean = withContext(Dispatchers.IO) {
+        val text = writeM3u(playlist.name, resolve(playlist.songIds)) { it.path }
+        runCatching { target.writeText(text) }.isSuccess
+    }
+
     fun addToPlaylist(id: Long, songId: Long) = userLibrary.addToPlaylist(id, songId)
     fun removeFromPlaylist(id: Long, songId: Long) = userLibrary.removeFromPlaylist(id, songId)
 

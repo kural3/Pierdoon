@@ -124,6 +124,13 @@
     <string name="artists_count">Artists: %1$d</string>
     <string name="new_playlist">New playlist</string>
     <string name="playlist_name">Name</string>
+    <string name="playlist_import">Import from file</string>
+    <string name="playlist_export">Export to file</string>
+    <string name="playlist_exported">Playlist saved</string>
+    <string name="playlist_export_failed">Couldn\'t save the file</string>
+    <string name="playlist_import_failed">Couldn\'t read the file</string>
+    <string name="playlist_import_none">None of the file\'s tracks are in the library</string>
+    <string name="playlist_imported">Tracks added: %1$d, not found: %2$d</string>
     <string name="rename">Rename</string>
     <string name="delete">Delete</string>
     <string name="create">Create</string>

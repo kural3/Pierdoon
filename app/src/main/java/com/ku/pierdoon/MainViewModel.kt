@@ -1,6 +1,13 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.data.M3uMatch
+import com.ku.pierdoon.data.M3uMatcher
 import com.ku.pierdoon.data.MusicFolder
+import com.ku.pierdoon.data.Playlist
+import com.ku.pierdoon.data.decodeM3u
+import com.ku.pierdoon.data.parseM3u
+import com.ku.pierdoon.data.writeM3u
+import android.provider.OpenableColumns
 import kotlinx.coroutines.flow.drop
 import com.ku.pierdoon.data.ALBUM_ID
 import com.ku.pierdoon.data.QUEUE_KEY
@@ -388,6 +395,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
     fun removePlaylistCover(id: Long) = CoverStore.removePlaylistCover(id)
+
+    /** Makes a playlist of a file's tracks found in the library; null if the file can't be read. */
+    suspend fun importPlaylist(source: Uri): M3uMatch? = withContext(Dispatchers.IO) {
+        val app = getApplication<Application>()
+        val bytes = runCatching { app.contentResolver.openInputStream(source)?.use { it.readBytes() } }.getOrNull()
+            ?: return@withContext null
+        val songs = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
+        val paths = repository.paths()
+        val file = parseM3u(decodeM3u(bytes))
+        val match = M3uMatcher(songs, { paths[it.id].orEmpty() }).match(file)
+        if (match.songIds.isNotEmpty()) {
+            userLibrary.createPlaylist(file.name ?: displayName(source) ?: app.getString(R.string.nav_playlists), match.songIds)
+        }
+        match
+    }
+
+    /** Writes [playlist] to a file the user picked; false if it couldn't be. */
+    suspend fun exportPlaylist(playlist: Playlist, target: Uri): Boolean = withContext(Dispatchers.IO) {
+        val paths = repository.paths()
+        val text = writeM3u(playlist.name, resolve(playlist.songIds)) { paths[it.id].orEmpty() }
+        runCatching {
+            getApplication<Application>().contentResolver.openOutputStream(target, "wt")?.use { it.write(text.toByteArray()) } != null
+        }.getOrDefault(false)
+    }
+
+    private fun displayName(uri: Uri): String? = runCatching {
+        getApplication<Application>().contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0)?.substringBeforeLast('.')?.ifBlank { null } else null
+        }
+    }.getOrNull()
+
     fun addToPlaylist(id: Long, songId: Long) = userLibrary.addToPlaylist(id, songId)
     fun removeFromPlaylist(id: Long, songId: Long) = userLibrary.removeFromPlaylist(id, songId)
 

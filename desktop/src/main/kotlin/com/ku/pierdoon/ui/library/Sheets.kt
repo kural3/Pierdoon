@@ -175,6 +175,7 @@ fun PlaylistActionsSheet(
     onRename: () -> Unit,
     onCover: () -> Unit,
     onDelete: () -> Unit,
+    onExport: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     ContextMenu(onDismiss = onDismiss) {
@@ -195,6 +196,11 @@ fun PlaylistActionsSheet(
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onDismiss()
                 onCover()
+            }
+            ActionItem(PlayerIcons.Upload, stringResource(Res.string.playlist_export)) {
+                haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                onDismiss()
+                onExport()
             }
             ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete), destructive = true) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)

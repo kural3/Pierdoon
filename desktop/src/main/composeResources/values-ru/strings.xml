@@ -121,6 +121,13 @@
     <string name="artists_count">Артистов: %1$d</string>
     <string name="new_playlist">Новый плейлист</string>
     <string name="playlist_name">Название</string>
+    <string name="playlist_import">Импорт из файла</string>
+    <string name="playlist_export">Экспорт в файл</string>
+    <string name="playlist_exported">Плейлист сохранён</string>
+    <string name="playlist_export_failed">Не удалось сохранить файл</string>
+    <string name="playlist_import_failed">Не удалось прочитать файл</string>
+    <string name="playlist_import_none">Ни одного трека из файла нет в библиотеке</string>
+    <string name="playlist_imported">Добавлено треков: %1$d, не найдено: %2$d</string>
     <string name="rename">Переименовать</string>
     <string name="delete">Удалить</string>
     <string name="create">Создать</string>

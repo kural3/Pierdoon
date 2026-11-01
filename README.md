@@ -24,6 +24,7 @@ What changed in each version is in its release notes.
 - Downloads by link or by search from YouTube, SoundCloud, Bandcamp and the other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports, with title, artist and cover; whole playlists and albums too
 - Edits tags and covers, in the app or in the file
 - Crossfade of up to 12 seconds between tracks, with albums left gapless unless asked otherwise
+- Playlists in and out as `.m3u` / `.m3u8`, finding tracks by path, then by name and tags
 - English and Russian interface: the system's language by default, or chosen in Settings → Appearance
 - Expanding player, frosted glass, album art / wallpaper or Windows accent / custom color themes, a Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts
 - The phone works as a remote for the computer over Wi-Fi: the computer's playback in the phone's own player, its queue, lyrics and library, and downloads sent to it

@@ -42,6 +42,8 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.updateTransition
@@ -110,6 +112,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ku.pierdoon.LibraryState
 import com.ku.pierdoon.MainViewModel
 import com.ku.pierdoon.R
+import com.ku.pierdoon.data.M3U_EXTENSION
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.ColorSource
 import com.ku.pierdoon.data.CoverStore
@@ -299,11 +302,40 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     var dialog by remember { mutableStateOf<PlaylistDialog?>(null) }
 
     val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val playlistFiles = rememberCoroutineScope()
+    var exporting by remember { mutableStateOf<Playlist?>(null) }
+    val exportedText = stringResource(R.string.playlist_exported)
+    val exportFailedText = stringResource(R.string.playlist_export_failed)
+    val importFailedText = stringResource(R.string.playlist_import_failed)
+    val importNoneText = stringResource(R.string.playlist_import_none)
+    val resources = LocalResources.current
+    val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(M3U_MIME)) { target ->
+        val playlist = exporting
+        exporting = null
+        if (target != null && playlist != null) {
+            playlistFiles.launch {
+                val ok = vm.exportPlaylist(playlist, target)
+                Toast.makeText(context, if (ok) exportedText else exportFailedText, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { source ->
+        if (source != null) {
+            playlistFiles.launch {
+                val match = vm.importPlaylist(source)
+                val text = when {
+                    match == null -> importFailedText
+                    match.songIds.isEmpty() -> importNoneText
+                    else -> resources.getString(R.string.playlist_imported, match.songIds.size, match.missed)
+                }
+                Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     // The system asks before the files go; saved, so a recreated activity still cleans up after it.
     var deletingSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     var afterDelete by remember { mutableStateOf<(() -> Unit)?>(null) }
     val deletedText = stringResource(R.string.deleted)
-    val resources = LocalResources.current
     val deleteConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
         val ids = deletingSongIds
         deletingSongIds = null
@@ -363,6 +395,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                     onBulk = { songs, playlistId, done -> bulk = BulkTarget(songs, playlistId, done) },
                     onDeleteSongs = deleteSongs,
                     onPlaylistLongPress = { playlistAction = it },
+                    onImportPlaylist = { importFile.launch(M3U_TYPES) },
                     onCreatePlaylist = { dialog = PlaylistDialog.Create(emptyList()) },
                     onRenamePlaylist = { dialog = PlaylistDialog.Rename(it) },
                     onDeletePlaylist = { dialog = PlaylistDialog.Delete(it) },
@@ -576,6 +609,10 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             onRename = { dialog = PlaylistDialog.Rename(p) },
             onCover = { coverSheetFor = p.id },
             onDelete = { dialog = PlaylistDialog.Delete(p) },
+            onExport = {
+                exporting = p
+                exportFile.launch("${p.name}.$M3U_EXTENSION")
+            },
             onSendToComputer = pcPaired?.let { { PcTransfers.sendToComputer(vm.resolve(p.songIds)) } },
         )
     }
@@ -640,6 +677,7 @@ private fun Screens(
     onBulk: (List<Song>, Long?, () -> Unit) -> Unit,
     onDeleteSongs: ((List<Song>, () -> Unit) -> Unit)?,
     onPlaylistLongPress: (Playlist) -> Unit,
+    onImportPlaylist: () -> Unit,
     onCreatePlaylist: () -> Unit,
     onRenamePlaylist: (Playlist) -> Unit,
     onDeletePlaylist: (Playlist) -> Unit,
@@ -754,6 +792,7 @@ private fun Screens(
                     onOpen = nav::push,
                     onCreate = onCreatePlaylist,
                     onPlaylistLongPress = onPlaylistLongPress,
+                    onImport = onImportPlaylist,
                     bottomInset = bottomInset,
                 )
                 is Route.AlbumDetail -> {
@@ -1126,3 +1165,7 @@ private fun ShareTargetDialog(pcName: String, onPhone: () -> Unit, onPc: () -> U
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
+
+private const val M3U_MIME = "audio/x-mpegurl"
+/** What file managers call a playlist; some know only the bare bytes. */
+private val M3U_TYPES = arrayOf(M3U_MIME, "audio/mpegurl", "application/x-mpegurl", "application/vnd.apple.mpegurl", "application/octet-stream")

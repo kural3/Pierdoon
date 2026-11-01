@@ -154,6 +154,7 @@ import com.ku.pierdoon.ui.phone.PhoneScreen
 import com.ku.pierdoon.ui.theme.AlbumThemeSeed
 import com.ku.pierdoon.ui.update.UpdateDialog
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -191,6 +192,12 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val nowPlaying = rememberLastNonNull(player.nowPlaying)
     val backdrop = rememberBackdrop()
     val scope = rememberCoroutineScope()
+    val exportTitle = stringResource(Res.string.playlist_export)
+    val exportedText = stringResource(Res.string.playlist_exported)
+    val exportFailedText = stringResource(Res.string.playlist_export_failed)
+    val importTitle = stringResource(Res.string.playlist_import)
+    val importFailedText = stringResource(Res.string.playlist_import_failed)
+    val importNoneText = stringResource(Res.string.playlist_import_none)
 
     LaunchedEffect(Unit) { vm.loadLibrary() }
 
@@ -285,6 +292,21 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                                 onBulk = { songs, playlistId, done -> bulk = BulkTarget(songs, playlistId, done) },
                                 onDeleteSongs = deleteSongs,
                                 onPlaylistLongPress = { playlistAction = it },
+                                onImportPlaylist = {
+                                    Files.pickPlaylist(importTitle)?.let { source ->
+                                        scope.launch {
+                                            val match = vm.importPlaylist(source)
+                                            Toast.show(
+                                                when {
+                                                    match == null -> importFailedText
+                                                    match.songIds.isEmpty() -> importNoneText
+                                                    else -> getString(Res.string.playlist_imported, match.songIds.size, match.missed)
+                                                },
+                                                Toast.LENGTH_LONG,
+                                            )
+                                        }
+                                    }
+                                },
                                 onCreatePlaylist = { dialog = PlaylistDialog.Create(emptyList()) },
                                 onRenamePlaylist = { dialog = PlaylistDialog.Rename(it) },
                                 onDeletePlaylist = { dialog = PlaylistDialog.Delete(it) },
@@ -486,6 +508,14 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
             onRename = { dialog = PlaylistDialog.Rename(p) },
             onCover = { coverSheetFor = p.id },
             onDelete = { dialog = PlaylistDialog.Delete(p) },
+            onExport = {
+                Files.savePlaylist(exportTitle, p.name)?.let { target ->
+                    scope.launch {
+                        val ok = vm.exportPlaylist(p, target)
+                        Toast.show(if (ok) exportedText else exportFailedText)
+                    }
+                }
+            },
         )
     }
     // Read from the live list, so the sheet shows each change as it's made.
@@ -612,6 +642,7 @@ private fun Screens(
     onBulk: (List<Song>, Long?, () -> Unit) -> Unit,
     onDeleteSongs: ((List<Song>, () -> Unit) -> Unit)?,
     onPlaylistLongPress: (Playlist) -> Unit,
+    onImportPlaylist: () -> Unit,
     onCreatePlaylist: () -> Unit,
     onRenamePlaylist: (Playlist) -> Unit,
     onDeletePlaylist: (Playlist) -> Unit,
@@ -722,6 +753,7 @@ private fun Screens(
                     onOpen = nav::push,
                     onCreate = onCreatePlaylist,
                     onPlaylistLongPress = onPlaylistLongPress,
+                    onImport = onImportPlaylist,
                     bottomInset = bottomInset,
                 )
                 is Route.AlbumDetail -> {

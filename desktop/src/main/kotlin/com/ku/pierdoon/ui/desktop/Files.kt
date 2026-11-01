@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.desktop
 
+import com.ku.pierdoon.data.M3U_EXTENSION
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.Toolkit
@@ -16,6 +17,7 @@ object Files {
     var owner: Frame? = null
 
     private val IMAGE_EXT = listOf("jpg", "jpeg", "png", "webp", "bmp", "gif")
+    private val PLAYLIST_EXT = listOf("m3u", "m3u8")
 
     /** Picks a picture with the native Open dialog; null if cancelled. */
     fun pickImage(title: String): File? {
@@ -26,6 +28,26 @@ object Files {
         dialog.isVisible = true
         val name = dialog.file ?: return null
         return File(dialog.directory, name).takeIf { it.isFile }
+    }
+
+    /** Picks a playlist file with the native Open dialog; null if cancelled. */
+    fun pickPlaylist(title: String): File? {
+        val dialog = FileDialog(owner, title, FileDialog.LOAD)
+        dialog.file = PLAYLIST_EXT.joinToString(";") { "*.$it" }
+        dialog.setFilenameFilter { _, name -> name.substringAfterLast('.').lowercase() in PLAYLIST_EXT }
+        dialog.isVisible = true
+        val name = dialog.file ?: return null
+        return File(dialog.directory, name).takeIf { it.isFile }
+    }
+
+    /** Asks where to save a playlist file; null if cancelled. */
+    fun savePlaylist(title: String, suggestedName: String): File? {
+        val dialog = FileDialog(owner, title, FileDialog.SAVE)
+        dialog.file = "$suggestedName.$M3U_EXTENSION"
+        dialog.isVisible = true
+        val name = dialog.file ?: return null
+        val picked = File(dialog.directory, name)
+        return if (picked.extension.lowercase() in PLAYLIST_EXT) picked else File(dialog.directory, "$name.$M3U_EXTENSION")
     }
 
     /** Picks a folder; null if cancelled. */

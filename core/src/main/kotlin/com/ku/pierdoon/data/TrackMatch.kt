@@ -17,11 +17,14 @@ data class TrackKey(val title: String, val artist: String, val durationMs: Long)
 class TrackMatcher(library: Collection<TrackKey>) {
     private val byTitle: Map<String, List<TrackKey>> = library.groupBy { normalizeTag(it.title) }
 
-    fun contains(track: TrackKey): Boolean {
+    fun contains(track: TrackKey): Boolean = find(track) != null
+
+    /** The library's track that looks like [track], if any. */
+    fun find(track: TrackKey): TrackKey? {
         val title = normalizeTag(track.title)
-        if (title.isEmpty()) return false
+        if (title.isEmpty()) return null
         val artist = normalizeArtist(track.artist)
-        return byTitle[title].orEmpty().any { other ->
+        return byTitle[title].orEmpty().firstOrNull { other ->
             val otherArtist = normalizeArtist(other.artist)
             val lengthsKnown = track.durationMs > 0 && other.durationMs > 0
             val closeLength = !lengthsKnown || kotlin.math.abs(track.durationMs - other.durationMs) <= DURATION_SLACK_MS

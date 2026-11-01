@@ -148,11 +148,15 @@ fun PlaylistsScreen(
     onOpen: (Route) -> Unit,
     onCreate: () -> Unit,
     onPlaylistLongPress: (Playlist) -> Unit,
+    onImport: () -> Unit,
     bottomInset: Dp,
 ) {
     val haptics = LocalHapticFeedback.current
     AppScaffold(
         title = stringResource(Res.string.nav_playlists),
+        actions = {
+            OverflowMenu(listOf(listOf(MenuEntry(stringResource(Res.string.playlist_import), PlayerIcons.Download, onClick = onImport))))
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 text = { Text(stringResource(Res.string.new_playlist)) },
