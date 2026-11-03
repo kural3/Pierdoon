@@ -81,8 +81,8 @@ One Gradle build for both apps. Any JDK starts Gradle; the JDK 25 it builds with
 | --- | --- |
 | `app/` | the Android app |
 | `desktop/` | the Windows app |
-| `core/` | code both use: the track model, library lists and search, artist splitting, lyrics parsing, listening stats and the playlist of the day, track naming, queue restore, version compare. Plain Kotlin/JVM, nothing platform-specific |
-| `ui/` | Compose code both draw with: expressive shapes and buttons, the colour scheme generator, transitions, the colour picker, the expanding player, the icons. Kotlin Multiplatform (Android + JVM) |
+| `core/` | code both use: the track model, library lists and search, playlists and favourites, tag edits, lyrics (LRCLIB, parsing, sync offsets), tag search and Opus tags, listening stats and the playlist of the day, track naming, the queue, update state, version compare. Plain Kotlin/JVM, nothing platform-specific |
+| `ui/` | Compose code both draw with: every string (en, ru), expressive shapes and buttons, the colour scheme generator, transitions, the colour picker, the expanding player, the queue and lyrics panels, track rows, the welcome screen and the update dialog, the icons. Kotlin Multiplatform (Android + JVM); what each app does its own way sits in `androidMain` / `jvmMain` |
 | `docs/` | [the phone ↔ computer protocol](docs/remote-api.md) |
 
 ```
