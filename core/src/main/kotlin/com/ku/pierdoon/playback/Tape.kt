@@ -6,6 +6,7 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Where the current track is on the tape the queue makes. */
 @Immutable
@@ -55,6 +56,24 @@ enum class SideEnd {
     Flip,
     /** Side B ran out and the queue starts over: the tape rewinds to the start of side A. */
     Rewind,
+}
+
+/** What the deck is doing with the tape besides playing it, for the cassette on screen. */
+enum class TapeMotion {
+    Still,
+    /** Turned over at the end of side A. */
+    Flip,
+    /** Running back from the end of side B to the start of side A. */
+    Rewind,
+    /** Spun on to the next track. */
+    Forward,
+    /** Spun back to the previous track, or the start of this one. */
+    Back;
+
+    companion object {
+        /** Set by the player, read by the screen. */
+        val current = MutableStateFlow(Still)
+    }
 }
 
 /** What going from [current] to [next] (positions in play order) means on the tape. */

@@ -105,8 +105,7 @@ import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.playback.QueueState
 import com.ku.pierdoon.playback.TapeSides
-import com.ku.pierdoon.playback.TapeRewind
-import com.ku.pierdoon.playback.CASSETTE_REWIND_MS
+import com.ku.pierdoon.playback.TapeMotion
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.components.Artwork
@@ -587,9 +586,9 @@ internal fun PlayerArtwork(
     val press = animatePressAsState(source, 0.94f)
     val slowSpatial = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     val morph = animateFloatAsState(if (isPlaying) 0f else 1f, slowSpatial, label = "artMorph")
-    val rewinding by TapeRewind.running.collectAsState()
-    // The player is paused through a rewind, but the tape is still moving.
-    val restScale = animateFloatAsState(if (isPlaying || rewinding) 1f else 0.86f, slowSpatial, label = "artScale")
+    val tapeMotion by TapeMotion.current.collectAsState()
+    // The player is paused through a rewind or a turn, but the tape is still moving.
+    val restScale = animateFloatAsState(if (isPlaying || tapeMotion != TapeMotion.Still) 1f else 0.86f, slowSpatial, label = "artScale")
     val scale = remember { derivedStateOf { press.value * restScale.value } }
 
     // Current skip streak: side (-1 back, 1 forward, 0 none), seconds so far, and where it got to.
@@ -677,10 +676,9 @@ internal fun PlayerArtwork(
             CassetteDeck(
                 title = nowPlaying.title,
                 artist = nowPlaying.artist,
-                side = if (tape.onSideB) "B" else "A",
+                sideB = tape.onSideB,
                 isPlaying = isPlaying,
-                rewinding = rewinding,
-                rewindMs = CASSETTE_REWIND_MS.toInt(),
+                motion = tapeMotion,
                 sideProgress = {
                     if (tape.sideLengthMs <= 0) 0f else (tape.elapsedMs + position().estimate()).toFloat() / tape.sideLengthMs
                 },

@@ -36,7 +36,7 @@ class CassetteSoundTest {
     @Test
     fun theWindIsShortAndStartsAndEndsWithoutAClick() {
         val wind = cassetteWindSound()
-        assertEquals(725.0, cassetteSoundMs(wind).toDouble(), 10.0)
+        assertEquals(CASSETTE_WIND_MS.toDouble(), cassetteSoundMs(wind).toDouble(), 5.0)
         assertTrue(abs(wind[0].toInt()) < 100 && abs(wind[1].toInt()) < 100)
         assertTrue(wind.takeLast(2 * rate / 1000).all { abs(it.toInt()) < 1_500 })
         assertTrue(wind.maxOf { abs(it.toInt()) } in 10_000..30_000)

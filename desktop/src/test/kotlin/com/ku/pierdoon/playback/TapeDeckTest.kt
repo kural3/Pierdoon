@@ -86,7 +86,7 @@ class TapeDeckTest {
         Thread.sleep(300)
         val rewound = CountDownLatch(1)
         Thread {
-            while (!TapeRewind.running.value) Thread.sleep(10)
+            while (TapeMotion.current.value != TapeMotion.Rewind) Thread.sleep(10)
             rewound.countDown()
         }.apply { isDaemon = true }.start()
         val tookMs = movesOnAfter(p, 0) { p.seekTo(songs[1].durationMs - 1_000) }

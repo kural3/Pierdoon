@@ -46,22 +46,22 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
     val buttons: Player = object : ForwardingPlayer(player) {
         override fun seekToNext() {
             super.seekToNext()
-            wind()
+            wind(TapeMotion.Forward)
         }
 
         override fun seekToNextMediaItem() {
             super.seekToNextMediaItem()
-            wind()
+            wind(TapeMotion.Forward)
         }
 
         override fun seekToPrevious() {
             super.seekToPrevious()
-            wind()
+            wind(TapeMotion.Back)
         }
 
         override fun seekToPreviousMediaItem() {
             super.seekToPreviousMediaItem()
-            wind()
+            wind(TapeMotion.Back)
         }
     }
 
@@ -156,7 +156,7 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
         val rewinding = end == SideEnd.Rewind
         val samples = if (rewinding) rewindSound else flipSound
         track = playing(samples)
-        TapeRewind.running.value = rewinding
+        TapeMotion.current.value = if (rewinding) TapeMotion.Rewind else TapeMotion.Flip
         waiting = scope.launch {
             delay(cassetteSoundMs(samples))
             finish(resume = true)
@@ -164,12 +164,13 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
     }
 
     /** Next or previous pressed while playing a tape: the track just moved to plays once the spin is over. */
-    private fun wind() {
+    private fun wind(motion: TapeMotion) {
         if (!tapeMode || !player.playWhenReady || player.mediaItemCount == 0) return
         finish(resume = false)
         windingFrom = player.volume
         player.volume = 0f
         track = playing(windSound)
+        TapeMotion.current.value = motion
         waiting = scope.launch {
             delay(cassetteSoundMs(windSound))
             finish(resume = true, backToStart = true)
@@ -188,7 +189,7 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
     private fun finish(resume: Boolean, backToStart: Boolean = false) {
         val job = waiting ?: return
         waiting = null
-        TapeRewind.running.value = false
+        TapeMotion.current.value = TapeMotion.Still
         track?.release()
         track = null
         job.cancel()

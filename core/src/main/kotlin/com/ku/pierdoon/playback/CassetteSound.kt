@@ -6,6 +6,9 @@ const val CASSETTE_SOUND_MS = 2_000L
 /** How long the tape takes to rewind from the end of side B to the start of side A. */
 const val CASSETTE_REWIND_MS = 2_650L
 
+/** How long the spin to the next or previous track takes ([cassetteWindSound]'s length). */
+const val CASSETTE_WIND_MS = 725L
+
 const val CASSETTE_SOUND_RATE = 44_100
 
 /** The file holds nothing but the plain header and the samples. */

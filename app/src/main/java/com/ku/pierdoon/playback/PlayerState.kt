@@ -2,7 +2,6 @@ package com.ku.pierdoon.playback
 
 import androidx.compose.runtime.Immutable
 import androidx.media3.common.Player
-import kotlinx.coroutines.flow.MutableStateFlow
 
 @Immutable
 data class PlayerState(
@@ -14,11 +13,6 @@ data class PlayerState(
     val shuffle: Boolean = false,
     @param:Player.RepeatMode val repeatMode: Int = Player.REPEAT_MODE_OFF,
 )
-
-/** The tape running back between two sides, for the reels on screen. */
-object TapeRewind {
-    val running = MutableStateFlow(false)
-}
 
 /** Off → all → one → off, the order of the player's repeat button. */
 @Player.RepeatMode

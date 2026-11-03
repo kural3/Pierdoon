@@ -3,12 +3,6 @@ package com.ku.pierdoon.playback
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.platform.ErrorLog
 import java.util.concurrent.CompletableFuture
-import kotlinx.coroutines.flow.MutableStateFlow
-
-/** The tape running back between two sides, for the reels on screen. */
-object TapeRewind {
-    val running = MutableStateFlow(false)
-}
 
 /** One entry of the queue: a song and the key that identifies this entry while it moves. */
 data class MediaItem(val song: Song, val queueKey: Long = Song.newQueueKey()) {
@@ -213,7 +207,7 @@ class Player {
             val end = sideEnd()
             if (end != SideEnd.None) {
                 changingCassette = true
-                TapeRewind.running.value = end == SideEnd.Rewind
+                TapeMotion.current.value = if (end == SideEnd.Rewind) TapeMotion.Rewind else TapeMotion.Flip
                 val sound = if (end == SideEnd.Rewind) TapeSounds.rewind else TapeSounds.flip
                 deck.play(sound, outputDevice, volume) { finishCassetteChange() }
                 return
@@ -398,17 +392,17 @@ class Player {
     /** The next button: on a tape, the deck spins it there first. */
     fun seekToNext() {
         val n = nextIndexFor(currentMediaItemIndex, if (repeatMode == REPEAT_MODE_ONE) REPEAT_MODE_ALL else repeatMode)
-        if (n >= 0) windTo { seekToDefaultPosition(n) }
+        if (n >= 0) windTo(TapeMotion.Forward) { seekToDefaultPosition(n) }
     }
 
     /** Back to the start of the track, or to the previous one within the first seconds. */
-    fun seekToPrevious() = windTo {
+    fun seekToPrevious() = windTo(TapeMotion.Back) {
         val p = if (currentPosition > PREVIOUS_THRESHOLD_MS) -1 else previousIndexFor(currentMediaItemIndex)
         if (p >= 0) seekToDefaultPosition(p) else seekTo(0)
     }
 
     /** Does [move] and, playing a tape, holds the track while the tape spins to it. */
-    private inline fun windTo(move: () -> Unit) {
+    private inline fun windTo(motion: TapeMotion, move: () -> Unit) {
         val wind = tapeMode && playWhenReady
         holdPlayback = wind
         try {
@@ -420,11 +414,13 @@ class Player {
         // Back to the start of the same track is a seek, not a load: the engine is still playing.
         engine.pause()
         winding = true
+        TapeMotion.current.value = motion
         deck.play(TapeSounds.wind, outputDevice, volume) { finishWind() }
     }
 
     private fun finishWind() {
         winding = false
+        TapeMotion.current.value = TapeMotion.Still
         if (playWhenReady && playbackState == STATE_READY) engine.play()
     }
 
@@ -455,7 +451,7 @@ class Player {
     private fun cancelCassetteChange() {
         changingCassette = false
         winding = false
-        TapeRewind.running.value = false
+        TapeMotion.current.value = TapeMotion.Still
         deck.cancel()
     }
 

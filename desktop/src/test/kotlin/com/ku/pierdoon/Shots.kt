@@ -16,6 +16,7 @@ import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.platform.InterfaceLanguage
 import com.ku.pierdoon.playback.PlaybackController
+import com.ku.pierdoon.playback.TapeMotion
 import com.ku.pierdoon.ui.PierdoonApp
 import com.ku.pierdoon.ui.navigation.Navigator
 import com.ku.pierdoon.ui.navigation.Route
@@ -45,6 +46,11 @@ import kotlin.system.exitProcess
  *     shot home          save home.png
  *     shotnow mid        save mid.png at once, mid-animation
  *     state              print whether it plays and how loud (the Delicious mode's levels)
+ *     cassette on        cassette mode on or off
+ *     shuffle            play the whole library shuffled
+ *     next               the next button, as a media key would press it
+ *     toggle             play / pause
+ *     motion Flip        show the tape doing that (Still, Flip, Rewind, Forward, Back) without the player
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
@@ -130,6 +136,11 @@ fun main(args: Array<String>) {
                         File(out, "${p[1]}.png").writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes)
                         println("shot ${p[1]}")
                     }
+                    "cassette" -> SettingsStore.update { it.copy(cassetteMode = p[1] == "on") }
+                    "shuffle" -> vm.shuffleAll()
+                    "next" -> PlaybackController.player.seekToNext()
+                    "toggle" -> vm.togglePlay()
+                    "motion" -> TapeMotion.current.value = TapeMotion.valueOf(p[1])
                     "state" -> PlaybackController.player.let { pl ->
                         val l = pl.levels()
                         println("state: playing ${pl.isPlaying} at ${pl.currentPosition} ms, energy ${l.energy}, bass ${l.bass}, beats ${l.beats}")
