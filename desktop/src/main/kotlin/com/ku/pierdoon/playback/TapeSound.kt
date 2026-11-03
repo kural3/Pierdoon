@@ -3,17 +3,14 @@ package com.ku.pierdoon.playback
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 
-/** Plays the sound of a cassette being changed, or of a tape rewinding, on an output line of its own. */
-class CassetteChange {
-    private val sound by lazy { cassetteChangeSound() }
-    private val rewindSound by lazy { cassetteRewindSound() }
+/** Plays one of the deck's sounds (cassette, rewind, wind, a key) on an output line of its own. */
+class TapeSound {
     @Volatile private var running: Thread? = null
 
     /** Stops whatever is playing and starts over; [onDone] runs on the UI thread unless [cancel]led. */
-    fun play(device: String?, volume: Float, rewinding: Boolean = false, onDone: () -> Unit) {
+    fun play(sound: ShortArray, device: String?, volume: Float, onDone: () -> Unit = {}) {
         cancel()
-        val samples = if (rewinding) rewindSound else sound
-        running = Thread({ run(samples, device, volume, onDone) }, "cassette").apply {
+        running = Thread({ run(sound, device, volume, onDone) }, "tape sound").apply {
             isDaemon = true
             start()
         }
@@ -65,4 +62,13 @@ class CassetteChange {
     private companion object {
         const val CHUNK_BYTES = 4096
     }
+}
+
+/** The deck's sounds, read once. */
+internal object TapeSounds {
+    val flip by lazy { cassetteChangeSound() }
+    val rewind by lazy { cassetteRewindSound() }
+    val wind by lazy { cassetteWindSound() }
+    val playKey by lazy { cassetteKeySound(play = true) }
+    val stopKey by lazy { cassetteKeySound(play = false) }
 }

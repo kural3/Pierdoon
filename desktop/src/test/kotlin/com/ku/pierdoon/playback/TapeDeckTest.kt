@@ -13,14 +13,17 @@ import javax.sound.sampled.AudioSystem
 import javax.swing.SwingUtilities
 
 /**
- * Plays real files silently (volume 0) through the real output, like [AudioEngineTest]. Skipped
- * on machines without a sound device or without music in the user's Music folder.
+ * Cassette mode on two tracks: one on side A, one on side B. Plays real files silently (volume 0)
+ * through the real output, like [AudioEngineTest]. Skipped on machines without a sound device or
+ * without music in the user's Music folder.
  */
-class CassetteChangeTest {
+class TapeDeckTest {
 
     private val music = File(System.getProperty("user.home"), "Music")
         .walkTopDown().filter { it.isFile && it.extension.lowercase() in setOf("mp3", "m4a", "flac", "opus", "ogg") }
         .sortedBy { it.name }.take(2).toList()
+
+    private val windMs = cassetteSoundMs(cassetteWindSound())
 
     private fun songs() = music.map { f ->
         Song(Song.idFor(f), f.name, "", "", 0, MediaProbe.tags(f)!!.durationMs, path = f.path)
@@ -28,13 +31,14 @@ class CassetteChangeTest {
 
     private fun onUi(block: () -> Unit) = SwingUtilities.invokeAndWait(block)
 
-    private fun newPlayer(): Pair<Player, List<Song>> {
+    private fun newPlayer(repeat: Int = Player.REPEAT_MODE_OFF): Pair<Player, List<Song>> {
         val songs = songs()
         lateinit var p: Player
         onUi {
             p = Player()
             p.volume = 0f
-            p.cassetteChange = true
+            p.tapeMode = true
+            p.repeatMode = repeat
             p.setMediaItems(songs.map { MediaItem(it) }, 0, 0)
             p.prepare()
             p.play()
@@ -43,20 +47,24 @@ class CassetteChangeTest {
         return p to songs
     }
 
-    @Test
-    fun waitsForTheSoundBetweenTwoTracks() {
-        assumeTrue(music.size == 2 && AudioSystem.getMixerInfo().isNotEmpty())
-        val (p, songs) = newPlayer()
+    private fun movesOnAfter(p: Player, toIndex: Int, start: () -> Unit): Long {
         val moved = CountDownLatch(1)
         onUi {
             p.addListener { player, events ->
-                if (Player.Event.Transition in events && player.currentMediaItemIndex == 1) moved.countDown()
+                if (Player.Event.Transition in events && player.currentMediaItemIndex == toIndex) moved.countDown()
             }
-            p.seekTo(songs[0].durationMs - 1_000)
+            start()
         }
-        val seekedAt = System.nanoTime()
+        val at = System.nanoTime()
         assertTrue("never moved on", moved.await(15, TimeUnit.SECONDS))
-        val tookMs = (System.nanoTime() - seekedAt) / 1_000_000
+        return (System.nanoTime() - at) / 1_000_000
+    }
+
+    @Test
+    fun theCassetteIsTurnedOverAtTheEndOfSideA() {
+        assumeTrue(music.size == 2 && AudioSystem.getMixerInfo().isNotEmpty())
+        val (p, songs) = newPlayer()
+        val tookMs = movesOnAfter(p, 1) { p.seekTo(songs[0].durationMs - 1_000) }
         assertTrue("moved on after $tookMs ms", tookMs in CASSETTE_SOUND_MS..CASSETTE_SOUND_MS + 2_500)
         Thread.sleep(800)
         var position = 0L
@@ -71,7 +79,48 @@ class CassetteChangeTest {
     }
 
     @Test
-    fun skippingDuringTheSoundGoesRightOn() {
+    fun theTapeRewindsWhenSideBRunsIntoTheStartOfTheQueue() {
+        assumeTrue(music.size == 2 && AudioSystem.getMixerInfo().isNotEmpty())
+        val (p, songs) = newPlayer(Player.REPEAT_MODE_ALL)
+        onUi { p.seekTo(1, 0) }
+        Thread.sleep(300)
+        val rewound = CountDownLatch(1)
+        Thread {
+            while (!TapeRewind.running.value) Thread.sleep(10)
+            rewound.countDown()
+        }.apply { isDaemon = true }.start()
+        val tookMs = movesOnAfter(p, 0) { p.seekTo(songs[1].durationMs - 1_000) }
+        assertEquals(0, rewound.count)
+        assertTrue("moved on after $tookMs ms", tookMs in CASSETTE_REWIND_MS..CASSETTE_REWIND_MS + 2_500)
+        onUi { p.release() }
+    }
+
+    @Test
+    fun nextSpinsTheTapeAndPlaysOn() {
+        assumeTrue(music.size == 2 && AudioSystem.getMixerInfo().isNotEmpty())
+        val (p, _) = newPlayer()
+        var index = -1
+        var playing = false
+        onUi {
+            p.seekToNext()
+            index = p.currentMediaItemIndex
+            playing = p.isPlaying
+        }
+        // The new track shows at once and stays "playing" while the tape spins to it.
+        assertEquals(1, index)
+        assertTrue(playing)
+        Thread.sleep(windMs / 2)
+        var position = -1L
+        onUi { position = p.currentPosition }
+        assertTrue("ran during the spin: $position", position < 100)
+        Thread.sleep(windMs / 2 + 1_000)
+        onUi { position = p.currentPosition }
+        assertTrue("position $position", position in 500..1_500)
+        onUi { p.release() }
+    }
+
+    @Test
+    fun skippingWhileTheCassetteIsTurnedGoesThereAfterASpin() {
         assumeTrue(music.size == 2 && AudioSystem.getMixerInfo().isNotEmpty())
         val (p, songs) = newPlayer()
         onUi { p.seekTo(songs[0].durationMs - 300) }
@@ -90,7 +139,7 @@ class CassetteChangeTest {
             position = p.currentPosition
         }
         assertEquals(1, index)
-        assertTrue("position $position", position >= CASSETTE_SOUND_MS - 500)
+        assertTrue("position $position", position >= CASSETTE_SOUND_MS + 500 - windMs - 500)
         onUi { p.release() }
     }
 

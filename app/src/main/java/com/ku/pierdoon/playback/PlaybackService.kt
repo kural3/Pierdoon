@@ -65,7 +65,9 @@ class PlaybackService : MediaLibraryService() {
     private var widget: PlayerWidget.Updater? = null
     private lateinit var carLibrary: CarLibrary
     private var crossfader: Crossfader? = null
-    private var cassetteChange: CassetteChange? = null
+    private var tapeDeck: TapeDeck? = null
+    /** The player itself; the session gets it wrapped in [TapeDeck.buttons]. */
+    private var exoPlayer: ExoPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private lateinit var queueStore: QueueStore
@@ -136,11 +138,9 @@ class PlaybackService : MediaLibraryService() {
 
         val fader = Crossfader(this, player, scope).also { crossfader = it }
         fader.start()
-        val cassette = CassetteChange(player, scope).also { cassetteChange = it }
+        exoPlayer = player
+        val cassette = TapeDeck(player, scope).also { tapeDeck = it }
         cassette.start()
-        scope.launch {
-            SettingsStore.settings.map { it.cassetteChange }.distinctUntilChanged().collect { cassette.enabled = it }
-        }
         scope.launch {
             SettingsStore.settings.map { it.cassetteMode }.distinctUntilChanged().collect {
                 cassette.tapeMode = it
@@ -200,7 +200,9 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        session = MediaLibrarySession.Builder(this, player, SessionCallback())
+        // Next and previous from controllers (the app, the notification, headphones, the car)
+        // go through the deck; the player's own moves (crossfade, end of track) don't.
+        session = MediaLibrarySession.Builder(this, cassette.buttons, SessionCallback())
             .setSessionActivity(openApp)
             .setMediaButtonPreferences(modeButtons(player))
             .build()
@@ -223,15 +225,17 @@ class PlaybackService : MediaLibraryService() {
         scope.cancel()
         crossfader?.release()
         crossfader = null
-        cassetteChange?.release()
-        cassetteChange = null
+        tapeDeck?.release()
+        tapeDeck = null
         session?.run {
+            val player = exoPlayer ?: player
             // A few hundred bytes; written in place so it lands before the process can go.
             if (!restoring) queueStore.write(snapshot(player))
             player.release()
             release()
         }
         session = null
+        exoPlayer = null
         super.onDestroy()
     }
 

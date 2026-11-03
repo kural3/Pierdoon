@@ -47,10 +47,22 @@ private fun sideBStart(durationsMs: List<Long>): Int {
     return best
 }
 
-/** Whether going from [current] to [next] (positions in play order) runs off the end of a side. */
-fun isSideEnd(current: Int, next: Int, size: Int, sideBStart: Int): Boolean {
-    if (current == next || size < 2) return false
-    return (next == sideBStart && current == sideBStart - 1) || (next == 0 && current == size - 1)
+/** What the deck does between two tracks of the tape. */
+enum class SideEnd {
+    /** Same side: one track runs into the next. */
+    None,
+    /** Side A ran out: the cassette is turned over. */
+    Flip,
+    /** Side B ran out and the queue starts over: the tape rewinds to the start of side A. */
+    Rewind,
+}
+
+/** What going from [current] to [next] (positions in play order) means on the tape. */
+fun sideEnd(current: Int, next: Int, size: Int, sideBStart: Int): SideEnd = when {
+    current == next || size < 2 -> SideEnd.None
+    next == 0 && current == size - 1 -> SideEnd.Rewind
+    next == sideBStart && current == sideBStart - 1 -> SideEnd.Flip
+    else -> SideEnd.None
 }
 
 /**

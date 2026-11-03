@@ -34,6 +34,25 @@ class CassetteSoundTest {
     }
 
     @Test
+    fun theWindIsShortAndStartsAndEndsWithoutAClick() {
+        val wind = cassetteWindSound()
+        assertEquals(725.0, cassetteSoundMs(wind).toDouble(), 10.0)
+        assertTrue(abs(wind[0].toInt()) < 100 && abs(wind[1].toInt()) < 100)
+        assertTrue(wind.takeLast(2 * rate / 1000).all { abs(it.toInt()) < 1_500 })
+        assertTrue(wind.maxOf { abs(it.toInt()) } in 10_000..30_000)
+    }
+
+    @Test
+    fun theKeysAreShortClicksThatDieAway() {
+        for (play in listOf(true, false)) {
+            val key = cassetteKeySound(play)
+            assertTrue("play=$play", cassetteSoundMs(key) in 140..160)
+            assertTrue("play=$play", key.maxOf { abs(it.toInt()) } in 9_000..20_000)
+            assertTrue("play=$play", key.takeLast(2 * rate / 1000).all { abs(it.toInt()) < 100 })
+        }
+    }
+
+    @Test
     fun holdsTheRecordingAndNotNoise() {
         fun loudest(fromMs: Int, toMs: Int) =
             sound.slice(fromMs * rate / 1000 * 2 until toMs * rate / 1000 * 2).maxOf { abs(it.toInt()) }

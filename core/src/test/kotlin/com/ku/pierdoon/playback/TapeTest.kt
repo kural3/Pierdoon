@@ -48,15 +48,18 @@ class TapeTest {
     }
 
     @Test
-    fun aSideEndsBetweenTheSidesAndWhereTheTapeGoesRound() {
-        assertTrue(isSideEnd(current = 1, next = 2, size = 4, sideBStart = 2))
-        assertTrue(isSideEnd(current = 3, next = 0, size = 4, sideBStart = 2))
-        assertFalse(isSideEnd(current = 0, next = 1, size = 4, sideBStart = 2))
-        assertFalse(isSideEnd(current = 2, next = 3, size = 4, sideBStart = 2))
+    fun sideAIsTurnedOverAndSideBRewoundWhenTheQueueStartsOver() {
+        assertEquals(SideEnd.Flip, sideEnd(current = 1, next = 2, size = 4, sideBStart = 2))
+        assertEquals(SideEnd.Rewind, sideEnd(current = 3, next = 0, size = 4, sideBStart = 2))
+        assertEquals(SideEnd.None, sideEnd(current = 0, next = 1, size = 4, sideBStart = 2))
+        assertEquals(SideEnd.None, sideEnd(current = 2, next = 3, size = 4, sideBStart = 2))
+        // Two tracks: one on each side.
+        assertEquals(SideEnd.Flip, sideEnd(current = 0, next = 1, size = 2, sideBStart = 1))
+        assertEquals(SideEnd.Rewind, sideEnd(current = 1, next = 0, size = 2, sideBStart = 1))
         // Jumping back over the middle or repeating one track isn't running off the end.
-        assertFalse(isSideEnd(current = 3, next = 2, size = 4, sideBStart = 2))
-        assertFalse(isSideEnd(current = 1, next = 1, size = 4, sideBStart = 2))
-        assertFalse(isSideEnd(current = 0, next = 0, size = 1, sideBStart = 1))
+        assertEquals(SideEnd.None, sideEnd(current = 3, next = 2, size = 4, sideBStart = 2))
+        assertEquals(SideEnd.None, sideEnd(current = 1, next = 1, size = 4, sideBStart = 2))
+        assertEquals(SideEnd.None, sideEnd(current = 0, next = 0, size = 1, sideBStart = 1))
     }
 
     private fun run(tape: TapeEffect, frames: Int, sample: (Int) -> Int = { 0 }): IntArray {

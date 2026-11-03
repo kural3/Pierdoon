@@ -258,11 +258,9 @@
     <string name="settings_crossfade_albums">И внутри альбома</string>
     <string name="settings_crossfade_albums_desc">Если выключено, треки одного альбома идут встык, как записаны</string>
     <string name="settings_cassette_mode">Кассетный режим</string>
-    <string name="settings_cassette_mode_desc">Шипение и плавание плёнки, кассета вместо обложки, очередь на двух сторонах и перемотка между ними</string>
+    <string name="settings_cassette_mode_desc">Шипение и плавание плёнки, кассета вместо обложки, очередь на двух сторонах. Магнитофон щёлкает клавишами на паузе и пуске, перематывает плёнку на следующий и предыдущий трек, переворачивает кассету после стороны A и отматывает её назад после стороны B</string>
     <string name="queue_side">Сторона %1$s</string>
     <string name="queue_now_on_side">Сейчас играет · сторона %1$s</string>
-    <string name="settings_cassette">Смена кассеты</string>
-    <string name="settings_cassette_desc">Между песнями слышно, как меняют кассету. Вместо кроссфейда</string>
     <string name="daily_mix">Плейлист дня</string>
     <string name="daily_mix_desc">Новый каждый день</string>
     <string name="stats">Статистика</string>
