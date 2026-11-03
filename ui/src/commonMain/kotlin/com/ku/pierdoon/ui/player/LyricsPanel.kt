@@ -1,12 +1,9 @@
 package com.ku.pierdoon.ui.player
 
-import com.ku.pierdoon.ui.resources.Res
-import com.ku.pierdoon.ui.resources.*
-import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.ui.platform.LocalWindowInfo
-import android.os.SystemClock
+import com.ku.pierdoon.ui.elapsedRealtime
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -61,11 +58,14 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.LyricsState
 import com.ku.pierdoon.PositionSnapshot
-import com.ku.pierdoon.R
+import com.ku.pierdoon.ui.PlatformStrings
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsOffsets
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
@@ -130,7 +130,7 @@ fun LyricsPanel(
                 Lyrics.Instrumental -> Centered { Message(stringResource(Res.string.lyrics_instrumental)); SearchButton() }
                 Lyrics.NotFound -> Centered { Message(stringResource(Res.string.lyrics_not_found)); SearchButton() }
             }
-            LyricsState.WifiOnly -> Centered { Message(stringResource(Res.string.lyrics_wifi_only)) }
+            LyricsState.WifiOnly -> Centered { Message(stringResource(PlatformStrings.lyricsWifiOnly)) }
         }
     }
 }
@@ -156,7 +156,7 @@ private fun SyncedLyrics(
         snapshotFlow { currentPosition() }.collectLatest { snap ->
             while (true) {
                 // Timeline of the lyrics: shifting them later = reading an earlier moment.
-                val now = snap.estimate(SystemClock.elapsedRealtime()) + LEAD_MS - offsetMs
+                val now = snap.estimate(elapsedRealtime()) + LEAD_MS - offsetMs
                 val idx = lyrics.indexAt(now)
                 current = idx
                 if (!snap.playing) break
@@ -171,7 +171,7 @@ private fun SyncedLyrics(
     val connection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput) userScrolledAt = SystemClock.elapsedRealtime()
+                if (source == NestedScrollSource.UserInput) userScrolledAt = elapsedRealtime()
                 return Offset.Zero
             }
         }
@@ -182,7 +182,7 @@ private fun SyncedLyrics(
     // (and stutter) all the way through. Half a window lets the first and last lines centre.
     val halfWindow = with(LocalDensity.current) { (LocalWindowInfo.current.containerSize.height / 2).toDp() }
     val centerSpring = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    fun userHolding() = SystemClock.elapsedRealtime() - userScrolledAt < USER_SCROLL_HOLD_MS
+    fun userHolding() = elapsedRealtime() - userScrolledAt < USER_SCROLL_HOLD_MS
 
     // The active line glides to the vertical centre of the panel. Before the first line starts,
     // that line takes the centre (unlit): the padding is sized for the taller immersive panel,

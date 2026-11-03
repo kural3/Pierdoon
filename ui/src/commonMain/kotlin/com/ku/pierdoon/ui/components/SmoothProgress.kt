@@ -1,6 +1,6 @@
 package com.ku.pierdoon.ui.components
 
-import com.ku.pierdoon.platform.SystemClock
+import com.ku.pierdoon.ui.elapsedRealtime
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -35,7 +35,7 @@ fun rememberSmoothProgress(
     LaunchedEffect(durationMs, widthPx) {
         snapshotFlow { currentPosition() }.collectLatest { snap ->
             while (true) {
-                val now = snap.estimate(SystemClock.elapsedRealtime())
+                val now = snap.estimate(elapsedRealtime())
                 fraction.floatValue =
                     if (durationMs > 0) (now.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
                 if (!snap.playing || durationMs <= 0 || widthPx <= 0) break

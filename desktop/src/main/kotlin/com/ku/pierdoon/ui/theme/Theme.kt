@@ -28,19 +28,9 @@ import androidx.compose.runtime.collectAsState
 import com.ku.pierdoon.data.AppSettings
 import com.ku.pierdoon.data.ColorSource
 import com.ku.pierdoon.data.ThemeMode
+import com.ku.pierdoon.ui.components.DesktopArtwork
+import com.ku.pierdoon.ui.components.LocalArtworkLoader
 import kotlinx.coroutines.flow.MutableStateFlow
-
-/** UI switches that components read without threading them through every call. */
-@Immutable
-data class UiPrefs(
-    val glass: Boolean = true,
-    val wavyProgress: Boolean = true,
-    val lyricsSyncControls: Boolean = false,
-    /** Nothing style: dot-matrix headings, dotted progress, flat player. */
-    val nothing: Boolean = false,
-)
-
-val LocalUiPrefs = staticCompositionLocalOf { UiPrefs() }
 
 /** Seed extracted from the current track's artwork; written by the app, read by the theme. */
 object AlbumThemeSeed {
@@ -109,6 +99,7 @@ fun PierdoonTheme(
                 nothing = settings.nothingStyle,
             ),
             LocalHapticFeedback provides haptics,
+            LocalArtworkLoader provides DesktopArtwork,
             // Text outside a Surface (or on a transparent one) would otherwise default to black.
             LocalContentColor provides MaterialTheme.colorScheme.onSurface,
             content = content,

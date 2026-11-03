@@ -111,7 +111,6 @@ import androidx.graphics.shapes.Morph
 import androidx.media3.common.Player
 import com.ku.pierdoon.LyricsState
 import com.ku.pierdoon.PositionSnapshot
-import com.ku.pierdoon.R
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.data.SettingsStore

@@ -51,7 +51,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.ku.pierdoon.R
 import com.ku.pierdoon.data.Album
 import com.ku.pierdoon.data.MusicCollections
 import com.ku.pierdoon.data.Playlist

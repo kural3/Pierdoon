@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.ku.pierdoon.R
 import com.ku.pierdoon.data.splitArtists
 import com.ku.pierdoon.ui.components.AppMenu
 import com.ku.pierdoon.ui.components.MenuAction

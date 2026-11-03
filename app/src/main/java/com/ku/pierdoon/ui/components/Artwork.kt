@@ -236,7 +236,7 @@ object ArtworkCache {
 val LocalRemoteCovers = staticCompositionLocalOf<((songId: Long, sizePx: Int) -> String?)?> { null }
 
 @Composable
-fun Artwork(
+private fun SongArtwork(
     songId: Long,
     albumId: Long,
     modifier: Modifier = Modifier,
@@ -258,7 +258,7 @@ fun Artwork(
 
 /** A cover file of the app's own (picked for a playlist, or about to be saved for a track). */
 @Composable
-fun FileArtwork(
+private fun PictureFileArtwork(
     file: File,
     version: Long,
     modifier: Modifier = Modifier,
@@ -338,3 +338,14 @@ fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
 
 private const val REMOTE_SMALL_PX = 160
 private const val REMOTE_LARGE_PX = 720
+
+/** Covers as found by this app (MediaStore, or the computer's while it is the one playing), for the screens in ui. */
+object PhoneArtwork : ArtworkLoader {
+    @Composable
+    override fun Artwork(songId: Long, albumId: Long, modifier: Modifier, large: Boolean, placeholderIconSize: Dp) =
+        SongArtwork(songId, albumId, modifier, large, placeholderIconSize)
+
+    @Composable
+    override fun FileArtwork(file: File, version: Long, modifier: Modifier, large: Boolean, placeholderIconSize: Dp) =
+        PictureFileArtwork(file, version, modifier, large, placeholderIconSize)
+}

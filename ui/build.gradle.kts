@@ -1,8 +1,9 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// Compose code both apps draw with: the expressive shapes and buttons, the colour scheme
-// generator, screen transitions, the colour picker, the expanding player and the icons.
-// Only Compose and Material 3 in here; strings, settings and screens stay in app/ and desktop/.
+// Compose code both apps draw with: the strings, the expressive shapes and buttons, the colour
+// scheme generator, screen transitions, the colour picker, the players' panels, the screens
+// that look the same on both, and the icons. What each app does its own way (covers, settings,
+// navigation, the screens laid out for a phone or a window) stays in app/ and desktop/.
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
@@ -38,6 +39,15 @@ kotlin {
             implementation(libs.compose.mp.material3)
             implementation(libs.androidx.graphics.shapes)
             api(libs.compose.mp.resources)
+            implementation(project(":core"))
+        }
+        // The Android app runs on the Compose and Material 3 of its own build file, newer than
+        // the ones Compose Multiplatform names. Compiled against those same ones, a call to
+        // anything that changed between them fails here instead of on the phone.
+        androidMain.dependencies {
+            implementation(project.dependencies.platform(libs.androidx.compose.bom))
+            implementation(libs.androidx.compose.material3)
+            implementation(libs.androidx.compose.ui)
         }
     }
 }

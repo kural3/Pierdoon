@@ -65,7 +65,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ku.pierdoon.R
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.download.DownloadGroup
 import com.ku.pierdoon.data.download.DownloadStatus

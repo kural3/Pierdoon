@@ -37,7 +37,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
-import com.ku.pierdoon.R
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.Backdrop

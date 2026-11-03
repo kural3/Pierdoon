@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-import com.ku.pierdoon.R
 import com.ku.pierdoon.data.update.AppRelease
 import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.data.update.Updater

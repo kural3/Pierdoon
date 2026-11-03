@@ -101,7 +101,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ku.pierdoon.R
 import com.ku.pierdoon.remote.FoundPc
 import com.ku.pierdoon.remote.PcLibrary
 import com.ku.pierdoon.remote.PcRemote

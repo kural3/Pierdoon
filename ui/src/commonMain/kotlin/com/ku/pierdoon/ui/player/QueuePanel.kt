@@ -378,7 +378,7 @@ private fun Label(text: String, modifier: Modifier = Modifier) {
 }
 
 /** Lets content reach [amount] past the parent's side padding (padding can't be negative). */
-internal fun Modifier.horizontalBleed(amount: Dp): Modifier = layout { measurable, constraints ->
+fun Modifier.horizontalBleed(amount: Dp): Modifier = layout { measurable, constraints ->
     val extra = (amount * 2).roundToPx()
     val placeable = measurable.measure(
         constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra)

@@ -29,7 +29,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.ku.pierdoon.R
 import com.ku.pierdoon.ui.components.PlayerIcons
 
 @Composable

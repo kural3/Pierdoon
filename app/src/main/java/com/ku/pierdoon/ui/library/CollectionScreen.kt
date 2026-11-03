@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import com.ku.pierdoon.R
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.data.Song
 

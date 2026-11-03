@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
-import com.ku.pierdoon.R
 import com.ku.pierdoon.playback.SleepTimer
 import com.ku.pierdoon.playback.SleepTimerState
 import com.ku.pierdoon.ui.components.ExpressiveIconButton

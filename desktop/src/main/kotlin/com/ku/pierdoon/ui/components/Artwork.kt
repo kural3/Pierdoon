@@ -256,7 +256,7 @@ object ArtworkCache {
 }
 
 @Composable
-fun Artwork(
+private fun SongArtwork(
     songId: Long,
     albumId: Long,
     modifier: Modifier = Modifier,
@@ -273,7 +273,7 @@ fun Artwork(
 
 /** A cover file of the app's own (picked for a playlist, or about to be saved for a track). */
 @Composable
-fun FileArtwork(
+private fun PictureFileArtwork(
     file: File,
     version: Long,
     modifier: Modifier = Modifier,
@@ -366,4 +366,15 @@ private fun bakeFrosted(image: ImageBitmap, width: Int, height: Int): ImageBitma
             },
         )
     }
+}
+
+/** Covers as found by this app (the files' own pictures through FFmpeg, and the ones picked by hand), for the screens in ui. */
+object DesktopArtwork : ArtworkLoader {
+    @Composable
+    override fun Artwork(songId: Long, albumId: Long, modifier: Modifier, large: Boolean, placeholderIconSize: Dp) =
+        SongArtwork(songId, albumId, modifier, large, placeholderIconSize)
+
+    @Composable
+    override fun FileArtwork(file: File, version: Long, modifier: Modifier, large: Boolean, placeholderIconSize: Dp) =
+        PictureFileArtwork(file, version, modifier, large, placeholderIconSize)
 }

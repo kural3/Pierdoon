@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.playback.PlaybackSpeed
-import com.ku.pierdoon.R
 import com.ku.pierdoon.ui.components.AppMenu
 import com.ku.pierdoon.ui.components.ExpressiveTextButton
 import com.ku.pierdoon.ui.components.MenuAction
