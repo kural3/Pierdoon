@@ -53,6 +53,32 @@ class CassetteSoundTest {
     }
 
     @Test
+    fun keyPressesVaryButStayTheSameKey() {
+        val base = cassetteKeySound(play = true)
+        val keys = SoundVariety(base, pitchSpread = 0.04f, gainSpreadDb = 1.5f, random = kotlin.random.Random(7))
+        val takes = List(50) { keys.next() }
+        val basePeak = base.maxOf { abs(it.toInt()) }
+        for (take in takes) {
+            // Length follows the speed: within 4% either way.
+            assertTrue(take.size.toDouble() / base.size in 0.96 / 1.0..1.0 / 0.96)
+            // Within 1.5 dB, give or take what resampling does to the peak.
+            assertTrue(take.maxOf { abs(it.toInt()) }.toDouble() / basePeak in 0.75..1.25)
+        }
+        // Never two alike in a row.
+        takes.zipWithNext().forEach { (a, b) -> assertTrue(a.size != b.size || !a.contentEquals(b)) }
+        assertTrue(takes.map { it.size }.toSet().size > 10)
+    }
+
+    @Test
+    fun aSpinIsAsLongAsItsSpeedSays() {
+        val winds = SoundVariety(cassetteWindSound(), pitchSpread = 0.06f, gainSpreadDb = 0f, random = kotlin.random.Random(3))
+        repeat(30) {
+            val ms = cassetteSoundMs(winds.next())
+            assertTrue("$ms ms", ms in (CASSETTE_WIND_MS / 1.06).toLong()..(CASSETTE_WIND_MS / 0.94).toLong() + 1)
+        }
+    }
+
+    @Test
     fun holdsTheRecordingAndNotNoise() {
         fun loudest(fromMs: Int, toMs: Int) =
             sound.slice(fromMs * rate / 1000 * 2 until toMs * rate / 1000 * 2).maxOf { abs(it.toInt()) }

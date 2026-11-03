@@ -59,7 +59,7 @@ class Player {
             if (wantsPlay == value) return
             wantsPlay = value
             // Wherever it came from (a button, a media key, the phone), the deck's key goes down.
-            if (tapeMode && items.isNotEmpty()) keys.play(if (value) TapeSounds.playKey else TapeSounds.stopKey, outputDevice, volume)
+            if (tapeMode && items.isNotEmpty()) keys.play(TapeSounds.key(play = value), outputDevice, volume)
             if (value) {
                 if (playbackState == STATE_ENDED) seekToDefaultPosition()
                 if (playbackState == STATE_IDLE) prepare()
@@ -415,7 +415,7 @@ class Player {
         engine.pause()
         winding = true
         TapeMotion.current.value = motion
-        deck.play(TapeSounds.wind, outputDevice, volume) { finishWind() }
+        deck.play(TapeSounds.wind(), outputDevice, volume) { finishWind() }
     }
 
     private fun finishWind() {

@@ -66,6 +66,55 @@ fun cassetteKeySound(play: Boolean): ShortArray {
     }
 }
 
+/** The deck's keys as they're pressed: each press a touch tighter or looser, softer or harder. */
+fun cassetteKeyVariety(play: Boolean) = SoundVariety(cassetteKeySound(play), pitchSpread = 0.04f, gainSpreadDb = 1.5f)
+
+/** Spins of the tape: each a little faster or slower, and so a little higher and shorter or lower and longer. */
+fun cassetteWindVariety() = SoundVariety(cassetteWindSound(), pitchSpread = 0.06f, gainSpreadDb = 0f)
+
+/**
+ * One deck sound played again and again without sounding like a recording: every take is the same
+ * sound sped up or slowed down (pitch and length together, as a motor running faster) by up to
+ * [pitchSpread], and made louder or softer by up to [gainSpreadDb]. Two takes in a row never come
+ * out alike.
+ */
+class SoundVariety(
+    private val sound: ShortArray,
+    private val pitchSpread: Float,
+    private val gainSpreadDb: Float,
+    private val random: kotlin.random.Random = kotlin.random.Random.Default,
+) {
+    private var lastPitch = 1f
+
+    fun next(): ShortArray {
+        var pitch: Float
+        // A third of the range apart from the last one, so a quick double press is heard as two.
+        do {
+            pitch = 1f + (random.nextFloat() * 2 - 1) * pitchSpread
+        } while (pitchSpread > 0f && kotlin.math.abs(pitch - lastPitch) < pitchSpread / 3)
+        lastPitch = pitch
+        val db = (random.nextFloat() * 2 - 1) * gainSpreadDb
+        return resampled(pitch, Math.pow(10.0, db / 20.0).toFloat())
+    }
+
+    private fun resampled(pitch: Float, gain: Float): ShortArray {
+        val frames = sound.size / CHANNELS
+        val outFrames = (frames / pitch).toInt()
+        val out = ShortArray(outFrames * CHANNELS)
+        for (i in 0 until outFrames) {
+            val at = i * pitch
+            val a = at.toInt().coerceAtMost(frames - 1)
+            val b = (a + 1).coerceAtMost(frames - 1)
+            val part = at - a
+            for (c in 0 until CHANNELS) {
+                val x = sound[a * CHANNELS + c] + (sound[b * CHANNELS + c] - sound[a * CHANNELS + c]) * part
+                out[i * CHANNELS + c] = (x * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            }
+        }
+        return out
+    }
+}
+
 /** How long [samples] (interleaved stereo at [CASSETTE_SOUND_RATE]) play for. */
 fun cassetteSoundMs(samples: ShortArray): Long = samples.size / CHANNELS * 1000L / CASSETTE_SOUND_RATE
 

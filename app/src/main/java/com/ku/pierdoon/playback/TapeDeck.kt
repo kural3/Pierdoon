@@ -67,9 +67,10 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
 
     private val flipSound by lazy { cassetteChangeSound() }
     private val rewindSound by lazy { cassetteRewindSound() }
-    private val windSound by lazy { cassetteWindSound() }
-    private val playKey by lazy { cassetteKeySound(play = true) }
-    private val stopKey by lazy { cassetteKeySound(play = false) }
+    // The keys and spins come out a little different every time.
+    private val winds by lazy { cassetteWindVariety() }
+    private val playKeys by lazy { cassetteKeyVariety(play = true) }
+    private val stopKeys by lazy { cassetteKeyVariety(play = false) }
 
     private var track: AudioTrack? = null
     private var keyTrack: AudioTrack? = null
@@ -169,17 +170,18 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
         finish(resume = false)
         windingFrom = player.volume
         player.volume = 0f
-        track = playing(windSound)
+        val spin = winds.next()
+        track = playing(spin)
         TapeMotion.current.value = motion
         waiting = scope.launch {
-            delay(cassetteSoundMs(windSound))
+            delay(cassetteSoundMs(spin))
             finish(resume = true, backToStart = true)
         }
     }
 
     private fun key(play: Boolean) {
         keyTrack?.release()
-        keyTrack = playing(if (play) playKey else stopKey)
+        keyTrack = playing((if (play) playKeys else stopKeys).next())
     }
 
     /**
