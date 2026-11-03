@@ -21,16 +21,16 @@ public class Banners {
         bold = Font.createFont(Font.TRUETYPE_FONT, new File("C:/Windows/Fonts/segoeuib.ttf"));
         regular = Font.createFont(Font.TRUETYPE_FONT, new File("C:/Windows/Fonts/segoeui.ttf"));
         BufferedImage home = ImageIO.read(shots.resolve("post_home.png").toFile());
-        hero(ImageIO.read(icon.toFile()), home, out.resolve("banner.png"));
+        hero(ImageIO.read(icon.toFile()), home, out.resolve("readme-hero.png"));
         feature(home, "A fresh, expressive look",
             "Material 3 Expressive on the phone and the PC. On a wide window the screens spread into two columns.",
-            false, out.resolve("feature-design.png"));
+            false, out.resolve("readme-design.png"));
         feature(ImageIO.read(shots.resolve("post_queue.png").toFile()), "Lyrics and queue on frosted glass",
             "Synced lyrics and the queue open over the screen, so nothing moves aside. Menus and sheets are frosted too.",
-            true, out.resolve("feature-glass.png"));
+            true, out.resolve("readme-glass.png"));
         feature(ImageIO.read(shots.resolve("post_log.png").toFile()), "Downloads that explain themselves",
             "Every download is logged with the full error. When YouTube asks if you\u2019re a bot, sign in once and it stops asking.",
-            false, out.resolve("feature-downloads.png"));
+            false, out.resolve("readme-downloads.png"));
     }
 
     static Graphics2D canvas(BufferedImage img) {

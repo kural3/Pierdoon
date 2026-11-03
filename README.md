@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/banner.png" alt="Pier.doon, an offline music player for Android and Windows" width="100%"></p>
+<p align="center"><img src="docs/readme-hero.png" alt="Pier.doon, an offline music player for Android and Windows" width="100%"></p>
 
 <p align="center">
   <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/kural3/Pierdoon?style=flat-square&color=2e2f33&label=release" alt="Latest release"></a>
@@ -22,9 +22,9 @@ What changed in each version is in its release notes.
 
 ## A look around
 
-<p align="center"><img src="docs/feature-design.png" alt="The home screen in Material 3 Expressive" width="100%"></p>
-<p align="center"><img src="docs/feature-glass.png" alt="The queue over the screen on frosted glass" width="100%"></p>
-<p align="center"><img src="docs/feature-downloads.png" alt="The download log and YouTube sign-in" width="100%"></p>
+<p align="center"><img src="docs/readme-design.png" alt="The home screen in Material 3 Expressive" width="100%"></p>
+<p align="center"><img src="docs/readme-glass.png" alt="The queue over the screen on frosted glass" width="100%"></p>
+<p align="center"><img src="docs/readme-downloads.png" alt="The download log and YouTube sign-in" width="100%"></p>
 
 ## What it does
 
