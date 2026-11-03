@@ -63,7 +63,8 @@ class Player {
             if (value) {
                 if (playbackState == STATE_ENDED) seekToDefaultPosition()
                 if (playbackState == STATE_IDLE) prepare()
-                engine.play()
+                // Mid-spin the tape isn't there yet: it plays once it is.
+                if (!winding) engine.play()
             } else {
                 engine.pause()
                 // No tape left to wait for: paused on the next track.
@@ -401,17 +402,19 @@ class Player {
         if (p >= 0) seekToDefaultPosition(p) else seekTo(0)
     }
 
-    /** Does [move] and, playing a tape, holds the track while the tape spins to it. */
+    /**
+     * Does [move] and, on a tape, spins it there. Playing, the track is held until the tape gets
+     * there; paused, the tape spins all the same and stays paused.
+     */
     private inline fun windTo(motion: TapeMotion, move: () -> Unit) {
-        val wind = tapeMode && playWhenReady
-        holdPlayback = wind
+        holdPlayback = tapeMode
         try {
             move()
         } finally {
             holdPlayback = false
         }
-        if (!wind || playbackState != STATE_READY) return
-        // Back to the start of the same track is a seek, not a load: the engine is still playing.
+        if (!tapeMode || playbackState != STATE_READY) return
+        // Back to the start of the same track is a seek, not a load: the engine may still be playing.
         engine.pause()
         winding = true
         TapeMotion.current.value = motion

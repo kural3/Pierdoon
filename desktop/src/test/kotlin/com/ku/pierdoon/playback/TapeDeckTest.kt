@@ -120,6 +120,52 @@ class TapeDeckTest {
     }
 
     @Test
+    fun aPausedTapeSpinsTooAndStaysPaused() {
+        assumeTrue(music.size == 2 && AudioSystem.getMixerInfo().isNotEmpty())
+        val (p, _) = newPlayer()
+        var playing = true
+        onUi {
+            p.pause()
+            p.seekToNext()
+        }
+        Thread.sleep(windMs / 2)
+        var motion = TapeMotion.Still
+        onUi { motion = TapeMotion.current.value }
+        assertEquals(TapeMotion.Forward, motion)
+        Thread.sleep(windMs / 2 + 800)
+        var position = -1L
+        onUi {
+            playing = p.isPlaying
+            position = p.currentPosition
+            motion = TapeMotion.current.value
+        }
+        assertTrue("started playing", !playing)
+        assertEquals(TapeMotion.Still, motion)
+        assertTrue("position $position", position < 100)
+        onUi { p.release() }
+    }
+
+    @Test
+    fun playPressedMidSpinStartsOnceTheTapeIsThere() {
+        assumeTrue(music.size == 2 && AudioSystem.getMixerInfo().isNotEmpty())
+        val (p, _) = newPlayer()
+        onUi {
+            p.pause()
+            p.seekToNext()
+        }
+        Thread.sleep(windMs / 4)
+        onUi { p.play() }
+        Thread.sleep(windMs / 4)
+        var position = -1L
+        onUi { position = p.currentPosition }
+        assertTrue("ran during the spin: $position", position < 100)
+        Thread.sleep(windMs / 2 + 1_000)
+        onUi { position = p.currentPosition }
+        assertTrue("position $position", position in 500..1_500)
+        onUi { p.release() }
+    }
+
+    @Test
     fun skippingWhileTheCassetteIsTurnedGoesThereAfterASpin() {
         assumeTrue(music.size == 2 && AudioSystem.getMixerInfo().isNotEmpty())
         val (p, songs) = newPlayer()

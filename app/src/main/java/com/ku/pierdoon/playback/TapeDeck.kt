@@ -22,8 +22,9 @@ import kotlinx.coroutines.launch
  *   (repeat all) rewinds it. [player] is told to pause at the end of that track, the sound plays,
  *   and playing on takes it into the next one. Going elsewhere meanwhile (next, a seek, play) ends
  *   it right there. Owns [Player.setPauseAtEndOfMediaItems], which keeps the crossfade out of it.
- * - Next and previous ([buttons], which the session hands to controllers) spin the tape there: the
- *   new track is held silent until the spin is over, then starts from the top.
+ * - Next and previous ([buttons], which the session hands to controllers) spin the tape there,
+ *   playing or paused. Playing, the new track is held silent until the spin is over, then starts
+ *   from the top; paused, it stays paused.
  * - Play and pause asked for by anyone (the app, the notification, headphones) press a key.
  */
 @OptIn(UnstableApi::class)
@@ -77,6 +78,8 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
     private var waiting: Job? = null
     /** Set while the tape spins to a track that plays muted until then; the volume to give back. */
     private var windingFrom: Float? = null
+    /** Set while the tape spins to the next or previous track, playing or not. */
+    private var spinning = false
     /**
      * Set when the deck itself plays on after turning the tape, which nobody pressed a key for.
      * Cleared by the change it causes, which may be reported late (from inside another callback).
@@ -91,7 +94,13 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
             }
             if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST && tapeMode) key(playWhenReady)
             if (playWhenReady) {
-                finish(resume = false)
+                if (spinning && windingFrom == null) {
+                    // Play pressed while a paused tape spins: the track starts once it's there, silent till then.
+                    windingFrom = player.volume
+                    player.volume = 0f
+                } else {
+                    finish(resume = false)
+                }
             } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM && !stopAtEnd) {
                 val end = sideEnd()
                 if (end != SideEnd.None) turn(end)
@@ -164,18 +173,24 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
         }
     }
 
-    /** Next or previous pressed while playing a tape: the track just moved to plays once the spin is over. */
+    /**
+     * Next or previous pressed on a tape: it spins to the track. Playing, the track plays once the
+     * spin is over; paused, the tape spins all the same and stays paused.
+     */
     private fun wind(motion: TapeMotion) {
-        if (!tapeMode || !player.playWhenReady || player.mediaItemCount == 0) return
+        if (!tapeMode || player.mediaItemCount == 0) return
         finish(resume = false)
-        windingFrom = player.volume
-        player.volume = 0f
+        if (player.playWhenReady) {
+            windingFrom = player.volume
+            player.volume = 0f
+        }
+        spinning = true
         val spin = winds.next()
         track = playing(spin)
         TapeMotion.current.value = motion
         waiting = scope.launch {
             delay(cassetteSoundMs(spin))
-            finish(resume = true, backToStart = true)
+            finish(resume = false, backToStart = true)
         }
     }
 
@@ -185,12 +200,15 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
     }
 
     /**
-     * Ends whatever the deck is doing. [resume] plays on into the track it was going to;
-     * [backToStart] puts a track that was spun to back at its start, as it ran silently meanwhile.
+     * Ends whatever the deck is doing. [resume] plays on into the track a turn of the tape was
+     * going to; [backToStart] puts a track that was spun to back at its start, as it ran silently
+     * meanwhile. A paused tape that was spun stays paused either way.
      */
     private fun finish(resume: Boolean, backToStart: Boolean = false) {
         val job = waiting ?: return
         waiting = null
+        val wasSpinning = spinning
+        spinning = false
         TapeMotion.current.value = TapeMotion.Still
         track?.release()
         track = null
@@ -200,7 +218,7 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
         if (volume != null) {
             if (backToStart) player.seekTo(0)
             player.volume = volume
-        } else if (resume && player.playbackState != Player.STATE_IDLE && !player.playWhenReady) {
+        } else if (resume && !wasSpinning && player.playbackState != Player.STATE_IDLE && !player.playWhenReady) {
             playingOn = true
             player.play()
         }

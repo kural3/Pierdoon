@@ -24,7 +24,7 @@ What changed in each version is in its release notes.
 - Downloads by link or by search from YouTube, SoundCloud, Bandcamp and the other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports, with title, artist and cover; whole playlists and albums too
 - Edits tags and covers, in the app or in the file
 - Crossfade of up to 12 seconds between tracks, with albums left gapless unless asked otherwise
-- Cassette mode: tape hiss and wobble, a cassette with turning reels in place of the cover, the queue split into sides A and B. The deck's keys click on play and pause (from anywhere: the app, the notification, headphones, media keys), next and previous spin the tape to the track, the cassette is turned over after side A and rewound after side B when the queue repeats
+- Cassette mode: tape hiss and wobble, a cassette with turning reels in place of the cover, the queue split into sides A and B. The deck's keys click on play and pause (from anywhere: the app, the notification, headphones, media keys), next and previous spin the tape to the track (paused too), the cassette is turned over after side A and rewound after side B when the queue repeats
 - Playlists in and out as `.m3u` / `.m3u8`, finding tracks by path, then by name and tags
 - English and Russian interface: the system's language by default, or chosen in Settings → Appearance
 - Expanding player, frosted glass, album art / wallpaper or Windows accent / custom color themes, a Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts
