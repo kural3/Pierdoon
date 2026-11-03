@@ -19,6 +19,7 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.ku.pierdoon", appContext.packageName)
+        // ".test" when installed beside the real app (-PsideBySideTests).
+        assertEquals("com.ku.pierdoon", appContext.packageName.removeSuffix(".test"))
     }
 }
