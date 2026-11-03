@@ -268,7 +268,7 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                                     stringResource(Res.string.theme_dark),
                                 ),
                                 selected = settings.theme.ordinal,
-                                onSelect = { i -> onUpdate { it.copy(theme = ThemeMode.entries[i]) } },
+                                onSelect = { i -> onUpdate { it.shared { copy(theme = ThemeMode.entries[i]) } } },
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             )
                         }
@@ -280,7 +280,7 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         title = stringResource(Res.string.settings_nothing),
                         subtitle = stringResource(Res.string.settings_nothing_desc),
                         checked = settings.nothingStyle,
-                        onChange = { v -> onUpdate { it.copy(nothingStyle = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(nothingStyle = v) } } },
                     )
                 },
             )
@@ -299,7 +299,7 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         shape = shape,
                         font = font,
                         selected = settings.font == font,
-                        onClick = { onUpdate { it.copy(font = font) } },
+                        onClick = { onUpdate { it.shared { copy(font = font) } } },
                     )
                 }
             }
@@ -317,7 +317,7 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                             title = stringResource(Res.string.settings_black),
                             subtitle = stringResource(Res.string.settings_black_desc),
                             checked = settings.pureBlack,
-                            onChange = { v -> onUpdate { it.copy(pureBlack = v) } },
+                            onChange = { v -> onUpdate { it.shared { copy(pureBlack = v) } } },
                         )
                     },
                 )
@@ -333,7 +333,7 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         title = stringResource(Res.string.settings_glass),
                         subtitle = stringResource(Res.string.settings_glass_desc),
                         checked = settings.glass,
-                        onChange = { v -> onUpdate { it.copy(glass = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(glass = v) } } },
                     )
                 }
                 add { shape ->
@@ -351,7 +351,7 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         title = stringResource(Res.string.settings_wavy),
                         subtitle = stringResource(Res.string.settings_wavy_desc),
                         checked = settings.wavyProgress,
-                        onChange = { v -> onUpdate { it.copy(wavyProgress = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(wavyProgress = v) } } },
                     )
                 }
             }
@@ -481,7 +481,7 @@ private fun ColorsItem(shape: Shape, settings: AppSettings, onUpdate: Update) {
                     )
                 },
                 selected = sources.indexOf(source),
-                onSelect = { i -> onUpdate { it.copy(colorSource = sources[i]) } },
+                onSelect = { i -> onUpdate { it.shared { copy(colorSource = sources[i]) } } },
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             )
             if (source != ColorSource.Wallpaper) {
@@ -497,12 +497,12 @@ private fun ColorsItem(shape: Shape, settings: AppSettings, onUpdate: Update) {
                 Spacer(Modifier.height(8.dp))
                 SwatchRow(
                     selected = settings.seedColor,
-                    onSelect = { seed -> onUpdate { it.copy(seedColor = seed) } },
+                    onSelect = { seed -> onUpdate { it.shared { copy(seedColor = seed) } } },
                 )
                 Spacer(Modifier.height(12.dp))
                 HuePicker(
                     seed = settings.seedColor,
-                    onSeed = { seed -> onUpdate { it.copy(seedColor = seed) } },
+                    onSeed = { seed -> onUpdate { it.shared { copy(seedColor = seed) } } },
                 )
             }
             Spacer(Modifier.height(16.dp))
@@ -521,7 +521,7 @@ private fun LazyListScope.feedback(settings: AppSettings, onUpdate: Update) {
                         title = stringResource(Res.string.settings_haptics),
                         subtitle = stringResource(Res.string.settings_haptics_desc),
                         checked = settings.haptics,
-                        onChange = { v -> onUpdate { it.copy(haptics = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(haptics = v) } } },
                     )
                 },
                 { shape ->
@@ -534,7 +534,7 @@ private fun LazyListScope.feedback(settings: AppSettings, onUpdate: Update) {
                         ),
                         checked = settings.smoothAnimations && supported,
                         enabled = supported,
-                        onChange = { v -> onUpdate { it.copy(smoothAnimations = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(smoothAnimations = v) } } },
                     )
                 },
             )
@@ -545,14 +545,14 @@ private fun LazyListScope.feedback(settings: AppSettings, onUpdate: Update) {
 private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
     item(key = "speed") {
         Group(stringResource(Res.string.speed)) {
-            listOf<@Composable (Shape) -> Unit>({ shape -> SpeedItem(shape, settings.playbackSpeed) { v -> onUpdate { it.copy(playbackSpeed = v) } } })
+            listOf<@Composable (Shape) -> Unit>({ shape -> SpeedItem(shape, settings.playbackSpeed) { v -> onUpdate { it.shared { copy(playbackSpeed = v) } } } })
         }
     }
     item(key = "crossfade") {
         Group(stringResource(Res.string.settings_crossfade)) {
             listOf<@Composable (Shape) -> Unit>(
                 { shape ->
-                    CrossfadeItem(shape, settings.crossfadeSeconds) { s -> onUpdate { it.copy(crossfadeSeconds = s) } }
+                    CrossfadeItem(shape, settings.crossfadeSeconds) { s -> onUpdate { it.shared { copy(crossfadeSeconds = s) } } }
                 },
                 { shape ->
                     SwitchItem(
@@ -561,7 +561,7 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
                         subtitle = stringResource(Res.string.settings_crossfade_albums_desc),
                         checked = settings.crossfadeAlbums,
                         enabled = settings.crossfadeSeconds > 0,
-                        onChange = { v -> onUpdate { it.copy(crossfadeAlbums = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(crossfadeAlbums = v) } } },
                     )
                 },
             )
@@ -576,7 +576,7 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
                         title = stringResource(Res.string.settings_equalizer),
                         subtitle = stringResource(Res.string.settings_equalizer_desc),
                         checked = settings.eqEnabled,
-                        onChange = { v -> onUpdate { it.copy(eqEnabled = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(eqEnabled = v) } } },
                     )
                 },
                 { shape -> EqualizerItem(shape, settings, onUpdate) },
@@ -592,7 +592,7 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
                         title = stringResource(Res.string.settings_silence),
                         subtitle = stringResource(Res.string.settings_silence_desc),
                         checked = settings.skipSilence,
-                        onChange = { v -> onUpdate { it.copy(skipSilence = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(skipSilence = v) } } },
                     )
                 },
                 { shape ->
@@ -601,7 +601,7 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
                         title = stringResource(Res.string.settings_cassette_mode),
                         subtitle = stringResource(Res.string.settings_cassette_mode_desc),
                         checked = settings.cassetteMode,
-                        onChange = { v -> onUpdate { it.copy(cassetteMode = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(cassetteMode = v) } } },
                     )
                 },
             )
@@ -622,7 +622,7 @@ private fun EqualizerItem(shape: Shape, settings: AppSettings, onUpdate: Update)
                     ChoiceChip(
                         selected = settings.eqPreset == preset,
                         label = stringResource(preset.label()),
-                        onClick = { onUpdate { it.copy(eqPreset = preset, eqGains = preset.gains ?: it.eqGains) } },
+                        onClick = { onUpdate { it.shared { copy(eqPreset = preset, eqGains = preset.gains ?: it.eqGains) } } },
                         enabled = on,
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     )
@@ -636,7 +636,7 @@ private fun EqualizerItem(shape: Shape, settings: AppSettings, onUpdate: Update)
                 enabled = on,
                 onChange = { band, db ->
                     onUpdate { s ->
-                        s.copy(eqGains = s.eqGains.toMutableList().also { it[band] = db }, eqPreset = EqPreset.Custom)
+                        s.shared { copy(eqGains = s.eqGains.toMutableList().also { it[band] = db }, eqPreset = EqPreset.Custom) }
                     }
                 },
             )
@@ -672,7 +672,7 @@ private fun LazyListScope.lyrics(
                         title = stringResource(Res.string.settings_wifi_only),
                         subtitle = stringResource(Res.string.settings_wifi_only_desc),
                         checked = settings.lyricsWifiOnly,
-                        onChange = { v -> onUpdate { it.copy(lyricsWifiOnly = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(lyricsWifiOnly = v) } } },
                     )
                 },
                 { shape ->
@@ -681,7 +681,7 @@ private fun LazyListScope.lyrics(
                         title = stringResource(Res.string.settings_sync_controls),
                         subtitle = stringResource(Res.string.settings_sync_controls_desc),
                         checked = settings.lyricsSyncControls,
-                        onChange = { v -> onUpdate { it.copy(lyricsSyncControls = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(lyricsSyncControls = v) } } },
                     )
                 },
                 { shape ->
@@ -782,7 +782,7 @@ private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update) {
                                     stringResource(Res.string.download_format_opus),
                                 ),
                                 selected = settings.downloadFormat.ordinal,
-                                onSelect = { i -> onUpdate { it.copy(downloadFormat = DownloadFormat.entries[i]) } },
+                                onSelect = { i -> onUpdate { it.shared { copy(downloadFormat = DownloadFormat.entries[i]) } } },
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             )
                             Spacer(Modifier.height(12.dp))
@@ -843,7 +843,7 @@ private fun LazyListScope.updates(
                         title = stringResource(Res.string.settings_updates_auto),
                         subtitle = stringResource(Res.string.settings_updates_auto_desc),
                         checked = settings.checkUpdates,
-                        onChange = { v -> onUpdate { it.copy(checkUpdates = v) } },
+                        onChange = { v -> onUpdate { it.shared { copy(checkUpdates = v) } } },
                     )
                 },
                 { shape ->

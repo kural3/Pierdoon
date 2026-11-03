@@ -1,79 +1,36 @@
 package com.ku.pierdoon.data
 
-import com.ku.pierdoon.playback.EQ_FLAT
-import com.ku.pierdoon.playback.EqPreset
-import com.ku.pierdoon.playback.PlaybackSpeed
-import com.ku.pierdoon.playback.formatEqGains
-import com.ku.pierdoon.playback.parseEqGains
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.Immutable
 import androidx.core.content.edit
-import com.ku.pierdoon.data.download.DownloadFormat
-import com.ku.pierdoon.data.metadata.SaveTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class ThemeMode { System, Light, Dark }
-
-/** Where the palette comes from: device wallpaper, current album art, or a chosen colour. */
-enum class ColorSource { Wallpaper, AlbumArt, Custom }
-
-/** Typeface for the whole app. */
-enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono }
-
-const val DEFAULT_SEED: Int = 0xFF6750A4.toInt()
-
 /** Where downloads and tracks from the computer go, relative to the storage root. */
 const val DEFAULT_SAVE_FOLDER = "Music/Pier.doon"
 
-@Immutable
-data class AppSettings(
-    val theme: ThemeMode = ThemeMode.System,
-    val colorSource: ColorSource =
+/** The phone's defaults for what both apps have: wallpaper colours where Android has them, haptics on. */
+private val PHONE_DEFAULTS = CommonSettings(
+    colorSource =
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) ColorSource.Wallpaper
         else ColorSource.Custom,
-    val seedColor: Int = DEFAULT_SEED,
-    /** True black surfaces in dark theme: OLED pixels switch off and save power. */
-    val pureBlack: Boolean = false,
-    val haptics: Boolean = true,
-    /** Ask the display for its top refresh rate while animating (Android 15+). */
-    val smoothAnimations: Boolean = true,
-    val glass: Boolean = true,
+    haptics = true,
+)
+
+/** The settings both apps have ([common]) and the phone's own. */
+@Immutable
+data class AppSettings(
+    val common: CommonSettings = PHONE_DEFAULTS,
     /** Rounded tab bar hovering above content instead of docked to the bottom edge. */
     val floatingNav: Boolean = false,
-    val wavyProgress: Boolean = true,
-    /** Nothing-style look: monochrome with a red accent, dot-matrix headings, dotted progress. */
-    val nothingStyle: Boolean = false,
-    val font: AppFont = AppFont.System,
-    val lyricsWifiOnly: Boolean = false,
-    /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
-    val lyricsSyncControls: Boolean = false,
-    val skipSilence: Boolean = false,
-    /** Seconds one track fades into the next; 0 for none. */
-    val crossfadeSeconds: Int = 0,
-    /** Playback speed, pitch following it; one of [com.ku.pierdoon.playback.PlaybackSpeed.options]. */
-    val playbackSpeed: Float = 1f,
-    /** Fade between tracks of one album too; off keeps albums gapless, as recorded. */
-    val crossfadeAlbums: Boolean = false,
-    /** The queue as a tape: its sound, a cassette in the player, two sides, the deck's keys and spins. */
-    val cassetteMode: Boolean = false,
-    val eqEnabled: Boolean = false,
-    /** Gain per band in dB, [com.ku.pierdoon.playback.EQ_BANDS] long; a preset copies its own in. */
-    val eqGains: List<Float> = EQ_FLAT,
-    /** The preset [eqGains] came from, or [EqPreset.Custom] once a band was moved by hand. */
-    val eqPreset: EqPreset = EqPreset.Flat,
-    /** Last choice on the track editor: the app's records or the file itself. */
-    val editTarget: SaveTarget = SaveTarget.App,
-    /** Look for a new release on GitHub now and then (at most twice a day). */
-    val checkUpdates: Boolean = true,
-    val downloadFormat: DownloadFormat = DownloadFormat.M4a,
     /** Folders left out of the library, as [MusicFolder.path]s: only that folder, not the ones inside it. */
     val excludedFolders: Set<String> = emptySet(),
-    val songSort: SongSort = SongSort.Title,
-    val songSortDescending: Boolean = false,
-)
+) : SharedSettings by common {
+    /** A change to the settings both apps have. */
+    fun shared(change: CommonSettings.() -> CommonSettings): AppSettings = copy(common = common.change())
+}
 
 /**
  * App-wide settings shared by the UI and the playback service (same process).
@@ -90,39 +47,14 @@ object SettingsStore {
         val p = context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
         prefs = p
         val d = AppSettings()
+        // The old on/off "wallpaper colours" switch, from before there was a colour source.
+        val defaults =
+            if (!p.contains(CommonSettings.COLOR_SOURCE_KEY) && !p.getBoolean(K_DYNAMIC, true)) d.common.copy(colorSource = ColorSource.Custom)
+            else d.common
         _settings.value = AppSettings(
-            theme = runCatching { ThemeMode.valueOf(p.getString(K_THEME, d.theme.name)!!) }.getOrDefault(d.theme),
-            colorSource = p.getString(K_SOURCE, null)
-                ?.let { runCatching { ColorSource.valueOf(it) }.getOrNull() }
-                // Migrate the old on/off "wallpaper colours" switch.
-                ?: if (p.getBoolean(K_DYNAMIC, true)) d.colorSource else ColorSource.Custom,
-            seedColor = p.getInt(K_SEED, d.seedColor),
-            pureBlack = p.getBoolean(K_BLACK, d.pureBlack),
-            haptics = p.getBoolean(K_HAPTICS, d.haptics),
-            smoothAnimations = p.getBoolean(K_SMOOTH, d.smoothAnimations),
-            glass = p.getBoolean(K_GLASS, d.glass),
+            common = CommonSettings.read(Reader(p), defaults),
             floatingNav = p.getBoolean(K_FLOATING_NAV, d.floatingNav),
-            wavyProgress = p.getBoolean(K_WAVY, d.wavyProgress),
-            nothingStyle = p.getBoolean(K_NOTHING, d.nothingStyle),
-            font = runCatching { AppFont.valueOf(p.getString(K_FONT, d.font.name)!!) }.getOrDefault(d.font),
-            lyricsWifiOnly = p.getBoolean(K_WIFI, d.lyricsWifiOnly),
-            lyricsSyncControls = p.getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
-            skipSilence = p.getBoolean(K_SILENCE, d.skipSilence),
-            crossfadeSeconds = p.getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
-            playbackSpeed = PlaybackSpeed.nearest(p.getFloat(K_SPEED, d.playbackSpeed)),
-            crossfadeAlbums = p.getBoolean(K_CROSSFADE_ALBUMS, d.crossfadeAlbums),
-            cassetteMode = p.getBoolean(K_CASSETTE_MODE, d.cassetteMode),
-            eqEnabled = p.getBoolean(K_EQ, d.eqEnabled),
-            eqGains = parseEqGains(p.getString(K_EQ_GAINS, null)),
-            eqPreset = EqPreset.entries.firstOrNull { it.name == p.getString(K_EQ_PRESET, null) } ?: d.eqPreset,
-            editTarget = runCatching { SaveTarget.valueOf(p.getString(K_EDIT_TARGET, d.editTarget.name)!!) }
-                .getOrDefault(d.editTarget),
-            checkUpdates = p.getBoolean(K_UPDATES, d.checkUpdates),
-            downloadFormat = runCatching { DownloadFormat.valueOf(p.getString(K_DOWNLOAD_FORMAT, d.downloadFormat.name)!!) }
-                .getOrDefault(d.downloadFormat),
             excludedFolders = p.getStringSet(K_EXCLUDED, null)?.toSet() ?: d.excludedFolders,
-            songSort = runCatching { SongSort.valueOf(p.getString(K_SONG_SORT, d.songSort.name)!!) }.getOrDefault(d.songSort),
-            songSortDescending = p.getBoolean(K_SONG_SORT_DESC, d.songSortDescending),
         )
     }
 
@@ -131,62 +63,27 @@ object SettingsStore {
         if (s == _settings.value) return
         _settings.value = s
         prefs?.edit {
-            putString(K_THEME, s.theme.name)
-            putString(K_SOURCE, s.colorSource.name)
-            putInt(K_SEED, s.seedColor)
-            putBoolean(K_BLACK, s.pureBlack)
-            putBoolean(K_HAPTICS, s.haptics)
-            putBoolean(K_SMOOTH, s.smoothAnimations)
-            putBoolean(K_GLASS, s.glass)
+            s.common.write(Writer(this))
             putBoolean(K_FLOATING_NAV, s.floatingNav)
-            putBoolean(K_WAVY, s.wavyProgress)
-            putBoolean(K_NOTHING, s.nothingStyle)
-            putString(K_FONT, s.font.name)
-            putBoolean(K_WIFI, s.lyricsWifiOnly)
-            putBoolean(K_SYNC_CONTROLS, s.lyricsSyncControls)
-            putBoolean(K_SILENCE, s.skipSilence)
-            putInt(K_CROSSFADE, s.crossfadeSeconds)
-            putFloat(K_SPEED, s.playbackSpeed)
-            putBoolean(K_CROSSFADE_ALBUMS, s.crossfadeAlbums)
-            putBoolean(K_CASSETTE_MODE, s.cassetteMode)
-            putBoolean(K_EQ, s.eqEnabled)
-            putString(K_EQ_GAINS, formatEqGains(s.eqGains))
-            putString(K_EQ_PRESET, s.eqPreset.name)
-            putString(K_EDIT_TARGET, s.editTarget.name)
-            putBoolean(K_UPDATES, s.checkUpdates)
-            putString(K_DOWNLOAD_FORMAT, s.downloadFormat.name)
             putStringSet(K_EXCLUDED, s.excludedFolders)
-            putString(K_SONG_SORT, s.songSort.name)
-            putBoolean(K_SONG_SORT_DESC, s.songSortDescending)
         }
     }
 
-    private const val K_THEME = "theme"
+    private class Reader(private val p: SharedPreferences) : SettingsReader {
+        override fun getString(key: String, default: String?) = p.getString(key, default)
+        override fun getInt(key: String, default: Int) = p.getInt(key, default)
+        override fun getFloat(key: String, default: Float) = p.getFloat(key, default)
+        override fun getBoolean(key: String, default: Boolean) = p.getBoolean(key, default)
+    }
+
+    private class Writer(private val e: SharedPreferences.Editor) : SettingsWriter {
+        override fun putString(key: String, value: String?) { e.putString(key, value) }
+        override fun putInt(key: String, value: Int) { e.putInt(key, value) }
+        override fun putFloat(key: String, value: Float) { e.putFloat(key, value) }
+        override fun putBoolean(key: String, value: Boolean) { e.putBoolean(key, value) }
+    }
+
     private const val K_DYNAMIC = "dynamic_color"
-    private const val K_SOURCE = "color_source"
-    private const val K_SEED = "seed_color"
-    private const val K_BLACK = "pure_black"
-    private const val K_HAPTICS = "haptics"
-    private const val K_SMOOTH = "smooth_animations"
-    private const val K_GLASS = "glass"
     private const val K_FLOATING_NAV = "floating_nav"
-    private const val K_WAVY = "wavy_progress"
-    private const val K_NOTHING = "nothing_style"
-    private const val K_FONT = "font"
-    private const val K_WIFI = "lyrics_wifi_only"
-    private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
-    private const val K_SILENCE = "skip_silence"
-    private const val K_CROSSFADE = "crossfade_seconds"
-    private const val K_SPEED = "playback_speed"
-    private const val K_CROSSFADE_ALBUMS = "crossfade_albums"
-    private const val K_CASSETTE_MODE = "cassette_mode"
-    private const val K_EQ = "equalizer"
-    private const val K_EQ_GAINS = "equalizer_gains"
-    private const val K_EQ_PRESET = "equalizer_preset"
-    private const val K_EDIT_TARGET = "edit_target"
-    private const val K_UPDATES = "check_updates"
-    private const val K_DOWNLOAD_FORMAT = "download_format"
     private const val K_EXCLUDED = "excluded_folders"
-    private const val K_SONG_SORT = "song_sort"
-    private const val K_SONG_SORT_DESC = "song_sort_desc"
 }

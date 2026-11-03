@@ -740,7 +740,7 @@ private fun Screens(
                     onOpen = nav::push,
                     sort = settings.songSort,
                     sortDescending = settings.songSortDescending,
-                    onSort = { sort, desc -> SettingsStore.update { it.copy(songSort = sort, songSortDescending = desc) } },
+                    onSort = { sort, desc -> SettingsStore.update { it.shared { copy(songSort = sort, songSortDescending = desc) } } },
                     onBulk = { picked, done -> onBulk(picked, null, done) },
                     onDelete = onDeleteSongs,
                     bottomInset = bottomInset,

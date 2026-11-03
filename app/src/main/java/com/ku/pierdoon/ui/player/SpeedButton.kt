@@ -45,7 +45,7 @@ fun SpeedButton(containerColor: Color, modifier: Modifier = Modifier) {
             groups = listOf(
                 PlaybackSpeed.options.map { s ->
                     MenuAction(PlaybackSpeed.label(s), icon = null, selected = s == speed) {
-                        SettingsStore.update { it.copy(playbackSpeed = s) }
+                        SettingsStore.update { it.shared { copy(playbackSpeed = s) } }
                     }
                 }
             ),

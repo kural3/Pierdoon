@@ -136,7 +136,7 @@ fun main(args: Array<String>) {
                         File(out, "${p[1]}.png").writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes)
                         println("shot ${p[1]}")
                     }
-                    "cassette" -> SettingsStore.update { it.copy(cassetteMode = p[1] == "on") }
+                    "cassette" -> SettingsStore.update { it.shared { copy(cassetteMode = p[1] == "on") } }
                     "shuffle" -> vm.shuffleAll()
                     "next" -> PlaybackController.player.seekToNext()
                     "toggle" -> vm.togglePlay()

@@ -1,13 +1,6 @@
 package com.ku.pierdoon.data
 
-import com.ku.pierdoon.playback.EQ_FLAT
-import com.ku.pierdoon.playback.EqPreset
-import com.ku.pierdoon.playback.PlaybackSpeed
-import com.ku.pierdoon.playback.formatEqGains
-import com.ku.pierdoon.playback.parseEqGains
 import androidx.compose.runtime.Immutable
-import com.ku.pierdoon.data.download.DownloadFormat
-import com.ku.pierdoon.data.metadata.SaveTarget
 import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.platform.Prefs
 import kotlinx.coroutines.CoroutineScope
@@ -20,67 +13,24 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class ThemeMode { System, Light, Dark }
-
-/** Where the palette comes from: the Windows accent colour, current album art, or a chosen colour. */
-enum class ColorSource { Wallpaper, AlbumArt, Custom }
-
-/** Typeface for the whole app. */
-enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono }
-
 /** How the Delicious mode draws the music. */
 enum class DeliciousStyle { Aura, Waves, Dust, Calm }
-
-const val DEFAULT_SEED: Int = 0xFF6750A4.toInt()
 
 /** Narrowest navigation rail: a column of icons. */
 const val NAV_MIN_WIDTH = 88f
 /** Widest: the pills just fit the longest label. */
 const val NAV_MAX_WIDTH = 232f
 
+/** The PC's defaults for what both apps have: album art colours, no click on presses. */
+private val PC_DEFAULTS = CommonSettings(colorSource = ColorSource.AlbumArt, haptics = false)
+
+/** The settings both apps have ([common]) and the PC's own. */
 @Immutable
 data class AppSettings(
-    val theme: ThemeMode = ThemeMode.System,
-    val colorSource: ColorSource = ColorSource.AlbumArt,
-    val seedColor: Int = DEFAULT_SEED,
-    /** True black surfaces in dark theme. */
-    val pureBlack: Boolean = false,
-    /** A soft click on presses (the desktop's stand-in for haptics). Off by default. */
-    val haptics: Boolean = false,
-    val smoothAnimations: Boolean = true,
-    val glass: Boolean = true,
+    val common: CommonSettings = PC_DEFAULTS,
     /** Width of the navigation rail in dp, dragged by its edge: [NAV_MIN_WIDTH] shows icons only. */
     val navWidth: Float = NAV_MAX_WIDTH,
-    val wavyProgress: Boolean = true,
-    /** Nothing-style look: monochrome with a red accent, dot-matrix headings, dotted progress. */
-    val nothingStyle: Boolean = false,
-    val font: AppFont = AppFont.System,
     val language: AppLanguage = AppLanguage.System,
-    /** Lyrics from the cache only, never downloaded. */
-    val lyricsWifiOnly: Boolean = false,
-    /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
-    val lyricsSyncControls: Boolean = false,
-    val skipSilence: Boolean = false,
-    /** Seconds one track fades into the next; 0 for none. */
-    val crossfadeSeconds: Int = 0,
-    /** Playback speed, pitch following it; one of [com.ku.pierdoon.playback.PlaybackSpeed.options]. */
-    val playbackSpeed: Float = 1f,
-    /** Fade between tracks of one album too; off keeps albums gapless, as recorded. */
-    val crossfadeAlbums: Boolean = false,
-    /** The queue as a tape: its sound, a cassette in the player, two sides, the deck's keys and spins. */
-    val cassetteMode: Boolean = false,
-    val eqEnabled: Boolean = false,
-    /** Gain per band in dB, [com.ku.pierdoon.playback.EQ_BANDS] long; a preset copies its own in. */
-    val eqGains: List<Float> = EQ_FLAT,
-    /** The preset [eqGains] came from, or [EqPreset.Custom] once a band was moved by hand. */
-    val eqPreset: EqPreset = EqPreset.Flat,
-    /** Last choice on the track editor: the app's records or the file itself. */
-    val editTarget: SaveTarget = SaveTarget.App,
-    /** Look for a new release on GitHub now and then (at most twice a day). */
-    val checkUpdates: Boolean = true,
-    val downloadFormat: DownloadFormat = DownloadFormat.M4a,
-    val songSort: SongSort = SongSort.Title,
-    val songSortDescending: Boolean = false,
     /** Folders scanned for music, subfolders included. */
     val musicFolders: List<String> = listOf(AppDirs.music.absolutePath),
     /** Folders inside the music folders that the library skips, subfolders included. */
@@ -99,7 +49,10 @@ data class AppSettings(
     val discordPresence: Boolean = false,
     /** The picture behind the Delicious mode's lyrics. */
     val deliciousStyle: DeliciousStyle = DeliciousStyle.Aura,
-)
+) : SharedSettings by common {
+    /** A change to the settings both apps have. */
+    fun shared(change: CommonSettings.() -> CommonSettings): AppSettings = copy(common = common.change())
+}
 
 /**
  * App-wide settings, shared by the UI and the player. Backed by a small properties file.
@@ -121,33 +74,9 @@ object SettingsStore {
         prefs = p
         val d = AppSettings()
         _settings.value = AppSettings(
-            theme = enumOr(p.getString(K_THEME, null), d.theme),
-            colorSource = enumOr(p.getString(K_SOURCE, null), d.colorSource),
-            seedColor = p.getInt(K_SEED, d.seedColor),
-            pureBlack = p.getBoolean(K_BLACK, d.pureBlack),
-            haptics = p.getBoolean(K_HAPTICS, d.haptics),
-            smoothAnimations = p.getBoolean(K_SMOOTH, d.smoothAnimations),
-            glass = p.getBoolean(K_GLASS, d.glass),
+            common = CommonSettings.read(p, d.common),
             navWidth = p.getFloat(K_NAV_WIDTH, d.navWidth).coerceIn(NAV_MIN_WIDTH, NAV_MAX_WIDTH),
-            wavyProgress = p.getBoolean(K_WAVY, d.wavyProgress),
-            nothingStyle = p.getBoolean(K_NOTHING, d.nothingStyle),
-            font = enumOr(p.getString(K_FONT, null), d.font),
             language = AppLanguage.fromTag(p.getString(K_LANGUAGE, null)),
-            lyricsWifiOnly = p.getBoolean(K_WIFI, d.lyricsWifiOnly),
-            lyricsSyncControls = p.getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
-            skipSilence = p.getBoolean(K_SILENCE, d.skipSilence),
-            crossfadeSeconds = p.getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
-            playbackSpeed = PlaybackSpeed.nearest(p.getFloat(K_SPEED, d.playbackSpeed)),
-            crossfadeAlbums = p.getBoolean(K_CROSSFADE_ALBUMS, d.crossfadeAlbums),
-            cassetteMode = p.getBoolean(K_CASSETTE_MODE, d.cassetteMode),
-            eqEnabled = p.getBoolean(K_EQ, d.eqEnabled),
-            eqGains = parseEqGains(p.getString(K_EQ_GAINS, null)),
-            eqPreset = EqPreset.entries.firstOrNull { it.name == p.getString(K_EQ_PRESET, null) } ?: d.eqPreset,
-            editTarget = enumOr(p.getString(K_EDIT_TARGET, null), d.editTarget),
-            checkUpdates = p.getBoolean(K_UPDATES, d.checkUpdates),
-            downloadFormat = enumOr(p.getString(K_DOWNLOAD_FORMAT, null), d.downloadFormat),
-            songSort = enumOr(p.getString(K_SONG_SORT, null), d.songSort),
-            songSortDescending = p.getBoolean(K_SONG_SORT_DESC, d.songSortDescending),
             musicFolders = p.getString(K_FOLDERS, null)?.split(FOLDER_SEPARATOR)?.filter { it.isNotBlank() }
                 ?: d.musicFolders,
             excludedFolders = p.getString(K_EXCLUDED, null)?.split(FOLDER_SEPARATOR)?.filter { it.isNotBlank() }
@@ -185,33 +114,9 @@ object SettingsStore {
 
     private fun write(s: AppSettings) {
         prefs?.edit {
-            putString(K_THEME, s.theme.name)
-            putString(K_SOURCE, s.colorSource.name)
-            putInt(K_SEED, s.seedColor)
-            putBoolean(K_BLACK, s.pureBlack)
-            putBoolean(K_HAPTICS, s.haptics)
-            putBoolean(K_SMOOTH, s.smoothAnimations)
-            putBoolean(K_GLASS, s.glass)
+            s.common.write(this)
             putFloat(K_NAV_WIDTH, s.navWidth)
-            putBoolean(K_WAVY, s.wavyProgress)
-            putBoolean(K_NOTHING, s.nothingStyle)
-            putString(K_FONT, s.font.name)
             putString(K_LANGUAGE, s.language.tag)
-            putBoolean(K_WIFI, s.lyricsWifiOnly)
-            putBoolean(K_SYNC_CONTROLS, s.lyricsSyncControls)
-            putBoolean(K_SILENCE, s.skipSilence)
-            putInt(K_CROSSFADE, s.crossfadeSeconds)
-            putFloat(K_SPEED, s.playbackSpeed)
-            putBoolean(K_CROSSFADE_ALBUMS, s.crossfadeAlbums)
-            putBoolean(K_CASSETTE_MODE, s.cassetteMode)
-            putBoolean(K_EQ, s.eqEnabled)
-            putString(K_EQ_GAINS, formatEqGains(s.eqGains))
-            putString(K_EQ_PRESET, s.eqPreset.name)
-            putString(K_EDIT_TARGET, s.editTarget.name)
-            putBoolean(K_UPDATES, s.checkUpdates)
-            putString(K_DOWNLOAD_FORMAT, s.downloadFormat.name)
-            putString(K_SONG_SORT, s.songSort.name)
-            putBoolean(K_SONG_SORT_DESC, s.songSortDescending)
             putString(K_FOLDERS, s.musicFolders.joinToString(FOLDER_SEPARATOR))
             putString(K_EXCLUDED, s.excludedFolders.joinToString(FOLDER_SEPARATOR))
             putString(K_DOWNLOAD_FOLDER, s.downloadFolder)
@@ -233,33 +138,8 @@ object SettingsStore {
     /** Not a character a Windows path can hold. */
     private const val FOLDER_SEPARATOR = "|"
 
-    private const val K_THEME = "theme"
-    private const val K_SOURCE = "color_source"
-    private const val K_SEED = "seed_color"
-    private const val K_BLACK = "pure_black"
-    private const val K_HAPTICS = "haptics"
-    private const val K_SMOOTH = "smooth_animations"
-    private const val K_GLASS = "glass"
     private const val K_NAV_WIDTH = "nav_width"
-    private const val K_WAVY = "wavy_progress"
-    private const val K_NOTHING = "nothing_style"
-    private const val K_FONT = "font"
     private const val K_LANGUAGE = "language"
-    private const val K_WIFI = "lyrics_wifi_only"
-    private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
-    private const val K_SILENCE = "skip_silence"
-    private const val K_CROSSFADE = "crossfade_seconds"
-    private const val K_SPEED = "playback_speed"
-    private const val K_CROSSFADE_ALBUMS = "crossfade_albums"
-    private const val K_CASSETTE_MODE = "cassette_mode"
-    private const val K_EQ = "equalizer"
-    private const val K_EQ_GAINS = "equalizer_gains"
-    private const val K_EQ_PRESET = "equalizer_preset"
-    private const val K_EDIT_TARGET = "edit_target"
-    private const val K_UPDATES = "check_updates"
-    private const val K_DOWNLOAD_FORMAT = "download_format"
-    private const val K_SONG_SORT = "song_sort"
-    private const val K_SONG_SORT_DESC = "song_sort_desc"
     private const val K_FOLDERS = "music_folders"
     private const val K_EXCLUDED = "excluded_folders"
     private const val K_DOWNLOAD_FOLDER = "download_folder"

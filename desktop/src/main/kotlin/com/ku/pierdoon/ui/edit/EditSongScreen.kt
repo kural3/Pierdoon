@@ -318,7 +318,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                         stringResource(Res.string.save_in_file),
                                     ),
                                     selected = target.ordinal,
-                                    onSelect = { i -> SettingsStore.update { it.copy(editTarget = SaveTarget.entries[i]) } },
+                                    onSelect = { i -> SettingsStore.update { it.shared { copy(editTarget = SaveTarget.entries[i]) } } },
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 )
                                 Spacer(Modifier.height(12.dp))
