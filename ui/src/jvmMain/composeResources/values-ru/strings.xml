@@ -9,8 +9,6 @@
     <string name="settings_glass_desc">Размытие под плеером и панелями</string>
     <string name="settings_floating_nav">Компактная боковая панель</string>
     <string name="settings_floating_nav_desc">Только значки, без подписей. Ширину можно менять, потянув за край панели</string>
-    <string name="settings_feedback_summary">Плавность анимаций</string>
-    <string name="settings_playback_summary">Кроссфейд, эквалайзер, устройство вывода</string>
     <string name="settings_haptics">Звук нажатий</string>
     <string name="settings_smooth_desc">Анимации на частоте монитора</string>
     <string name="settings_wifi_only">Не загружать тексты</string>
@@ -39,8 +37,6 @@
     <string name="close_to_tray_desc">Закрытие окна не останавливает музыку</string>
     <string name="tray_show">Открыть Pier.doon</string>
     <string name="tray_quit">Выход</string>
-    <string name="settings_integrations">Интеграции</string>
-    <string name="settings_integrations_summary">Статус в Discord</string>
     <string name="nav_phone">Телефон</string>
     <string name="phone_hint">Откройте Pier.doon на Android, подключённом к той же сети, выберите этот компьютер и введите код</string>
     <string name="remote_control">Управление с телефона</string>
@@ -58,10 +54,6 @@
     <string name="output_unavailable">Звук некуда выводить: проверьте наушники или колонки</string>
     <string name="choose_image">Выберите изображение</string>
     <string name="choose_folder">Выберите папку с музыкой</string>
-    <string name="settings_desktop">Окно</string>
-    <string name="settings_desktop_summary">Сворачивание в трей</string>
-    <string name="settings_group_music">Музыка</string>
-    <string name="settings_group_app">Приложение</string>
     <string name="settings_library_summary">Папки, исключения · %1$s</string>
     <string name="excluded_folders">Не сканировать</string>
     <string name="excluded_folders_none">Сканируются все вложенные папки</string>
@@ -86,4 +78,6 @@
     <string name="delicious_waves">Волны</string>
     <string name="delicious_dust">Пыль</string>
     <string name="delicious_calm">Спокойно</string>
+    <string name="settings_system">Система</string>
+    <string name="settings_system_summary">Трей, статус в Discord</string>
 </resources>

@@ -14,8 +14,8 @@ enum class ThemeMode { System, Light, Dark }
 /** Where the palette comes from: the wallpaper (the Windows accent colour on a PC), current album art, or a chosen colour. */
 enum class ColorSource { Wallpaper, AlbumArt, Custom }
 
-/** Typeface for the whole app. */
-enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono }
+/** Typeface for the whole app; [Custom] is a font file the user brought (see [SharedSettings.customFontFile]). */
+enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono, Custom }
 
 const val DEFAULT_SEED: Int = 0xFF6750A4.toInt()
 
@@ -38,6 +38,10 @@ interface SharedSettings {
     /** Nothing-style look: monochrome with a red accent, dot-matrix headings, dotted progress. */
     val nothingStyle: Boolean
     val font: AppFont
+    /** The user's own font: a file name in the app's fonts folder, copied there when picked. */
+    val customFontFile: String?
+    /** That font's name, as shown in the font list. */
+    val customFontName: String?
     /** Lyrics downloaded on Wi-Fi only (on a PC: from the cache only). */
     val lyricsWifiOnly: Boolean
     /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
@@ -77,6 +81,8 @@ data class CommonSettings(
     override val wavyProgress: Boolean = true,
     override val nothingStyle: Boolean = false,
     override val font: AppFont = AppFont.System,
+    override val customFontFile: String? = null,
+    override val customFontName: String? = null,
     override val lyricsWifiOnly: Boolean = false,
     override val lyricsSyncControls: Boolean = false,
     override val skipSilence: Boolean = false,
@@ -106,6 +112,8 @@ data class CommonSettings(
         putBoolean(K_WAVY, wavyProgress)
         putBoolean(K_NOTHING, nothingStyle)
         putString(K_FONT, font.name)
+        putString(K_CUSTOM_FONT_FILE, customFontFile)
+        putString(K_CUSTOM_FONT_NAME, customFontName)
         putBoolean(K_WIFI, lyricsWifiOnly)
         putBoolean(K_SYNC_CONTROLS, lyricsSyncControls)
         putBoolean(K_SILENCE, skipSilence)
@@ -138,6 +146,8 @@ data class CommonSettings(
                 wavyProgress = getBoolean(K_WAVY, d.wavyProgress),
                 nothingStyle = getBoolean(K_NOTHING, d.nothingStyle),
                 font = enumOr(getString(K_FONT, null), d.font),
+                customFontFile = getString(K_CUSTOM_FONT_FILE, d.customFontFile),
+                customFontName = getString(K_CUSTOM_FONT_NAME, d.customFontName),
                 lyricsWifiOnly = getBoolean(K_WIFI, d.lyricsWifiOnly),
                 lyricsSyncControls = getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
                 skipSilence = getBoolean(K_SILENCE, d.skipSilence),
@@ -172,6 +182,8 @@ data class CommonSettings(
         private const val K_WAVY = "wavy_progress"
         private const val K_NOTHING = "nothing_style"
         private const val K_FONT = "font"
+        private const val K_CUSTOM_FONT_FILE = "custom_font_file"
+        private const val K_CUSTOM_FONT_NAME = "custom_font_name"
         private const val K_WIFI = "lyrics_wifi_only"
         private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
         private const val K_SILENCE = "skip_silence"

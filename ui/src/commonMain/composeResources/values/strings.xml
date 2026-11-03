@@ -44,7 +44,6 @@
     <string name="settings_colors_fallback">Color for tracks without a cover</string>
     <string name="settings_black">Black background</string>
     <string name="settings_glass">Frosted glass</string>
-    <string name="settings_appearance_summary">Theme, language, font, colors, Nothing style</string>
     <string name="settings_lyrics_summary">Downloading, sync, cache</string>
     <string name="settings_font">Font</string>
     <string name="settings_interface">Interface</string>
@@ -287,4 +286,23 @@
     <string name="lyrics_plain">plain</string>
     <string name="speed">Speed</string>
     <string name="speed_desc">Pitch follows: slower is lower, faster is higher</string>
+    <string name="settings_group_music">Music</string>
+    <string name="settings_group_sound">Sound</string>
+    <string name="settings_group_app">App</string>
+    <string name="settings_appearance_summary">Theme, colors, font, language</string>
+    <string name="settings_style">Style</string>
+    <string name="settings_text">Text and language</string>
+    <string name="settings_sound">Sound</string>
+    <string name="settings_transitions">Between tracks</string>
+    <string name="settings_modes">Modes</string>
+    <string name="settings_equalizer_off">Off</string>
+    <string name="settings_equalizer_on">On · %1$s</string>
+    <string name="settings_playback_speed_summary">Speed %1$s</string>
+    <string name="settings_crossfade_summary">crossfade %1$s</string>
+    <string name="settings_cassette_on">cassette</string>
+    <string name="font_custom">Your font</string>
+    <string name="font_custom_pick">Choose a font file…</string>
+    <string name="font_custom_desc">A TTF or OTF file. It is copied into the app, so the original can be moved or deleted</string>
+    <string name="font_custom_failed">That file isn't a font</string>
+    <string name="font_custom_title">Choose a font</string>
 </resources>

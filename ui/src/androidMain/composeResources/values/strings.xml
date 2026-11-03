@@ -9,8 +9,6 @@
     <string name="settings_glass_desc">Blur under the mini player and menus</string>
     <string name="settings_floating_nav">Floating menu</string>
     <string name="settings_floating_nav_desc">A rounded tab bar above the content</string>
-    <string name="settings_feedback_summary">Vibration and smooth animations</string>
-    <string name="settings_playback_summary">Crossfade, equalizer, skipping silence</string>
     <string name="settings_haptics">Vibration</string>
     <string name="settings_smooth_desc">Animations at the screen's top refresh rate (up to 120 Hz). Uses a little more battery while animating</string>
     <string name="settings_wifi_only">Wi‑Fi only</string>

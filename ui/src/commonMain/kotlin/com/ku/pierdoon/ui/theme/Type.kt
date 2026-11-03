@@ -19,7 +19,10 @@ import org.jetbrains.compose.resources.Font
 // Material defaults already include the expressive "Emphasized" styles.
 val Typography = Typography()
 
-/** One variable file covers every weight. */
+/** A font file from disk, every weight from it; null if it can't be read as a font. */
+internal expect fun fontFamilyFromFile(path: String): FontFamily?
+
+/** One variable file covers every weight (shown as regular where variable fonts aren't supported). */
 @OptIn(ExperimentalTextApi::class)
 @Composable
 private fun jetBrainsMono(): FontFamily {
@@ -40,19 +43,21 @@ private fun ibmPlexMono(): FontFamily {
     return remember(fonts) { FontFamily(fonts) }
 }
 
+/** The family [font] stands for; null for the platform's own (Roboto or the phone maker's, Segoe UI). */
 @Composable
-private fun AppFont.family(): FontFamily? = when (this) {
-    // The platform default: Segoe UI on Windows.
+fun fontFamilyFor(font: AppFont, customFontPath: String?): FontFamily? = when (font) {
     AppFont.System -> null
     AppFont.SystemMono -> FontFamily.Monospace
     AppFont.JetBrainsMono -> jetBrainsMono()
     AppFont.IbmPlexMono -> ibmPlexMono()
+    // A font file that went missing or broke falls back to the system one.
+    AppFont.Custom -> customFontPath?.let { path -> remember(path) { fontFamilyFromFile(path) } }
 }
 
-/** [Typography] with every style set in [font]. */
+/** [Typography] with every style set in [font]; [customFontPath] is the user's own font file, if any. */
 @Composable
-fun typographyFor(font: AppFont): Typography {
-    val family = font.family() ?: return Typography
+fun typographyFor(font: AppFont, customFontPath: String?): Typography {
+    val family = fontFamilyFor(font, customFontPath) ?: return Typography
     return remember(family) { Typography.withFamily(family) }
 }
 

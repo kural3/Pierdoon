@@ -9,8 +9,6 @@
     <string name="settings_glass_desc">Размытие под мини-плеером и меню</string>
     <string name="settings_floating_nav">Плавающее меню</string>
     <string name="settings_floating_nav_desc">Скруглённая панель вкладок над контентом</string>
-    <string name="settings_feedback_summary">Вибрация и плавность анимаций</string>
-    <string name="settings_playback_summary">Кроссфейд, эквалайзер, пропуск тишины</string>
     <string name="settings_haptics">Вибрация</string>
     <string name="settings_smooth_desc">Анимации на высшей частоте экрана (до 120 Гц). Чуть выше расход заряда во время анимаций</string>
     <string name="settings_wifi_only">Только по Wi‑Fi</string>

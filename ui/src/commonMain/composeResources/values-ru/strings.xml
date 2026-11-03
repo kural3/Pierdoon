@@ -44,7 +44,6 @@
     <string name="settings_colors_fallback">Цвет, если у трека нет обложки</string>
     <string name="settings_black">Чёрный фон</string>
     <string name="settings_glass">Матовое стекло</string>
-    <string name="settings_appearance_summary">Тема, язык, шрифт, цвета, стиль Nothing</string>
     <string name="settings_lyrics_summary">Загрузка, синхронизация, кэш</string>
     <string name="settings_font">Шрифт</string>
     <string name="settings_interface">Интерфейс</string>
@@ -295,4 +294,23 @@
     <string name="lyrics_plain">без тайминга</string>
     <string name="speed">Скорость</string>
     <string name="speed_desc">Тон меняется вместе с ней: медленнее ниже, быстрее выше</string>
+    <string name="settings_group_music">Музыка</string>
+    <string name="settings_group_sound">Звук</string>
+    <string name="settings_group_app">Приложение</string>
+    <string name="settings_appearance_summary">Тема, цвета, шрифт, язык</string>
+    <string name="settings_style">Стиль</string>
+    <string name="settings_text">Текст и язык</string>
+    <string name="settings_sound">Звук</string>
+    <string name="settings_transitions">Между треками</string>
+    <string name="settings_modes">Режимы</string>
+    <string name="settings_equalizer_off">Выключен</string>
+    <string name="settings_equalizer_on">Включён · %1$s</string>
+    <string name="settings_playback_speed_summary">Скорость %1$s</string>
+    <string name="settings_crossfade_summary">кроссфейд %1$s</string>
+    <string name="settings_cassette_on">кассета</string>
+    <string name="font_custom">Свой шрифт</string>
+    <string name="font_custom_pick">Выбрать файл шрифта…</string>
+    <string name="font_custom_desc">Файл TTF или OTF. Он копируется в приложение, так что оригинал можно переместить или удалить</string>
+    <string name="font_custom_failed">Этот файл не шрифт</string>
+    <string name="font_custom_title">Выберите шрифт</string>
 </resources>

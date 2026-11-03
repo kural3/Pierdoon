@@ -27,7 +27,7 @@ What changed in each version is in its release notes.
 - Cassette mode: tape hiss and wobble, a cassette with turning reels in place of the cover, the queue split into sides A and B. The deck's keys click on play and pause (from anywhere: the app, the notification, headphones, media keys), next and previous spin the tape to the track (paused too), the cassette is turned over after side A or when next and previous cross the middle, and rewound after side B when the queue repeats, for longer the longer the side
 - Playlists in and out as `.m3u` / `.m3u8`, finding tracks by path, then by name and tags
 - English and Russian interface: the system's language by default, or chosen in Settings → Appearance
-- Expanding player, frosted glass, album art / wallpaper or Windows accent / custom color themes, a Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts
+- Expanding player, frosted glass, album art / wallpaper or Windows accent / custom color themes, a Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts, your own TTF or OTF file among them
 - The phone works as a remote for the computer over Wi-Fi: the computer's playback in the phone's own player, its queue, lyrics and library, and downloads sent to it
 - Copies tracks between the phone and the computer over Wi-Fi, byte for byte: "Send to computer" on the phone's tracks and playlists, "Save to phone" on the computer's. Tracks that look like ones already there (same title, artist and length) are pointed out first
 

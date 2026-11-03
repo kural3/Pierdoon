@@ -30,6 +30,9 @@ data class AppSettings(
 ) : SharedSettings by common {
     /** A change to the settings both apps have. */
     fun shared(change: CommonSettings.() -> CommonSettings): AppSettings = copy(common = common.change())
+
+    /** The user's own font file, when one was picked; it lives in [SettingsStore.fontsDir]. */
+    val customFontPath: String? get() = customFontFile?.let { java.io.File(SettingsStore.fontsDir, it).path }
 }
 
 /**
@@ -41,11 +44,16 @@ object SettingsStore {
     private val _settings = MutableStateFlow(AppSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
+    /** Where the user's own font is kept (see [CustomFonts]). */
+    lateinit var fontsDir: java.io.File
+        private set
+
     @Synchronized
     fun init(context: Context) {
         if (prefs != null) return
         val p = context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
         prefs = p
+        fontsDir = java.io.File(context.applicationContext.filesDir, "fonts")
         val d = AppSettings()
         // The old on/off "wallpaper colours" switch, from before there was a colour source.
         val defaults =

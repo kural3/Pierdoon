@@ -83,7 +83,7 @@ fun PierdoonTheme(
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         motionScheme = MotionScheme.expressive(),
-        typography = typographyFor(settings.font),
+        typography = typographyFor(settings.font, settings.customFontPath),
     ) {
         CompositionLocalProvider(
             LocalUiPrefs provides UiPrefs(

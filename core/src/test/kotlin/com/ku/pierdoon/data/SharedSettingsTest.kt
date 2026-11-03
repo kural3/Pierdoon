@@ -33,7 +33,9 @@ class SharedSettingsTest {
             glass = false,
             wavyProgress = false,
             nothingStyle = true,
-            font = AppFont.IbmPlexMono,
+            font = AppFont.Custom,
+            customFontFile = "font-1.ttf",
+            customFontName = "Inter",
             lyricsWifiOnly = true,
             lyricsSyncControls = true,
             skipSilence = true,
@@ -58,12 +60,13 @@ class SharedSettingsTest {
     @Test
     fun theKeysStayAsTheAppsSavedThem() {
         val file = MapFile()
-        CommonSettings().write(file)
+        // A null value isn't written at all, so the font file and its name are given one.
+        CommonSettings(customFontFile = "font-1.ttf", customFontName = "Inter").write(file)
         // Renaming any of these would lose every user's choice on update.
         assertEquals(
             setOf(
                 "theme", "color_source", "seed_color", "pure_black", "haptics", "smooth_animations", "glass",
-                "wavy_progress", "nothing_style", "font", "lyrics_wifi_only", "lyrics_sync_controls", "skip_silence",
+                "wavy_progress", "nothing_style", "font", "custom_font_file", "custom_font_name", "lyrics_wifi_only", "lyrics_sync_controls", "skip_silence",
                 "crossfade_seconds", "playback_speed", "crossfade_albums", "cassette_mode", "equalizer",
                 "equalizer_gains", "equalizer_preset", "edit_target", "check_updates", "download_format",
                 "song_sort", "song_sort_desc",

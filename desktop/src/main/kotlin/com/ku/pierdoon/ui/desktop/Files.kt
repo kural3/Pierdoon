@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.desktop
 
+import com.ku.pierdoon.data.CustomFonts
 import com.ku.pierdoon.data.M3U_EXTENSION
 import java.awt.FileDialog
 import java.awt.Frame
@@ -35,6 +36,18 @@ object Files {
         val dialog = FileDialog(owner, title, FileDialog.LOAD)
         dialog.file = PLAYLIST_EXT.joinToString(";") { "*.$it" }
         dialog.setFilenameFilter { _, name -> name.substringAfterLast('.').lowercase() in PLAYLIST_EXT }
+        dialog.isVisible = true
+        val name = dialog.file ?: return null
+        return File(dialog.directory, name).takeIf { it.isFile }
+    }
+
+    /** Picks a font file with the native Open dialog; null if cancelled. */
+    fun pickFont(title: String): File? {
+        val dialog = FileDialog(owner, title, FileDialog.LOAD)
+        dialog.file = CustomFonts.EXTENSIONS.joinToString(";") { "*.$it" }
+        dialog.setFilenameFilter { _, name -> name.substringAfterLast('.').lowercase() in CustomFonts.EXTENSIONS }
+        // Windows keeps its fonts here; a good place to start looking.
+        System.getenv("WINDIR")?.let { dialog.directory = File(it, "Fonts").path }
         dialog.isVisible = true
         val name = dialog.file ?: return null
         return File(dialog.directory, name).takeIf { it.isFile }

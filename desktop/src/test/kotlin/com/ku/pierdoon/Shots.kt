@@ -11,7 +11,9 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
+import com.ku.pierdoon.data.AppFont
 import com.ku.pierdoon.data.AppLanguage
+import com.ku.pierdoon.data.CustomFonts
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.platform.InterfaceLanguage
@@ -20,6 +22,7 @@ import com.ku.pierdoon.playback.TapeMotion
 import com.ku.pierdoon.ui.PierdoonApp
 import com.ku.pierdoon.ui.navigation.Navigator
 import com.ku.pierdoon.ui.navigation.Route
+import com.ku.pierdoon.ui.settings.SettingsSection
 import com.ku.pierdoon.ui.theme.PierdoonTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -37,6 +40,8 @@ import kotlin.system.exitProcess
  *     size 1280 820      window size (first line only)
  *     wait 1500          let it run
  *     tab Settings       select a tab
+ *     page Appearance    open a settings page
+ *     font Custom <file> the font by name; Custom brings in that font file
  *     lang en            interface language: en, ru or system
  *     click 300 400      press and release there
  *     rclick 300 400     right click
@@ -99,6 +104,14 @@ fun main(args: Array<String>) {
                     "size" -> Unit
                     "wait" -> run(p[1].toLong())
                     "tab" -> nav.selectTab(Route.tabs.first { it::class.simpleName == p[1] })
+                    "page" -> nav.push(Route.SettingsPage(SettingsSection.valueOf(p[1])))
+                    "font" -> if (p[1] == "Custom") {
+                        val file = File(p.drop(2).joinToString(" "))
+                        val imported = CustomFonts.import(file.inputStream(), file.name, SettingsStore.fontsDir)!!
+                        SettingsStore.update { it.shared { copy(font = AppFont.Custom, customFontFile = imported.file, customFontName = imported.name) } }
+                    } else {
+                        SettingsStore.update { it.shared { copy(font = AppFont.valueOf(p[1])) } }
+                    }
                     "lang" -> SettingsStore.update { it.copy(language = if (p[1] == "system") AppLanguage.System else AppLanguage.fromTag(p[1])) }
                     "move" -> scene.sendPointerEvent(PointerEventType.Move, at(p[1], p[2]))
                     "click" -> {

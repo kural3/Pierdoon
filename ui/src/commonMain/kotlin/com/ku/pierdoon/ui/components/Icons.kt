@@ -286,6 +286,19 @@ object PlayerIcons {
         )
     }
 
+    val Equalizer by lazy { icon("Equalizer", "M10,20h4L14,4h-4v16zM4,20h4v-8L4,12v8zM16,9v11h4L20,9h-4z") }
+
+    /** A flask: things still being tried out. */
+    val Science by lazy {
+        icon(
+            "Science",
+            "M19.8,18.4L14,10.67V6.5l1.35,-1.69C15.61,4.48 15.38,4 14.96,4H9.04C8.62,4 8.39,4.48 8.65,4.81L10,6.5" +
+                "v4.17L4.2,18.4C3.71,19.06 4.18,20 5,20h14C19.82,20 20.29,19.06 19.8,18.4z",
+        )
+    }
+
+    val TextFields by lazy { icon("TextFields", "M2.5,4v3h5v12h3L10.5,7h5L15.5,4h-13zM21.5,9h-9v3h3v7h3v-7h3L21.5,9z") }
+
     private fun icon(name: String, path: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
             .addPath(pathData = addPathNodes(path), fill = SolidColor(Color.Black))

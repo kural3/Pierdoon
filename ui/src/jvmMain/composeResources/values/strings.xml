@@ -9,8 +9,6 @@
     <string name="settings_glass_desc">Blur under the player and panels</string>
     <string name="settings_floating_nav">Compact sidebar</string>
     <string name="settings_floating_nav_desc">Icons only, no labels. Drag the sidebar edge to change its width</string>
-    <string name="settings_feedback_summary">Smooth animations</string>
-    <string name="settings_playback_summary">Crossfade, equalizer, output device</string>
     <string name="settings_haptics">Click sounds</string>
     <string name="settings_smooth_desc">Animations at the monitor's refresh rate</string>
     <string name="settings_wifi_only">Don't download lyrics</string>
@@ -39,8 +37,6 @@
     <string name="close_to_tray_desc">Closing the window doesn't stop the music</string>
     <string name="tray_show">Open Pier.doon</string>
     <string name="tray_quit">Quit</string>
-    <string name="settings_integrations">Integrations</string>
-    <string name="settings_integrations_summary">Discord status</string>
     <string name="nav_phone">Phone</string>
     <string name="phone_hint">Open Pier.doon on an Android phone on the same network, pick this computer and enter the code</string>
     <string name="remote_control">Phone control</string>
@@ -58,10 +54,6 @@
     <string name="output_unavailable">Nowhere to play the sound: check your headphones or speakers</string>
     <string name="choose_image">Choose an image</string>
     <string name="choose_folder">Choose your music folder</string>
-    <string name="settings_desktop">Window</string>
-    <string name="settings_desktop_summary">Minimizing to tray</string>
-    <string name="settings_group_music">Music</string>
-    <string name="settings_group_app">App</string>
     <string name="settings_library_summary">Folders, exclusions · %1$s</string>
     <string name="excluded_folders">Don't scan</string>
     <string name="excluded_folders_none">All subfolders are scanned</string>
@@ -86,4 +78,6 @@
     <string name="delicious_waves">Waves</string>
     <string name="delicious_dust">Stardust</string>
     <string name="delicious_calm">Calm</string>
+    <string name="settings_system">System</string>
+    <string name="settings_system_summary">Tray, Discord status</string>
 </resources>
