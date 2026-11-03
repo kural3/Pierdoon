@@ -53,8 +53,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.ku.pierdoon.resources.Res
-import com.ku.pierdoon.resources.*
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.playback.QueueEntry
 import com.ku.pierdoon.playback.QueueState

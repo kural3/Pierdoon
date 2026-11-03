@@ -1,5 +1,10 @@
 package com.ku.pierdoon.ui.remote
 
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.getPluralString
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +20,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,8 +40,8 @@ fun TransferPrompts() {
     LaunchedEffect(Unit) {
         PcTransfers.messages.collect { m ->
             val text = when (m) {
-                is TransferMessage.Started -> resources.getQuantityString(
-                    if (m.direction == TransferDirection.ToPhone) R.plurals.transfer_started_phone else R.plurals.transfer_started_pc,
+                is TransferMessage.Started -> getPluralString(
+                    if (m.direction == TransferDirection.ToPhone) Res.plurals.transfer_started_phone else Res.plurals.transfer_started_pc,
                     m.count, m.count,
                 )
                 TransferMessage.Offline -> resources.getString(R.string.transfer_offline)
@@ -49,7 +53,7 @@ fun TransferPrompts() {
     }
     val checking by PcTransfers.checking.collectAsStateWithLifecycle()
     LaunchedEffect(checking) {
-        if (checking) Toast.makeText(context, R.string.transfer_checking, Toast.LENGTH_SHORT).show()
+        if (checking) Toast.makeText(context, getString(Res.string.transfer_checking), Toast.LENGTH_SHORT).show()
     }
 
     val pending by PcTransfers.pending.collectAsStateWithLifecycle()
@@ -59,14 +63,14 @@ fun TransferPrompts() {
     AlertDialog(
         onDismissRequest = PcTransfers::dismiss,
         title = {
-            Text(stringResource(if (p.direction == TransferDirection.ToPhone) R.string.transfer_dup_title_phone else R.string.transfer_dup_title_pc))
+            Text(stringResource(if (p.direction == TransferDirection.ToPhone) Res.string.transfer_dup_title_phone else Res.string.transfer_dup_title_pc))
         },
         text = {
             Column {
                 if (single) {
-                    Text(stringResource(R.string.transfer_dup_one))
+                    Text(stringResource(Res.string.transfer_dup_one))
                 } else {
-                    Text(stringResource(R.string.transfer_dup_some, p.duplicates.size, p.items.size))
+                    Text(stringResource(Res.string.transfer_dup_some, p.duplicates.size, p.items.size))
                     Spacer(Modifier.height(8.dp))
                     p.duplicates.take(SHOWN).forEach { item ->
                         Text(
@@ -90,20 +94,20 @@ fun TransferPrompts() {
         confirmButton = {
             if (allThere) {
                 TextButton(onClick = { PcTransfers.confirm(includeDuplicates = true) }) {
-                    Text(stringResource(R.string.transfer_dup_anyway))
+                    Text(stringResource(Res.string.transfer_dup_anyway))
                 }
             } else {
                 TextButton(onClick = { PcTransfers.confirm(includeDuplicates = false) }) {
-                    Text(stringResource(R.string.transfer_dup_only_new) + " (${p.items.size - p.duplicates.size})")
+                    Text(stringResource(Res.string.transfer_dup_only_new) + " (${p.items.size - p.duplicates.size})")
                 }
             }
         },
         dismissButton = {
             Row {
-                TextButton(onClick = PcTransfers::dismiss) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = PcTransfers::dismiss) { Text(stringResource(Res.string.cancel)) }
                 if (!allThere) {
                     TextButton(onClick = { PcTransfers.confirm(includeDuplicates = true) }) {
-                        Text(stringResource(R.string.transfer_dup_all))
+                        Text(stringResource(Res.string.transfer_dup_all))
                     }
                 }
             }

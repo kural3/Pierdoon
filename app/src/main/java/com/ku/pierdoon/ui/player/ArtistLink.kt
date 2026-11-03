@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,7 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,7 +43,7 @@ fun ArtistLink(
     var open by remember(artist) { mutableStateOf(false) }
     Box {
         Text(
-            text = artist.ifEmpty { stringResource(R.string.unknown_artist) },
+            text = artist.ifEmpty { stringResource(Res.string.unknown_artist) },
             style = style,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -49,7 +51,7 @@ fun ArtistLink(
             modifier = modifier
                 .clickable(
                     enabled = artist.isNotEmpty(),
-                    onClickLabel = stringResource(R.string.open_artist),
+                    onClickLabel = stringResource(Res.string.open_artist),
                 ) {
                     if (pick && artists.size > 1) open = true else onOpen(artists.firstOrNull() ?: artist)
                 }

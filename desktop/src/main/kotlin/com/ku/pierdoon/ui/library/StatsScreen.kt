@@ -43,8 +43,8 @@ import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.history.ListeningStats
 import com.ku.pierdoon.data.history.Play
 import com.ku.pierdoon.data.history.StatsPeriod
-import com.ku.pierdoon.resources.Res
-import com.ku.pierdoon.resources.*
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.navigation.Route

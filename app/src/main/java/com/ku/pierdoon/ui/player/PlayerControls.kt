@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -11,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.R
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
@@ -48,7 +50,7 @@ fun PlayerControls(
         ExpressiveIconButton(
             onClick = onPrevious,
             icon = PlayerIcons.Previous,
-            contentDescription = stringResource(R.string.previous),
+            contentDescription = stringResource(Res.string.previous),
             iconSize = 32.dp,
             containerColor = sideColor,
             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -58,8 +60,8 @@ fun PlayerControls(
         PlayPauseButton(
             isPlaying = isPlaying,
             onClick = onTogglePlay,
-            playLabel = stringResource(R.string.play),
-            pauseLabel = stringResource(R.string.pause),
+            playLabel = stringResource(Res.string.play),
+            pauseLabel = stringResource(Res.string.pause),
             iconSize = 44.dp,
             interactionSource = playSource,
             modifier = Modifier.weight(1.8f + GROW * playPress).fillMaxHeight(),
@@ -67,7 +69,7 @@ fun PlayerControls(
         ExpressiveIconButton(
             onClick = onNext,
             icon = PlayerIcons.Next,
-            contentDescription = stringResource(R.string.next),
+            contentDescription = stringResource(Res.string.next),
             iconSize = 32.dp,
             containerColor = sideColor,
             contentColor = MaterialTheme.colorScheme.onSurface,

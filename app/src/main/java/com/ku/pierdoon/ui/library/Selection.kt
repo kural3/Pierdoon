@@ -1,5 +1,9 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,8 +37,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.R
@@ -98,13 +100,13 @@ fun SelectionActions(
     onDelete: ((List<Song>) -> Unit)?,
 ) {
     val picked = all.filter { it.id in selection.ids }
-    TopBarIcon(PlayerIcons.SelectAll, stringResource(R.string.select_all)) { selection.toggleAll(all.map { it.id }) }
+    TopBarIcon(PlayerIcons.SelectAll, stringResource(Res.string.select_all)) { selection.toggleAll(all.map { it.id }) }
     if (onDelete != null) {
-        TopBarIcon(PlayerIcons.Delete, stringResource(R.string.delete_from_device), enabled = picked.isNotEmpty()) {
+        TopBarIcon(PlayerIcons.Delete, stringResource(Res.string.delete_from_device), enabled = picked.isNotEmpty()) {
             onDelete(picked)
         }
     }
-    TopBarIcon(PlayerIcons.More, stringResource(R.string.more_actions), enabled = picked.isNotEmpty()) { onBulk(picked) }
+    TopBarIcon(PlayerIcons.More, stringResource(Res.string.more_actions), enabled = picked.isNotEmpty()) { onBulk(picked) }
 }
 
 @Composable
@@ -115,7 +117,7 @@ fun SelectionBackHandler(selection: SongSelection) {
 /** "Selected: 3" while selecting, [title] otherwise. */
 @Composable
 fun selectionTitle(selection: SongSelection, title: String): String =
-    if (selection.active) stringResource(R.string.selected_count, selection.ids.size) else title
+    if (selection.active) stringResource(Res.string.selected_count, selection.ids.size) else title
 
 @Composable
 fun TopBarIcon(icon: ImageVector, description: String, enabled: Boolean = true, onClick: () -> Unit) {
@@ -156,7 +158,7 @@ fun OverflowMenu(
         ExpressiveIconButton(
             onClick = { open = true },
             icon = PlayerIcons.More,
-            contentDescription = stringResource(R.string.more_actions),
+            contentDescription = stringResource(Res.string.more_actions),
             containerColor = containerColor,
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(size),
@@ -247,7 +249,7 @@ fun BulkActionsSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Text(
-                pluralStringResource(R.plurals.tracks_selected, target.songs.size, target.songs.size),
+                pluralStringResource(Res.plurals.tracks_selected, target.songs.size, target.songs.size),
                 style = MaterialTheme.typography.titleLargeEmphasized,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
@@ -260,29 +262,29 @@ fun BulkActionsSheet(
             ) { picking ->
                 Column {
                     if (!picking) {
-                        ActionItem(PlayerIcons.Play, stringResource(R.string.play)) { act(onPlay) }
-                        ActionItem(PlayerIcons.PlayNext, stringResource(R.string.play_next)) { act(onPlayNext) }
-                        ActionItem(PlayerIcons.Queue, stringResource(R.string.add_to_queue)) { act(onAddToQueue) }
-                        ActionItem(PlayerIcons.FavoriteBorder, stringResource(R.string.add_to_favorites)) { act(onAddFavorites) }
-                        ActionItem(PlayerIcons.PlaylistAdd, stringResource(R.string.add_to_playlist)) {
+                        ActionItem(PlayerIcons.Play, stringResource(Res.string.play)) { act(onPlay) }
+                        ActionItem(PlayerIcons.PlayNext, stringResource(Res.string.play_next)) { act(onPlayNext) }
+                        ActionItem(PlayerIcons.Queue, stringResource(Res.string.add_to_queue)) { act(onAddToQueue) }
+                        ActionItem(PlayerIcons.FavoriteBorder, stringResource(Res.string.add_to_favorites)) { act(onAddFavorites) }
+                        ActionItem(PlayerIcons.PlaylistAdd, stringResource(Res.string.add_to_playlist)) {
                             haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                             pickingPlaylist = true
                         }
                         if (onSendToComputer != null) {
-                            ActionItem(PlayerIcons.Desktop, stringResource(R.string.transfer_send_to_pc)) { act(onSendToComputer) }
+                            ActionItem(PlayerIcons.Desktop, stringResource(Res.string.transfer_send_to_pc)) { act(onSendToComputer) }
                         }
                         if (target.playlistId != null) {
-                            ActionItem(PlayerIcons.Remove, stringResource(R.string.remove_from_playlist)) { act(onRemoveFromPlaylist) }
+                            ActionItem(PlayerIcons.Remove, stringResource(Res.string.remove_from_playlist)) { act(onRemoveFromPlaylist) }
                         }
                         if (onDelete != null) {
-                            ActionItem(PlayerIcons.Delete, stringResource(R.string.delete_from_device), destructive = true) {
+                            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete_from_device), destructive = true) {
                                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                                 onDismiss()
                                 onDelete()
                             }
                         }
                     } else {
-                        ActionItem(PlayerIcons.Add, stringResource(R.string.new_playlist)) { act(onCreatePlaylist) }
+                        ActionItem(PlayerIcons.Add, stringResource(Res.string.new_playlist)) { act(onCreatePlaylist) }
                         playlists.forEach { p ->
                             ActionItem(PlayerIcons.Playlist, p.name) { act { onAddToPlaylist(p.id) } }
                         }

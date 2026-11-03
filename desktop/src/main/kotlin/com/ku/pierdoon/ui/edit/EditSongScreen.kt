@@ -61,8 +61,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import com.ku.pierdoon.MainViewModel
-import com.ku.pierdoon.resources.Res
-import com.ku.pierdoon.resources.*
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song

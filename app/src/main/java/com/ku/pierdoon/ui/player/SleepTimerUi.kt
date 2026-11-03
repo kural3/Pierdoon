@@ -1,5 +1,9 @@
 package com.ku.pierdoon.ui.player
 
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -16,8 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.R
 import com.ku.pierdoon.playback.SleepTimer
@@ -34,7 +36,7 @@ fun SleepTimerButton(active: Boolean, onClick: () -> Unit, glass: Color) {
     ExpressiveIconButton(
         onClick = onClick,
         icon = PlayerIcons.Bedtime,
-        contentDescription = stringResource(R.string.sleep_timer),
+        contentDescription = stringResource(Res.string.sleep_timer),
         containerColor = if (active) colors.primary else glass,
         contentColor = if (active) colors.onPrimary else colors.onSurface,
         restCorner = if (active) 30 else 50,
@@ -53,10 +55,10 @@ fun sleepTimerLabel(state: SleepTimerState?): String? {
     }
     return when (state) {
         null -> null
-        SleepTimerState.EndOfTrack -> stringResource(R.string.sleep_after_track)
+        SleepTimerState.EndOfTrack -> stringResource(Res.string.sleep_after_track)
         is SleepTimerState.At -> {
             val s = (remaining + 999) / 1000
-            stringResource(R.string.sleep_pauses_in, "%d:%02d".format(s / 60, s % 60))
+            stringResource(Res.string.sleep_pauses_in, "%d:%02d".format(s / 60, s % 60))
         }
     }
 }
@@ -73,7 +75,7 @@ fun SleepTimerSheet(state: SleepTimerState?, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Text(
-                stringResource(R.string.sleep_timer),
+                stringResource(Res.string.sleep_timer),
                 style = MaterialTheme.typography.titleLargeEmphasized,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
@@ -86,14 +88,14 @@ fun SleepTimerSheet(state: SleepTimerState?, onDismiss: () -> Unit) {
                 )
             }
             SLEEP_MINUTES.forEach { m ->
-                ActionItem(PlayerIcons.Bedtime, pluralStringResource(R.plurals.sleep_minutes, m, m)) {
+                ActionItem(PlayerIcons.Bedtime, pluralStringResource(Res.plurals.sleep_minutes, m, m)) {
                     act { SleepTimer.start(m) }
                 }
             }
-            ActionItem(PlayerIcons.MusicNote, stringResource(R.string.sleep_end_of_track)) { act(SleepTimer::endOfTrack) }
+            ActionItem(PlayerIcons.MusicNote, stringResource(Res.string.sleep_end_of_track)) { act(SleepTimer::endOfTrack) }
             if (state != null) {
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                ActionItem(PlayerIcons.Close, stringResource(R.string.sleep_off)) { act(SleepTimer::cancel) }
+                ActionItem(PlayerIcons.Close, stringResource(Res.string.sleep_off)) { act(SleepTimer::cancel) }
             }
         }
     }

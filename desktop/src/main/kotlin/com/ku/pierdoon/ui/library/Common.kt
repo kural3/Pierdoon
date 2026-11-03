@@ -51,8 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
-import com.ku.pierdoon.resources.Res
-import com.ku.pierdoon.resources.*
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.ExpressiveIconButton

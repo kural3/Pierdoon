@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
@@ -19,7 +22,6 @@ import com.ku.pierdoon.R
 import com.ku.pierdoon.ui.components.AppMenu
 import com.ku.pierdoon.ui.components.ExpressiveTextButton
 import com.ku.pierdoon.ui.components.MenuAction
-import androidx.compose.ui.res.stringResource
 
 /** The speed on glass ("1×"), with a menu of the others. Lit while it isn't 1×, so that doesn't go unnoticed. */
 @Composable
@@ -32,7 +34,7 @@ fun SpeedButton(containerColor: Color, modifier: Modifier = Modifier) {
         ExpressiveTextButton(
             onClick = { open = true },
             text = PlaybackSpeed.label(speed),
-            onClickLabel = stringResource(R.string.speed),
+            onClickLabel = stringResource(Res.string.speed),
             containerColor = if (changed) colors.primary else containerColor,
             contentColor = if (changed) colors.onPrimary else colors.onSurface,
             restCorner = if (changed) 30 else 50,

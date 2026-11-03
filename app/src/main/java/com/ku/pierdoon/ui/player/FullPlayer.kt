@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import com.ku.pierdoon.ui.components.MenuAction
 import com.ku.pierdoon.ui.components.AppMenu
 import androidx.compose.runtime.Immutable
@@ -100,7 +103,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -243,7 +245,7 @@ fun FullPlayer(
                 ExpressiveIconButton(
                     onClick = onCollapse,
                     icon = PlayerIcons.ExpandMore,
-                    contentDescription = stringResource(R.string.collapse),
+                    contentDescription = stringResource(Res.string.collapse),
                     containerColor = glassButton,
                     contentColor = colors.onSurface,
                     modifier = Modifier.size(48.dp),
@@ -252,9 +254,9 @@ fun FullPlayer(
                     Text(
                         text = stringResource(
                             when {
-                                showQueue -> R.string.queue
-                                showLyrics -> R.string.lyrics
-                                else -> R.string.now_playing
+                                showQueue -> Res.string.queue
+                                showLyrics -> Res.string.lyrics
+                                else -> Res.string.now_playing
                             }
                         ),
                         style = MaterialTheme.typography.labelLarge,
@@ -406,7 +408,7 @@ fun FullPlayer(
                         checked = state.shuffle,
                         onClick = onToggleShuffle,
                         icon = PlayerIcons.Shuffle,
-                        contentDescription = stringResource(R.string.shuffle),
+                        contentDescription = stringResource(Res.string.shuffle),
                         uncheckedColor = glassButton,
                         modifier = toggleSize,
                     )
@@ -414,7 +416,7 @@ fun FullPlayer(
                         checked = showLyrics,
                         onClick = onToggleLyrics,
                         icon = PlayerIcons.Lyrics,
-                        contentDescription = stringResource(R.string.lyrics),
+                        contentDescription = stringResource(Res.string.lyrics),
                         uncheckedColor = glassButton,
                         modifier = toggleSize,
                     )
@@ -422,7 +424,7 @@ fun FullPlayer(
                         checked = showQueue,
                         onClick = onToggleQueue,
                         icon = PlayerIcons.Queue,
-                        contentDescription = stringResource(R.string.queue),
+                        contentDescription = stringResource(Res.string.queue),
                         uncheckedColor = glassButton,
                         modifier = toggleSize,
                     )
@@ -430,7 +432,7 @@ fun FullPlayer(
                         checked = state.repeatMode != Player.REPEAT_MODE_OFF,
                         onClick = onCycleRepeat,
                         icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
-                        contentDescription = stringResource(R.string.repeat),
+                        contentDescription = stringResource(Res.string.repeat),
                         uncheckedColor = glassButton,
                         modifier = toggleSize,
                     )
@@ -529,8 +531,8 @@ private fun DeviceSwitch(devices: PlayerDevices, glass: Color) {
     var menu by remember { mutableStateOf(false) }
     val turn by animateFloatAsState(if (menu) 180f else 0f, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "deviceArrow")
     val colors = MaterialTheme.colorScheme
-    val phoneName = stringResource(R.string.player_device_phone)
-    val nothing = stringResource(R.string.player_device_idle)
+    val phoneName = stringResource(Res.string.player_device_phone)
+    val nothing = stringResource(Res.string.player_device_idle)
     Box {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -538,7 +540,7 @@ private fun DeviceSwitch(devices: PlayerDevices, glass: Color) {
                 .padding(top = 4.dp)
                 .clip(CircleShape)
                 .background(glass)
-                .clickable(onClickLabel = stringResource(R.string.player_device_switch)) { menu = true }
+                .clickable(onClickLabel = stringResource(Res.string.player_device_switch)) { menu = true }
                 .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
                 .animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()),
         ) {
@@ -597,7 +599,7 @@ private fun DeviceSwitch(devices: PlayerDevices, glass: Color) {
                         label = devices.pcName,
                         icon = PlayerIcons.Desktop,
                         supporting = when {
-                            !devices.pcOnline -> stringResource(R.string.player_device_offline)
+                            !devices.pcOnline -> stringResource(Res.string.player_device_offline)
                             else -> devices.pcTrack ?: nothing
                         },
                         selected = devices.onPc,
@@ -605,7 +607,7 @@ private fun DeviceSwitch(devices: PlayerDevices, glass: Color) {
                     ) { devices.onSwitch(true) },
                 ),
                 listOf(
-                    MenuAction(stringResource(R.string.pc_open), PlayerIcons.Library, onClick = devices.onOpenComputer),
+                    MenuAction(stringResource(Res.string.pc_open), PlayerIcons.Library, onClick = devices.onOpenComputer),
                 ),
             ),
         )
@@ -657,7 +659,7 @@ private fun CompactControls(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = nowPlaying.artist.ifEmpty { stringResource(R.string.unknown_artist) },
+                    text = nowPlaying.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                     maxLines = 1,
@@ -668,7 +670,7 @@ private fun CompactControls(
             ExpressiveIconButton(
                 onClick = onPrevious,
                 icon = PlayerIcons.Previous,
-                contentDescription = stringResource(R.string.previous),
+                contentDescription = stringResource(Res.string.previous),
                 containerColor = glassButton,
                 contentColor = colors.onSurface,
                 modifier = Modifier.size(48.dp),
@@ -677,8 +679,8 @@ private fun CompactControls(
             PlayPauseButton(
                 isPlaying = isPlaying,
                 onClick = onTogglePlay,
-                playLabel = stringResource(R.string.play),
-                pauseLabel = stringResource(R.string.pause),
+                playLabel = stringResource(Res.string.play),
+                pauseLabel = stringResource(Res.string.pause),
                 iconSize = 26.dp,
                 modifier = Modifier.size(width = 64.dp, height = 52.dp),
             )
@@ -686,7 +688,7 @@ private fun CompactControls(
             ExpressiveIconButton(
                 onClick = onNext,
                 icon = PlayerIcons.Next,
-                contentDescription = stringResource(R.string.next),
+                contentDescription = stringResource(Res.string.next),
                 containerColor = glassButton,
                 contentColor = colors.onSurface,
                 modifier = Modifier.size(48.dp),
@@ -716,7 +718,7 @@ private fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, containerCo
     ExpressiveIconButton(
         onClick = onClick,
         icon = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
-        contentDescription = stringResource(if (isFavorite) R.string.remove_from_favorites else R.string.add_to_favorites),
+        contentDescription = stringResource(if (isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites),
         containerColor = containerColor,
         contentColor = tint,
         haptic = if (isFavorite) HapticFeedbackType.ToggleOff else HapticFeedbackType.Confirm,
@@ -801,8 +803,8 @@ private fun PlayerArtwork(
         currentOnSeek(seekTarget)
     }
 
-    val backLabel = stringResource(R.string.seek_back)
-    val forwardLabel = stringResource(R.string.seek_forward)
+    val backLabel = stringResource(Res.string.seek_back)
+    val forwardLabel = stringResource(Res.string.seek_forward)
     Box(modifier.trackSwipe(swipe, onNext, onPrevious), contentAlignment = Alignment.Center) {
         val gestures = Modifier
                 .semantics {
@@ -900,7 +902,7 @@ private fun SeekHint(side: Int, activeSide: Int, seconds: Int, modifier: Modifie
             val icon = if (side < 0) PlayerIcons.FastRewind else PlayerIcons.FastForward
             if (side < 0) Icon(icon, null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
             Text(
-                text = stringResource(R.string.seek_seconds, seconds),
+                text = stringResource(Res.string.seek_seconds, seconds),
                 style = MaterialTheme.typography.labelLarge,
                 color = colors.onSurface,
                 modifier = Modifier.padding(horizontal = 6.dp),

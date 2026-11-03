@@ -1,13 +1,15 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import com.ku.pierdoon.R
 import com.ku.pierdoon.ui.components.PlayerIcons
@@ -35,7 +37,7 @@ fun CollectionScreen(
 ) {
     val selection = rememberSongSelection()
     SelectionBackHandler(selection)
-    val selectLabel = stringResource(R.string.select)
+    val selectLabel = stringResource(Res.string.select)
     AppScaffold(
         title = selectionTitle(selection, title),
         onBack = if (selection.active) selection::clear else onBack,
@@ -64,7 +66,7 @@ fun CollectionScreen(
             item(key = "header") {
                 CollectionHeader(
                     cover = cover,
-                    subtitle = subtitle.ifEmpty { pluralStringResource(R.plurals.songs_count, songs.size, songs.size) },
+                    subtitle = subtitle.ifEmpty { pluralStringResource(Res.plurals.songs_count, songs.size, songs.size) },
                     onPlay = { onPlay(songs, 0) },
                     onShuffle = { onShuffle(songs) },
                     enabled = songs.isNotEmpty(),

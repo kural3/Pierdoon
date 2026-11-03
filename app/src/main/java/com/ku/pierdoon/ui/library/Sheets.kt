@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -57,7 +60,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.R
@@ -115,7 +117,7 @@ fun SongActionsSheet(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        target.song.artist.ifEmpty { stringResource(R.string.unknown_artist) },
+                        target.song.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -132,38 +134,38 @@ fun SongActionsSheet(
             ) { picking ->
                 Column {
                     if (!picking) {
-                        ActionItem(PlayerIcons.PlayNext, stringResource(R.string.play_next)) { act(onPlayNext) }
-                        ActionItem(PlayerIcons.Queue, stringResource(R.string.add_to_queue)) { act(onAddToQueue) }
+                        ActionItem(PlayerIcons.PlayNext, stringResource(Res.string.play_next)) { act(onPlayNext) }
+                        ActionItem(PlayerIcons.Queue, stringResource(Res.string.add_to_queue)) { act(onAddToQueue) }
                         ActionItem(
                             if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
-                            stringResource(if (isFavorite) R.string.remove_from_favorites else R.string.add_to_favorites),
+                            stringResource(if (isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites),
                         ) { act(onToggleFavorite) }
-                        ActionItem(PlayerIcons.PlaylistAdd, stringResource(R.string.add_to_playlist)) {
+                        ActionItem(PlayerIcons.PlaylistAdd, stringResource(Res.string.add_to_playlist)) {
                             haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                             pickingPlaylist = true
                         }
-                        ActionItem(PlayerIcons.Edit, stringResource(R.string.edit_track)) {
+                        ActionItem(PlayerIcons.Edit, stringResource(Res.string.edit_track)) {
                             haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                             onDismiss()
                             onEdit()
                         }
                         if (onSendToComputer != null) {
-                            ActionItem(PlayerIcons.Desktop, stringResource(R.string.transfer_send_to_pc)) { act(onSendToComputer) }
+                            ActionItem(PlayerIcons.Desktop, stringResource(Res.string.transfer_send_to_pc)) { act(onSendToComputer) }
                         }
                         if (target.playlistId != null) {
-                            ActionItem(PlayerIcons.Remove, stringResource(R.string.remove_from_playlist)) {
+                            ActionItem(PlayerIcons.Remove, stringResource(Res.string.remove_from_playlist)) {
                                 act(onRemoveFromPlaylist)
                             }
                         }
                         if (onDelete != null) {
-                            ActionItem(PlayerIcons.Delete, stringResource(R.string.delete_from_device), destructive = true) {
+                            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete_from_device), destructive = true) {
                                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                                 onDismiss()
                                 onDelete()
                             }
                         }
                     } else {
-                        ActionItem(PlayerIcons.Add, stringResource(R.string.new_playlist)) { act(onCreatePlaylist) }
+                        ActionItem(PlayerIcons.Add, stringResource(Res.string.new_playlist)) { act(onCreatePlaylist) }
                         playlists.forEach { p ->
                             ActionItem(PlayerIcons.Playlist, p.name) { act { onAddToPlaylist(p.id) } }
                         }
@@ -194,28 +196,28 @@ fun PlaylistActionsSheet(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
             if (onSendToComputer != null && playlist.songIds.isNotEmpty()) {
-                ActionItem(PlayerIcons.Desktop, stringResource(R.string.transfer_send_to_pc)) {
+                ActionItem(PlayerIcons.Desktop, stringResource(Res.string.transfer_send_to_pc)) {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     onDismiss()
                     onSendToComputer()
                 }
             }
-            ActionItem(PlayerIcons.Edit, stringResource(R.string.rename)) {
+            ActionItem(PlayerIcons.Edit, stringResource(Res.string.rename)) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onDismiss()
                 onRename()
             }
-            ActionItem(PlayerIcons.Image, stringResource(R.string.cover)) {
+            ActionItem(PlayerIcons.Image, stringResource(Res.string.cover)) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onDismiss()
                 onCover()
             }
-            ActionItem(PlayerIcons.Upload, stringResource(R.string.playlist_export)) {
+            ActionItem(PlayerIcons.Upload, stringResource(Res.string.playlist_export)) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onDismiss()
                 onExport()
             }
-            ActionItem(PlayerIcons.Delete, stringResource(R.string.delete), destructive = true) {
+            ActionItem(PlayerIcons.Delete, stringResource(Res.string.delete), destructive = true) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onDismiss()
                 onDelete()
@@ -267,7 +269,7 @@ fun PlaylistNameDialog(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text(stringResource(R.string.playlist_name)) },
+                label = { Text(stringResource(Res.string.playlist_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
@@ -275,7 +277,7 @@ fun PlaylistNameDialog(
         confirmButton = {
             TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
     )
 }
 
@@ -283,9 +285,9 @@ fun PlaylistNameDialog(
 fun ConfirmDeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.delete_playlist_confirm, name)) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.delete)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        title = { Text(stringResource(Res.string.delete_playlist_confirm, name)) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(Res.string.delete)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
     )
 }
 
@@ -315,7 +317,7 @@ fun PlaylistCoverSheet(
         ) {
             PlaylistCover(playlist, firstSong, Modifier.size(160.dp), large = true, placeholderIconSize = 56.dp)
             Spacer(Modifier.height(20.dp))
-            SheetLabel(stringResource(R.string.playlist_cover_shape))
+            SheetLabel(stringResource(Res.string.playlist_cover_shape))
             PlaylistShapes.all.chunked(4).forEach { row ->
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -346,7 +348,7 @@ fun PlaylistCoverSheet(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            SheetLabel(stringResource(R.string.playlist_cover_image))
+            SheetLabel(stringResource(Res.string.playlist_cover_image))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 FilledTonalButton(
                     onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -355,7 +357,7 @@ fun PlaylistCoverSheet(
                 ) {
                     Icon(PlayerIcons.Image, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.cover_gallery), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(Res.string.cover_gallery), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 AnimatedVisibility(
                     visible = hasImage,
@@ -373,13 +375,13 @@ fun PlaylistCoverSheet(
                     ) {
                         Icon(PlayerIcons.Delete, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.cover_remove), maxLines = 1)
+                        Text(stringResource(Res.string.cover_remove), maxLines = 1)
                     }
                 }
             }
             if (!hasImage) {
                 Text(
-                    stringResource(R.string.playlist_cover_from_track),
+                    stringResource(Res.string.playlist_cover_from_track),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp),

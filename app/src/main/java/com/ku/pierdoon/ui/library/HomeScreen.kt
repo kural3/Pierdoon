@@ -1,5 +1,10 @@
 package com.ku.pierdoon.ui.library
 
+import org.jetbrains.compose.resources.StringResource
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -43,8 +48,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -98,7 +101,7 @@ fun HomeScreen(
                 ExpressiveIconButton(
                     onClick = { onOpen(Route.Computer) },
                     icon = PlayerIcons.Desktop,
-                    contentDescription = stringResource(R.string.pc_open),
+                    contentDescription = stringResource(Res.string.pc_open),
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(48.dp),
@@ -111,7 +114,7 @@ fun HomeScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
             ) {
                 QuickCard(
-                    title = stringResource(R.string.shuffle_all),
+                    title = stringResource(Res.string.shuffle_all),
                     icon = PlayerIcons.Shuffle,
                     shape = MaterialShapes.Cookie9Sided.toShape(),
                     container = MaterialTheme.colorScheme.primaryContainer,
@@ -120,8 +123,8 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                 )
                 QuickCard(
-                    title = stringResource(R.string.favorites),
-                    subtitle = pluralStringResource(R.plurals.songs_count, favoritesCount, favoritesCount),
+                    title = stringResource(Res.string.favorites),
+                    subtitle = pluralStringResource(Res.plurals.songs_count, favoritesCount, favoritesCount),
                     icon = PlayerIcons.Favorite,
                     shape = MaterialShapes.Sunny.toShape(),
                     container = MaterialTheme.colorScheme.tertiaryContainer,
@@ -149,11 +152,11 @@ fun HomeScreen(
         }
 
         if (recent.isNotEmpty()) {
-            item(key = "recentTitle") { SectionTitle(stringResource(R.string.recently_played)) }
+            item(key = "recentTitle") { SectionTitle(stringResource(Res.string.recently_played)) }
             item(key = "recent") { RecentCarousel(recent, onPlay) }
         }
         if (collections.recentlyAdded.isNotEmpty()) {
-            item(key = "addedTitle") { SectionTitle(stringResource(R.string.recently_added)) }
+            item(key = "addedTitle") { SectionTitle(stringResource(Res.string.recently_added)) }
             item(key = "added") {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -173,7 +176,7 @@ fun HomeScreen(
             }
         }
         if (collections.albums.isNotEmpty()) {
-            item(key = "albumsTitle") { SectionTitle(stringResource(R.string.nav_albums)) }
+            item(key = "albumsTitle") { SectionTitle(stringResource(Res.string.nav_albums)) }
             item(key = "albums") {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -184,7 +187,7 @@ fun HomeScreen(
             }
         }
         if (playlists.isNotEmpty()) {
-            item(key = "playlistsTitle") { SectionTitle(stringResource(R.string.your_playlists)) }
+            item(key = "playlistsTitle") { SectionTitle(stringResource(Res.string.your_playlists)) }
             item(key = "playlists") {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -194,7 +197,7 @@ fun HomeScreen(
                         val cover = resolveCover(p)
                         CoverCard(
                             title = p.name,
-                            subtitle = pluralStringResource(R.plurals.songs_count, p.songIds.size, p.songIds.size),
+                            subtitle = pluralStringResource(Res.plurals.songs_count, p.songIds.size, p.songIds.size),
                             songId = cover?.id ?: -1L,
                             albumId = cover?.albumId ?: -1L,
                             onClick = { onOpen(Route.PlaylistDetail(p.id)) },
@@ -207,11 +210,11 @@ fun HomeScreen(
     }
 }
 
-private fun greetingRes(): Int = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
-    in 5..11 -> R.string.greeting_morning
-    in 12..17 -> R.string.greeting_day
-    in 18..22 -> R.string.greeting_evening
-    else -> R.string.greeting_night
+private fun greetingRes(): StringResource = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+    in 5..11 -> Res.string.greeting_morning
+    in 12..17 -> Res.string.greeting_day
+    in 18..22 -> Res.string.greeting_evening
+    else -> Res.string.greeting_night
 }
 
 @Composable
@@ -365,7 +368,7 @@ fun CoverCard(
             modifier = Modifier.padding(horizontal = 4.dp),
         )
         Text(
-            text = subtitle.ifEmpty { stringResource(R.string.unknown_artist) },
+            text = subtitle.ifEmpty { stringResource(Res.string.unknown_artist) },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -413,14 +416,14 @@ private fun DailyMixCard(songs: List<Song>, onOpen: () -> Unit, onPlay: () -> Un
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                stringResource(R.string.daily_mix),
+                stringResource(Res.string.daily_mix),
                 style = MaterialTheme.typography.titleMediumEmphasized,
                 color = colors.onSecondaryContainer,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                artists.ifEmpty { stringResource(R.string.daily_mix_desc) },
+                artists.ifEmpty { stringResource(Res.string.daily_mix_desc) },
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSecondaryContainer.copy(alpha = 0.75f),
                 maxLines = 2,
@@ -431,7 +434,7 @@ private fun DailyMixCard(songs: List<Song>, onOpen: () -> Unit, onPlay: () -> Un
         ExpressiveIconButton(
             onClick = onPlay,
             icon = PlayerIcons.Play,
-            contentDescription = stringResource(R.string.play_all),
+            contentDescription = stringResource(Res.string.play_all),
             containerColor = colors.primary,
             contentColor = colors.onPrimary,
             iconSize = 28.dp,
@@ -495,9 +498,9 @@ private fun StatsCard(weekListenedMs: Long, onClick: () -> Unit, modifier: Modif
         }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.stats), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+            Text(stringResource(Res.string.stats), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
             Text(
-                stringResource(R.string.stats_week_summary, listenedTime(weekListenedMs)),
+                stringResource(Res.string.stats_week_summary, listenedTime(weekListenedMs)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant,
             )

@@ -92,8 +92,8 @@ import com.ku.pierdoon.data.UserData
 import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlaybackController
-import com.ku.pierdoon.resources.*
-import com.ku.pierdoon.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.ArtworkCache
 import com.ku.pierdoon.ui.components.Backdrop

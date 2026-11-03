@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -58,7 +61,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.LyricsState
@@ -118,17 +120,17 @@ fun LyricsPanel(
         when (s) {
             LyricsState.Idle, LyricsState.Loading -> Centered { LoadingIndicator(Modifier.size(56.dp)) }
             LyricsState.Error -> Centered {
-                Message(stringResource(R.string.lyrics_error))
+                Message(stringResource(Res.string.lyrics_error))
                 Spacer(Modifier.height(16.dp))
-                FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                FilledTonalButton(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
             }
             is LyricsState.Ready -> when (val l = s.lyrics) {
                 is Lyrics.Synced -> SyncedLyrics(l, position, onSeek, offsetMs, onShift, onResetOffset)
                 is Lyrics.Plain -> PlainLyrics(l)
-                Lyrics.Instrumental -> Centered { Message(stringResource(R.string.lyrics_instrumental)); SearchButton() }
-                Lyrics.NotFound -> Centered { Message(stringResource(R.string.lyrics_not_found)); SearchButton() }
+                Lyrics.Instrumental -> Centered { Message(stringResource(Res.string.lyrics_instrumental)); SearchButton() }
+                Lyrics.NotFound -> Centered { Message(stringResource(Res.string.lyrics_not_found)); SearchButton() }
             }
-            LyricsState.WifiOnly -> Centered { Message(stringResource(R.string.lyrics_wifi_only)) }
+            LyricsState.WifiOnly -> Centered { Message(stringResource(Res.string.lyrics_wifi_only)) }
         }
     }
 }
@@ -243,7 +245,7 @@ private fun SyncControls(offsetMs: Long, onShift: (Long) -> Unit, onReset: () ->
         ExpressiveIconButton(
             onClick = { onShift(-LyricsOffsets.STEP_MS) },
             icon = PlayerIcons.Remove,
-            contentDescription = stringResource(R.string.lyrics_earlier),
+            contentDescription = stringResource(Res.string.lyrics_earlier),
             containerColor = glass,
             contentColor = colors.onSurface,
             iconSize = 18.dp,
@@ -251,7 +253,7 @@ private fun SyncControls(offsetMs: Long, onShift: (Long) -> Unit, onReset: () ->
             modifier = Modifier.size(36.dp),
         )
         Text(
-            text = stringResource(R.string.lyrics_offset, formatOffset(offsetMs)),
+            text = stringResource(Res.string.lyrics_offset, formatOffset(offsetMs)),
             style = MaterialTheme.typography.labelMedium,
             color = if (offsetMs == 0L) colors.onSurfaceVariant else colors.primary,
             textAlign = TextAlign.Center,
@@ -261,7 +263,7 @@ private fun SyncControls(offsetMs: Long, onShift: (Long) -> Unit, onReset: () ->
                 .widthIn(min = 52.dp)
                 .clip(RoundedCornerShape(50))
                 .background(glass)
-                .clickable(enabled = offsetMs != 0L, onClickLabel = stringResource(R.string.lyrics_offset_reset)) {
+                .clickable(enabled = offsetMs != 0L, onClickLabel = stringResource(Res.string.lyrics_offset_reset)) {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     onReset()
                 }
@@ -270,7 +272,7 @@ private fun SyncControls(offsetMs: Long, onShift: (Long) -> Unit, onReset: () ->
         ExpressiveIconButton(
             onClick = { onShift(LyricsOffsets.STEP_MS) },
             icon = PlayerIcons.Add,
-            contentDescription = stringResource(R.string.lyrics_later),
+            contentDescription = stringResource(Res.string.lyrics_later),
             containerColor = glass,
             contentColor = colors.onSurface,
             iconSize = 18.dp,
@@ -342,7 +344,7 @@ private fun SourceLabel() {
         modifier = Modifier.padding(start = 8.dp, top = 16.dp, bottom = 16.dp),
     ) {
         Text(
-            text = stringResource(R.string.lyrics_source),
+            text = stringResource(Res.string.lyrics_source),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -360,10 +362,10 @@ private fun SearchButton(text: Boolean = false) {
     val search = LocalLyricsSearch.current ?: return
     var open by remember { mutableStateOf(false) }
     if (text) {
-        TextButton(onClick = { open = true }) { Text(stringResource(R.string.lyrics_search)) }
+        TextButton(onClick = { open = true }) { Text(stringResource(Res.string.lyrics_search)) }
     } else {
         Spacer(Modifier.height(16.dp))
-        FilledTonalButton(onClick = { open = true }) { Text(stringResource(R.string.lyrics_search)) }
+        FilledTonalButton(onClick = { open = true }) { Text(stringResource(Res.string.lyrics_search)) }
     }
     if (open) LyricsSearchDialog(search, onDismiss = { open = false })
 }

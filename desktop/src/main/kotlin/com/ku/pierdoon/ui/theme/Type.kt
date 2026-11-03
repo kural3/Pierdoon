@@ -9,11 +9,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import com.ku.pierdoon.data.AppFont
-import com.ku.pierdoon.resources.Res
-import com.ku.pierdoon.resources.ibm_plex_mono_bold
-import com.ku.pierdoon.resources.ibm_plex_mono_regular
-import com.ku.pierdoon.resources.ibm_plex_mono_semibold
-import com.ku.pierdoon.resources.jetbrains_mono
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.ibm_plex_mono_bold
+import com.ku.pierdoon.ui.resources.ibm_plex_mono_regular
+import com.ku.pierdoon.ui.resources.ibm_plex_mono_semibold
+import com.ku.pierdoon.ui.resources.jetbrains_mono
 import org.jetbrains.compose.resources.Font
 
 // Material defaults already include the expressive "Emphasized" styles.

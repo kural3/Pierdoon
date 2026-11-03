@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.download
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import android.content.ClipboardManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -56,7 +59,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -135,7 +137,7 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
         }
     }
 
-    AppScaffold(title = stringResource(R.string.downloads), onBack = onBack) { inner ->
+    AppScaffold(title = stringResource(Res.string.downloads), onBack = onBack) { inner ->
         LazyColumn(
             contentPadding = PaddingValues(
                 start = 16.dp,
@@ -148,7 +150,7 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
             if (!Downloader.supported) {
                 item(key = "unsupported") {
                     Text(
-                        stringResource(R.string.download_unsupported_os),
+                        stringResource(Res.string.download_unsupported_os),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(20.dp),
@@ -180,7 +182,7 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
                         ExpressiveIconButton(
                             onClick = ::start,
                             icon = if (url != null || !ready) PlayerIcons.Download else PlayerIcons.Search,
-                            contentDescription = stringResource(if (url != null) R.string.download_start else R.string.download_search),
+                            contentDescription = stringResource(if (url != null) Res.string.download_start else Res.string.download_search),
                             containerColor = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
                             contentColor = if (ready) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(56.dp),
@@ -196,8 +198,8 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
                     ) {
                         ConnectedChoice(
                             options = listOf(
-                                stringResource(R.string.download_source_youtube),
-                                stringResource(R.string.download_source_soundcloud),
+                                stringResource(Res.string.download_source_youtube),
+                                stringResource(Res.string.download_source_soundcloud),
                             ),
                             selected = source.ordinal,
                             onSelect = { i ->
@@ -216,14 +218,14 @@ fun DownloadScreen(onBack: () -> Unit, onPlay: (Long) -> Unit, bottomInset: Dp) 
                     Group(null) {
                         when (val st = search) {
                             SearchState.Loading -> listOf<@Composable (Shape) -> Unit>({ shape ->
-                                SearchNote(shape, stringResource(R.string.download_searching), loading = true)
+                                SearchNote(shape, stringResource(Res.string.download_searching), loading = true)
                             })
                             SearchState.Failed -> listOf<@Composable (Shape) -> Unit>({ shape ->
-                                SearchNote(shape, stringResource(R.string.download_search_failed))
+                                SearchNote(shape, stringResource(Res.string.download_search_failed))
                             })
                             is SearchState.Found -> if (st.hits.isEmpty()) {
                                 listOf<@Composable (Shape) -> Unit>({ shape ->
-                                    SearchNote(shape, stringResource(R.string.download_search_empty))
+                                    SearchNote(shape, stringResource(Res.string.download_search_empty))
                                 })
                             } else {
                                 st.hits.map<SearchHit, @Composable (Shape) -> Unit> { hit ->
@@ -309,16 +311,16 @@ private fun LinkField(
     TextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(stringResource(R.string.download_link), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        placeholder = { Text(stringResource(Res.string.download_link), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = { Icon(PlayerIcons.Search, contentDescription = null) },
         trailingIcon = {
             if (value.isEmpty()) {
                 IconButton(onClick = onPaste) {
-                    Icon(PlayerIcons.Paste, contentDescription = stringResource(R.string.download_paste))
+                    Icon(PlayerIcons.Paste, contentDescription = stringResource(Res.string.download_paste))
                 }
             } else {
                 IconButton(onClick = { onValueChange("") }) {
-                    Icon(PlayerIcons.Close, contentDescription = stringResource(R.string.cancel))
+                    Icon(PlayerIcons.Close, contentDescription = stringResource(Res.string.cancel))
                 }
             }
         },
@@ -357,7 +359,7 @@ private fun EmptyHint() {
         }
         Spacer(Modifier.height(20.dp))
         Text(
-            stringResource(R.string.download_empty),
+            stringResource(Res.string.download_empty),
             style = MaterialTheme.typography.bodyLarge,
             color = colors.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -365,7 +367,7 @@ private fun EmptyHint() {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            stringResource(R.string.download_rights),
+            stringResource(Res.string.download_rights),
             style = MaterialTheme.typography.bodySmall,
             color = colors.outline,
             textAlign = TextAlign.Center,
@@ -381,7 +383,7 @@ private fun QueueHeader(canClear: Boolean) {
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 12.dp).height(48.dp),
     ) {
         Text(
-            stringResource(R.string.download_queue),
+            stringResource(Res.string.download_queue),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),
@@ -391,7 +393,7 @@ private fun QueueHeader(canClear: Boolean) {
             enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
             exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
         ) {
-            TextButton(onClick = Downloader::clearFinished) { Text(stringResource(R.string.download_clear)) }
+            TextButton(onClick = Downloader::clearFinished) { Text(stringResource(Res.string.download_clear)) }
         }
     }
 }
@@ -435,7 +437,7 @@ private fun HitRow(hit: SearchHit, shape: Shape, queued: Boolean, onDownload: ()
             ExpressiveIconButton(
                 onClick = { if (!queued) onDownload() },
                 icon = if (queued) PlayerIcons.Check else PlayerIcons.Download,
-                contentDescription = stringResource(if (queued) R.string.download_in_queue else R.string.download_start),
+                contentDescription = stringResource(if (queued) Res.string.download_in_queue else Res.string.download_start),
                 containerColor = if (queued) colors.secondaryContainer else Color.Transparent,
                 contentColor = if (queued) colors.onSecondaryContainer else colors.onSurfaceVariant,
                 modifier = Modifier.size(44.dp),
@@ -470,7 +472,7 @@ private fun GroupHeader(group: DownloadGroup, tasks: List<DownloadTask>, shape: 
                 )
                 Text(
                     stringResource(
-                        if (finished && done > 0) R.string.download_group_done else R.string.download_group_progress,
+                        if (finished && done > 0) Res.string.download_group_done else Res.string.download_group_progress,
                         done,
                         tasks.size,
                     ),
@@ -523,7 +525,7 @@ private fun TaskRow(
                 ExpressiveIconButton(
                     onClick = onRetry,
                     icon = PlayerIcons.Restore,
-                    contentDescription = stringResource(R.string.retry),
+                    contentDescription = stringResource(Res.string.retry),
                     containerColor = Color.Transparent,
                     contentColor = colors.onSurfaceVariant,
                     modifier = Modifier.size(44.dp),
@@ -532,7 +534,7 @@ private fun TaskRow(
             ExpressiveIconButton(
                 onClick = onRemove,
                 icon = PlayerIcons.Close,
-                contentDescription = stringResource(if (task.active) R.string.download_cancel else R.string.delete),
+                contentDescription = stringResource(if (task.active) Res.string.download_cancel else Res.string.delete),
                 containerColor = Color.Transparent,
                 contentColor = colors.onSurfaceVariant,
                 modifier = Modifier.size(44.dp),
@@ -590,23 +592,23 @@ private fun TaskBadge(status: DownloadStatus) {
 private fun statusText(task: DownloadTask): String {
     val artist = task.artist
     val state = when (val s = task.status) {
-        DownloadStatus.Queued -> stringResource(R.string.download_queued)
-        DownloadStatus.Preparing -> stringResource(R.string.download_preparing)
+        DownloadStatus.Queued -> stringResource(Res.string.download_queued)
+        DownloadStatus.Preparing -> stringResource(Res.string.download_preparing)
         is DownloadStatus.Downloading ->
-            s.progress?.let { stringResource(R.string.download_progress, (it * 100).toInt()) }
-                ?: stringResource(R.string.download_running)
-        DownloadStatus.Saving -> stringResource(R.string.download_saving)
-        is DownloadStatus.Done -> stringResource(R.string.download_done)
+            s.progress?.let { stringResource(Res.string.download_progress, (it * 100).toInt()) }
+                ?: stringResource(Res.string.download_running)
+        DownloadStatus.Saving -> stringResource(Res.string.download_saving)
+        is DownloadStatus.Done -> stringResource(Res.string.download_done)
         is DownloadStatus.Failed -> {
             val reason = stringResource(
                 when (s.reason) {
-                    FailReason.Unsupported -> R.string.download_fail_unsupported
-                    FailReason.Unavailable -> R.string.download_fail_unavailable
-                    FailReason.Drm -> R.string.download_fail_drm
-                    FailReason.NoAudio -> R.string.download_fail_no_audio
-                    FailReason.Network -> R.string.download_fail_network
-                    FailReason.Save -> R.string.download_fail_save
-                    FailReason.Other -> R.string.download_fail_other
+                    FailReason.Unsupported -> Res.string.download_fail_unsupported
+                    FailReason.Unavailable -> Res.string.download_fail_unavailable
+                    FailReason.Drm -> Res.string.download_fail_drm
+                    FailReason.NoAudio -> Res.string.download_fail_no_audio
+                    FailReason.Network -> Res.string.download_fail_network
+                    FailReason.Save -> Res.string.download_fail_save
+                    FailReason.Other -> Res.string.download_fail_other
                 }
             )
             return if (s.reason == FailReason.Other && s.detail != null) "$reason: ${s.detail}" else reason

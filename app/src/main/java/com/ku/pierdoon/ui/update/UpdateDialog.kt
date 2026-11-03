@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.update
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,7 +22,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.ku.pierdoon.R
@@ -49,11 +51,11 @@ fun UpdateDialog(
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         properties = DialogProperties(dismissOnClickOutside = !busy),
-        title = { Text(stringResource(R.string.update_available, release.version)) },
+        title = { Text(stringResource(Res.string.update_available, release.version)) },
         text = {
             Column {
                 Text(
-                    stringResource(R.string.update_installed_now, Updater.currentVersion),
+                    stringResource(Res.string.update_installed_now, Updater.currentVersion),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -81,8 +83,8 @@ fun UpdateDialog(
                                     LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
                                 }
                             }
-                            UpdateState.Installing::class -> Status(stringResource(R.string.update_confirm), error = false)
-                            UpdateState.InstallFailed::class -> Status(stringResource(R.string.update_failed), error = true)
+                            UpdateState.Installing::class -> Status(stringResource(Res.string.update_confirm), error = false)
+                            UpdateState.InstallFailed::class -> Status(stringResource(Res.string.update_failed), error = true)
                             else -> Unit
                         }
                     }
@@ -94,9 +96,9 @@ fun UpdateDialog(
                 Text(
                     stringResource(
                         when (state) {
-                            is UpdateState.Downloading -> R.string.update_downloading
-                            is UpdateState.InstallFailed -> R.string.retry
-                            else -> R.string.update_install
+                            is UpdateState.Downloading -> Res.string.update_downloading
+                            is UpdateState.InstallFailed -> Res.string.retry
+                            else -> Res.string.update_install
                         }
                     )
                 )
@@ -104,7 +106,7 @@ fun UpdateDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(if (state is UpdateState.Downloading) R.string.cancel else R.string.update_later))
+                Text(stringResource(if (state is UpdateState.Downloading) Res.string.cancel else Res.string.update_later))
             }
         },
     )

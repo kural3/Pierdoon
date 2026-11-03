@@ -1,5 +1,10 @@
 package com.ku.pierdoon.ui.remote
 
+import org.jetbrains.compose.resources.StringResource
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import com.ku.pierdoon.ui.components.MenuAction
 import com.ku.pierdoon.ui.components.ChoiceChip
 import com.ku.pierdoon.ui.components.ConnectedChoice
@@ -85,8 +90,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -192,10 +195,10 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
     var address by rememberSaveable { mutableStateOf("") }
     var addressError by remember { mutableStateOf(false) }
     var code by rememberSaveable { mutableStateOf("") }
-    var pairError by remember { mutableStateOf<Int?>(if (revoked) R.string.pc_revoked else null) }
+    var pairError by remember { mutableStateOf<StringResource?>(if (revoked) Res.string.pc_revoked else null) }
     var pairing by remember { mutableStateOf(false) }
 
-    AppScaffold(title = stringResource(R.string.pc_title), onBack = onBack) { inner ->
+    AppScaffold(title = stringResource(Res.string.pc_title), onBack = onBack) { inner ->
         LazyColumn(
             contentPadding = PaddingValues(
                 start = 16.dp, end = 16.dp,
@@ -207,7 +210,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
             item(key = "intro") {
                 Box(Modifier.animateItem()) {
                     Text(
-                        stringResource(R.string.pc_intro),
+                        stringResource(Res.string.pc_intro),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
@@ -221,10 +224,10 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                             listOf<@Composable (Shape) -> Unit>({ shape ->
                                 ItemContainer(shape) {
                                     Column(Modifier.padding(20.dp)) {
-                                        Text(stringResource(R.string.pc_permission), style = MaterialTheme.typography.bodyLarge)
+                                        Text(stringResource(Res.string.pc_permission), style = MaterialTheme.typography.bodyLarge)
                                         Spacer(Modifier.height(12.dp))
                                         Button(onClick = { request.launch(permission) }) {
-                                            Text(stringResource(R.string.pc_permission_grant))
+                                            Text(stringResource(Res.string.pc_permission_grant))
                                         }
                                     }
                                 }
@@ -235,7 +238,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
             }
             item(key = "found") {
                 Box(Modifier.animateItem()) {
-                    Group(stringResource(R.string.pc_found)) {
+                    Group(stringResource(Res.string.pc_found)) {
                         buildList<@Composable (Shape) -> Unit> {
                             found.forEach { pc ->
                                 add { shape ->
@@ -256,7 +259,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                                             Spacer(Modifier.width(12.dp))
                                         }
                                         Text(
-                                            stringResource(if (searching || !allowed) R.string.pc_searching else R.string.pc_none_found),
+                                            stringResource(if (searching || !allowed) Res.string.pc_searching else Res.string.pc_none_found),
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -266,7 +269,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                             add { shape ->
                                 ItemContainer(shape) {
                                     Text(
-                                        stringResource(R.string.pc_search_again),
+                                        stringResource(Res.string.pc_search_again),
                                         style = MaterialTheme.typography.titleMedium,
                                         color = if (searching) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                                         modifier = Modifier
@@ -284,7 +287,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
             if (pc != null) {
                 item(key = "code") {
                     Box(Modifier.animateItem()) {
-                        Group(stringResource(R.string.pc_code_title, pc.name)) {
+                        Group(stringResource(Res.string.pc_code_title, pc.name)) {
                             listOf<@Composable (Shape) -> Unit>({ shape ->
                                 ItemContainer(shape) {
                                     val submit = {
@@ -293,9 +296,9 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                                             scope.launch {
                                                 pairError = when (PcRemote.pair(pc, code)) {
                                                     PcRemote.PairResult.Ok -> null
-                                                    PcRemote.PairResult.WrongCode -> R.string.pc_wrong_code
-                                                    PcRemote.PairResult.TooManyAttempts -> R.string.pc_too_many_attempts
-                                                    PcRemote.PairResult.Unreachable -> R.string.pc_unreachable
+                                                    PcRemote.PairResult.WrongCode -> Res.string.pc_wrong_code
+                                                    PcRemote.PairResult.TooManyAttempts -> Res.string.pc_too_many_attempts
+                                                    PcRemote.PairResult.Unreachable -> Res.string.pc_unreachable
                                                 }
                                                 if (pairError != null) code = ""
                                                 pairing = false
@@ -308,7 +311,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                                         OutlinedTextField(
                                             value = code,
                                             onValueChange = { v -> code = v.filter(Char::isDigit).take(6); pairError = null },
-                                            placeholder = { Text(stringResource(R.string.pc_code_hint)) },
+                                            placeholder = { Text(stringResource(Res.string.pc_code_hint)) },
                                             singleLine = true,
                                             isError = pairError != null,
                                             supportingText = pairError?.let { { Text(stringResource(it)) } },
@@ -319,7 +322,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                                         )
                                         Spacer(Modifier.height(8.dp))
                                         Button(onClick = submit, enabled = code.length == 6 && !pairing, modifier = Modifier.fillMaxWidth()) {
-                                            Text(stringResource(R.string.pc_connect))
+                                            Text(stringResource(Res.string.pc_connect))
                                         }
                                     }
                                 }
@@ -340,7 +343,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
             }
             item(key = "manual") {
                 Box(Modifier.animateItem()) {
-                    Group(stringResource(R.string.pc_manual)) {
+                    Group(stringResource(Res.string.pc_manual)) {
                         listOf<@Composable (Shape) -> Unit>({ shape ->
                             ItemContainer(shape) {
                                 Row(
@@ -350,10 +353,10 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                                     OutlinedTextField(
                                         value = address,
                                         onValueChange = { address = it.trim(); addressError = false },
-                                        placeholder = { Text(stringResource(R.string.pc_manual_hint)) },
+                                        placeholder = { Text(stringResource(Res.string.pc_manual_hint)) },
                                         singleLine = true,
                                         isError = addressError,
-                                        supportingText = if (addressError) ({ Text(stringResource(R.string.pc_manual_failed)) }) else null,
+                                        supportingText = if (addressError) ({ Text(stringResource(Res.string.pc_manual_failed)) }) else null,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                                         modifier = Modifier.weight(1f),
                                     )
@@ -370,7 +373,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                                                 }
                                             }
                                         },
-                                    ) { Text(stringResource(R.string.pc_manual_check)) }
+                                    ) { Text(stringResource(Res.string.pc_manual_check)) }
                                 }
                             }
                         })
@@ -425,7 +428,7 @@ private sealed interface SendState {
     data object Searching : SendState
     data class Found(val hits: List<SearchHit>) : SendState
     /** A one-line outcome: sent, the computer is too old, it didn't answer, nothing found. */
-    data class Note(val text: Int, val error: Boolean) : SendState
+    data class Note(val text: StringResource, val error: Boolean) : SendState
 }
 
 @Composable
@@ -443,8 +446,8 @@ private fun RemoteScreen(
     // Whichever side speaks the older protocol misses features; say which one to update.
     val versionNote = pcApi?.let {
         when {
-            it < PcRemote.API_VERSION -> R.string.pc_update_computer
-            it > PcRemote.API_VERSION -> R.string.pc_update_phone
+            it < PcRemote.API_VERSION -> Res.string.pc_update_computer
+            it > PcRemote.API_VERSION -> Res.string.pc_update_phone
             else -> null
         }
     }
@@ -467,10 +470,10 @@ private fun RemoteScreen(
                 PcRemote.SendResult.Ok -> {
                     sentUrls = sentUrls + url
                     // Picked from the results: keep them up to pick more.
-                    if (send is SendState.Found) send else SendState.Note(R.string.pc_sent, error = false)
+                    if (send is SendState.Found) send else SendState.Note(Res.string.pc_sent, error = false)
                 }
-                PcRemote.SendResult.Outdated -> SendState.Note(R.string.pc_send_outdated, error = true)
-                PcRemote.SendResult.Unreachable -> SendState.Note(R.string.pc_send_failed, error = true)
+                PcRemote.SendResult.Outdated -> SendState.Note(Res.string.pc_send_outdated, error = true)
+                PcRemote.SendResult.Unreachable -> SendState.Note(Res.string.pc_send_failed, error = true)
             }
         }
     }
@@ -489,9 +492,9 @@ private fun RemoteScreen(
         scope.launch {
             send = when (val r = PcRemote.searchDownloads(text, source)) {
                 is PcRemote.Search.Found ->
-                    if (r.hits.isEmpty()) SendState.Note(R.string.download_search_empty, error = false) else SendState.Found(r.hits)
-                PcRemote.Search.Outdated -> SendState.Note(R.string.pc_send_outdated, error = true)
-                PcRemote.Search.Failed -> SendState.Note(R.string.download_search_failed, error = true)
+                    if (r.hits.isEmpty()) SendState.Note(Res.string.download_search_empty, error = false) else SendState.Found(r.hits)
+                PcRemote.Search.Outdated -> SendState.Note(Res.string.pc_send_outdated, error = true)
+                PcRemote.Search.Failed -> SendState.Note(Res.string.download_search_failed, error = true)
             }
         }
     }
@@ -508,9 +511,9 @@ private fun RemoteScreen(
         title = name,
         subtitle = stringResource(
             when (connection) {
-                PcRemote.Connection.Connected -> R.string.pc_status_connected
-                PcRemote.Connection.Offline -> R.string.pc_status_offline
-                else -> R.string.pc_status_connecting
+                PcRemote.Connection.Connected -> Res.string.pc_status_connected
+                PcRemote.Connection.Offline -> Res.string.pc_status_offline
+                else -> Res.string.pc_status_connecting
             }
         ),
         onBack = onBack,
@@ -523,7 +526,7 @@ private fun RemoteScreen(
                     groups = listOf(
                         listOf(
                             MenuAction(
-                                label = stringResource(R.string.pc_forget),
+                                label = stringResource(Res.string.pc_forget),
                                 icon = PlayerIcons.LinkOff,
                                 destructive = true,
                                 onClick = PcRemote::forget,
@@ -567,7 +570,7 @@ private fun RemoteScreen(
                                 ) {
                                     Icon(
                                         if (state.muted || state.volume == 0f) PlayerIcons.VolumeOff else PlayerIcons.VolumeUp,
-                                        contentDescription = stringResource(R.string.pc_volume),
+                                        contentDescription = stringResource(Res.string.pc_volume),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     Spacer(Modifier.width(12.dp))
@@ -605,7 +608,7 @@ private fun RemoteScreen(
             if (downloads.isNotEmpty()) {
                 item(key = "downloads") {
                     Box(Modifier.animateItem().padding(horizontal = 16.dp)) {
-                        Group(stringResource(R.string.pc_downloads)) {
+                        Group(stringResource(Res.string.pc_downloads)) {
                             downloads.take(MAX_DOWNLOADS_SHOWN).map<PcDownload, @Composable (Shape) -> Unit> { d ->
                                 { shape -> DownloadRow(d, shape) }
                             }
@@ -646,7 +649,7 @@ private fun SendBox(
     val url = findUrl(link)
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    Group(stringResource(R.string.pc_send_title)) {
+    Group(stringResource(Res.string.pc_send_title)) {
         buildList<@Composable (Shape) -> Unit> {
             add { shape ->
                 ItemContainer(shape, Modifier.animateContentSize(spatial)) {
@@ -657,7 +660,7 @@ private fun SendBox(
                         OutlinedTextField(
                             value = link,
                             onValueChange = onLink,
-                            label = { Text(stringResource(R.string.download_link)) },
+                            label = { Text(stringResource(Res.string.download_link)) },
                             singleLine = true,
                             trailingIcon = {
                                 if (link.isEmpty()) {
@@ -666,11 +669,11 @@ private fun SendBox(
                                         val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)
                                         text?.let { findUrl(it.toString()) }?.let(onLink)
                                     }) {
-                                        Icon(PlayerIcons.Paste, contentDescription = stringResource(R.string.download_paste))
+                                        Icon(PlayerIcons.Paste, contentDescription = stringResource(Res.string.download_paste))
                                     }
                                 } else {
                                     IconButton(onClick = { onLink("") }) {
-                                        Icon(PlayerIcons.Close, contentDescription = stringResource(R.string.cancel))
+                                        Icon(PlayerIcons.Close, contentDescription = stringResource(Res.string.cancel))
                                     }
                                 }
                             },
@@ -688,7 +691,7 @@ private fun SendBox(
                         ExpressiveIconButton(
                             onClick = onSubmit,
                             icon = if (url != null || !ready) PlayerIcons.Download else PlayerIcons.Search,
-                            contentDescription = stringResource(if (url != null || !ready) R.string.pc_send else R.string.download_search),
+                            contentDescription = stringResource(if (url != null || !ready) Res.string.pc_send else Res.string.download_search),
                             containerColor = container,
                             contentColor = if (ready) colors.onPrimary else colors.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp).size(56.dp),
@@ -701,8 +704,8 @@ private fun SendBox(
                     ) {
                         ConnectedChoice(
                             options = listOf(
-                                stringResource(R.string.download_source_youtube),
-                                stringResource(R.string.download_source_soundcloud),
+                                stringResource(Res.string.download_source_youtube),
+                                stringResource(Res.string.download_source_soundcloud),
                             ),
                             selected = source.ordinal,
                             onSelect = { onSource(SearchSource.entries[it]) },
@@ -719,7 +722,7 @@ private fun SendBox(
                     ) { note ->
                         when (note) {
                             SendState.Searching -> Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-                                Text(stringResource(R.string.download_searching), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                                Text(stringResource(Res.string.download_searching), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                                 Spacer(Modifier.height(8.dp))
                                 LinearWavyProgressIndicator(Modifier.fillMaxWidth())
                             }
@@ -755,7 +758,7 @@ private fun SendBox(
                 add { shape ->
                     ItemContainer(shape) {
                         Box(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
-                            Tip(PlayerIcons.Smartphone, stringResource(R.string.pc_send_share))
+                            Tip(PlayerIcons.Smartphone, stringResource(Res.string.pc_send_share))
                         }
                     }
                 }
@@ -791,7 +794,7 @@ private fun SendHitRow(hit: SearchHit, shape: Shape, sent: Boolean, onSend: () -
                 val details = listOfNotNull(
                     hit.artist.ifBlank { null },
                     hit.durationSec?.let { formatDuration(it * 1000L) },
-                    if (sent) stringResource(R.string.pc_sent) else null,
+                    if (sent) stringResource(Res.string.pc_sent) else null,
                 ).joinToString(" · ")
                 if (details.isNotEmpty()) {
                     Text(details, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -805,7 +808,7 @@ private fun SendHitRow(hit: SearchHit, shape: Shape, sent: Boolean, onSend: () -
             ExpressiveIconButton(
                 onClick = { if (!sent) onSend() },
                 icon = if (sent) PlayerIcons.Check else PlayerIcons.Download,
-                contentDescription = stringResource(if (sent) R.string.pc_sent else R.string.pc_send),
+                contentDescription = stringResource(if (sent) Res.string.pc_sent else Res.string.pc_send),
                 containerColor = container,
                 contentColor = if (sent) colors.onSecondaryContainer else colors.onSurfaceVariant,
                 modifier = Modifier.size(44.dp),
@@ -830,14 +833,14 @@ private fun DownloadRow(d: PcDownload, shape: Shape) {
                 listOfNotNull(
                     d.artist,
                     when (d.status) {
-                        PcDownload.Status.Queued -> stringResource(R.string.download_queued)
-                        PcDownload.Status.Preparing -> stringResource(R.string.download_preparing)
+                        PcDownload.Status.Queued -> stringResource(Res.string.download_queued)
+                        PcDownload.Status.Preparing -> stringResource(Res.string.download_preparing)
                         PcDownload.Status.Downloading -> d.progress?.let {
-                            stringResource(R.string.download_progress, (it * 100).toInt())
-                        } ?: stringResource(R.string.download_running)
-                        PcDownload.Status.Saving -> stringResource(R.string.download_saving)
-                        PcDownload.Status.Done -> stringResource(R.string.download_done)
-                        PcDownload.Status.Failed -> stringResource(R.string.download_fail_other)
+                            stringResource(Res.string.download_progress, (it * 100).toInt())
+                        } ?: stringResource(Res.string.download_running)
+                        PcDownload.Status.Saving -> stringResource(Res.string.download_saving)
+                        PcDownload.Status.Done -> stringResource(Res.string.download_done)
+                        PcDownload.Status.Failed -> stringResource(Res.string.download_fail_other)
                     },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodyMedium,
@@ -875,7 +878,7 @@ private fun LazyListScope.libraryItems(
     onSave: ((List<PcSong>) -> Unit)?,
 ) {
     if (library.version < 0) {
-        item(key = "lib_loading") { Hint(stringResource(R.string.pc_library_loading), Modifier.animateItem()) }
+        item(key = "lib_loading") { Hint(stringResource(Res.string.pc_library_loading), Modifier.animateItem()) }
         return
     }
     if (open != null) {
@@ -884,7 +887,7 @@ private fun LazyListScope.libraryItems(
                 ExpressiveIconButton(
                     onClick = { onOpen(null) },
                     icon = PlayerIcons.Back,
-                    contentDescription = stringResource(R.string.back),
+                    contentDescription = stringResource(Res.string.back),
                     containerColor = Color.Transparent,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(48.dp),
@@ -901,7 +904,7 @@ private fun LazyListScope.libraryItems(
                     ExpressiveIconButton(
                         onClick = { onSave(library.resolve(open.ids)) },
                         icon = PlayerIcons.Smartphone,
-                        contentDescription = stringResource(R.string.transfer_save_all_to_phone),
+                        contentDescription = stringResource(Res.string.transfer_save_all_to_phone),
                         containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(48.dp),
@@ -916,7 +919,7 @@ private fun LazyListScope.libraryItems(
         OutlinedTextField(
             value = query,
             onValueChange = onQuery,
-            placeholder = { Text(stringResource(R.string.pc_search)) },
+            placeholder = { Text(stringResource(Res.string.pc_search)) },
             leadingIcon = { Icon(PlayerIcons.Search, contentDescription = null) },
             trailingIcon = if (query.isNotEmpty()) ({
                 IconButton(onClick = { onQuery("") }) { Icon(PlayerIcons.Close, contentDescription = null) }
@@ -942,10 +945,10 @@ private fun LazyListScope.libraryItems(
                         selected = t == tab,
                         label = stringResource(
                             when (t) {
-                                LibraryTab.Songs -> R.string.nav_songs
-                                LibraryTab.Albums -> R.string.nav_albums
-                                LibraryTab.Artists -> R.string.nav_artists
-                                LibraryTab.Playlists -> R.string.nav_playlists
+                                LibraryTab.Songs -> Res.string.nav_songs
+                                LibraryTab.Albums -> Res.string.nav_albums
+                                LibraryTab.Artists -> Res.string.nav_artists
+                                LibraryTab.Playlists -> Res.string.nav_playlists
                             }
                         ),
                         onClick = { onTab(t) },
@@ -959,7 +962,7 @@ private fun LazyListScope.libraryItems(
         val hits = library.songs.filter {
             it.title.lowercase().contains(q) || it.artist.lowercase().contains(q) || it.album.lowercase().contains(q)
         }
-        if (hits.isEmpty()) item(key = "lib_none") { Hint(stringResource(R.string.pc_nothing_found), Modifier.animateItem()) }
+        if (hits.isEmpty()) item(key = "lib_none") { Hint(stringResource(Res.string.pc_nothing_found), Modifier.animateItem()) }
         songItems(hits, currentId, "hit", onSave)
         return
     }
@@ -969,7 +972,7 @@ private fun LazyListScope.libraryItems(
             CollectionRow(
                 modifier = Modifier.animateItem(),
                 title = a.title,
-                subtitle = a.artist.ifBlank { pluralStringResource(R.plurals.songs_count, a.songIds.size, a.songIds.size) },
+                subtitle = a.artist.ifBlank { pluralStringResource(Res.plurals.songs_count, a.songIds.size, a.songIds.size) },
                 cover = a.songIds.firstOrNull()?.let(library.byId::get),
                 onClick = { onOpen(OpenCollection(a.title, a.songIds)) },
             )
@@ -978,7 +981,7 @@ private fun LazyListScope.libraryItems(
             CollectionRow(
                 modifier = Modifier.animateItem(),
                 title = a.name,
-                subtitle = pluralStringResource(R.plurals.songs_count, a.songIds.size, a.songIds.size),
+                subtitle = pluralStringResource(Res.plurals.songs_count, a.songIds.size, a.songIds.size),
                 cover = a.songIds.firstOrNull()?.let(library.byId::get),
                 round = true,
                 onClick = { onOpen(OpenCollection(a.name, a.songIds)) },
@@ -986,11 +989,11 @@ private fun LazyListScope.libraryItems(
         }
         LibraryTab.Playlists -> {
             item(key = "pl_favorites") {
-                val title = stringResource(R.string.favorites)
+                val title = stringResource(Res.string.favorites)
                 CollectionRow(
                     modifier = Modifier.animateItem(),
                     title = title,
-                    subtitle = pluralStringResource(R.plurals.songs_count, library.favorites.size, library.favorites.size),
+                    subtitle = pluralStringResource(Res.plurals.songs_count, library.favorites.size, library.favorites.size),
                     cover = library.favorites.firstOrNull()?.let(library.byId::get),
                     onClick = { onOpen(OpenCollection(title, library.favorites)) },
                 )
@@ -999,7 +1002,7 @@ private fun LazyListScope.libraryItems(
                 CollectionRow(
                     modifier = Modifier.animateItem(),
                     title = p.name,
-                    subtitle = pluralStringResource(R.plurals.songs_count, p.songIds.size, p.songIds.size),
+                    subtitle = pluralStringResource(Res.plurals.songs_count, p.songIds.size, p.songIds.size),
                     cover = p.songIds.firstOrNull()?.let(library.byId::get),
                     onClick = { onOpen(OpenCollection(p.name, p.songIds)) },
                 )
@@ -1031,16 +1034,16 @@ private fun LazyListScope.songItems(songs: List<PcSong>, currentId: Long?, prefi
                             },
                         ),
                         listOf(
-                            MenuAction(stringResource(R.string.play_next), PlayerIcons.PlayNext) {
+                            MenuAction(stringResource(Res.string.play_next), PlayerIcons.PlayNext) {
                                 PcRemote.playNext(listOf(song.id))
                             },
-                            MenuAction(stringResource(R.string.add_to_queue), PlayerIcons.Queue) {
+                            MenuAction(stringResource(Res.string.add_to_queue), PlayerIcons.Queue) {
                                 PcRemote.addToQueue(listOf(song.id))
                             },
                         ),
                         listOfNotNull(
                             onSave?.let { save ->
-                                MenuAction(stringResource(R.string.transfer_save_to_phone), PlayerIcons.Smartphone) {
+                                MenuAction(stringResource(Res.string.transfer_save_to_phone), PlayerIcons.Smartphone) {
                                     save(listOf(song))
                                 }
                             },

@@ -63,8 +63,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.LyricsState
 import com.ku.pierdoon.PositionSnapshot
-import com.ku.pierdoon.resources.Res
-import com.ku.pierdoon.resources.*
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsOffsets
 import com.ku.pierdoon.ui.components.ExpressiveIconButton

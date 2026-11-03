@@ -1,5 +1,9 @@
 package com.ku.pierdoon.ui.edit
 
+import org.jetbrains.compose.resources.StringResource
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import android.app.Activity
 import android.os.Build
 import android.widget.Toast
@@ -58,7 +62,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,7 +143,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
         ?: if (coverRemoved) CoverEdit.Remove else CoverEdit.Keep
     fun currentEdit() = TrackEdit(title, artist, album, coverEdit)
 
-    val coverFailed = stringResource(R.string.cover_failed)
+    val coverFailed = stringResource(Res.string.cover_failed)
     fun takeCover(load: suspend () -> File?) {
         coverLoading = true
         scope.launch {
@@ -158,8 +161,8 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
         if (uri != null) takeCover { vm.importCover(uri) }
     }
 
-    val savedText = stringResource(R.string.saved)
-    val failedText = stringResource(R.string.save_failed)
+    val savedText = stringResource(Res.string.saved)
+    val failedText = stringResource(Res.string.save_failed)
     fun finish(ok: Boolean) {
         saving = false
         Toast.makeText(context, if (ok) savedText else failedText, Toast.LENGTH_SHORT).show()
@@ -208,7 +211,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
         }
     }
 
-    AppScaffold(title = stringResource(R.string.edit_track_title), subtitle = song.title, onBack = onBack) { inner ->
+    AppScaffold(title = stringResource(Res.string.edit_track_title), subtitle = song.title, onBack = onBack) { inner ->
         LazyColumn(
             contentPadding = PaddingValues(
                 start = 16.dp,
@@ -237,16 +240,16 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
             }
 
             item(key = "tags") {
-                Group(stringResource(R.string.tags)) {
+                Group(stringResource(Res.string.tags)) {
                     listOf<@Composable (androidx.compose.ui.graphics.Shape) -> Unit>({ shape ->
                         ItemContainer(shape) {
                             Column(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                             ) {
-                                TagField(title, { title = it }, R.string.tag_title)
-                                TagField(artist, { artist = it }, R.string.tag_artist)
-                                TagField(album, { album = it }, R.string.tag_album, last = true)
+                                TagField(title, { title = it }, Res.string.tag_title)
+                                TagField(artist, { artist = it }, Res.string.tag_artist)
+                                TagField(album, { album = it }, Res.string.tag_album, last = true)
                             }
                         }
                     })
@@ -254,7 +257,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
             }
 
             item(key = "search") {
-                Group(stringResource(R.string.search_online)) {
+                Group(stringResource(Res.string.search_online)) {
                     buildList<@Composable (androidx.compose.ui.graphics.Shape) -> Unit> {
                         add { shape ->
                             ItemContainer(shape) {
@@ -265,7 +268,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                     OutlinedTextField(
                                         value = query,
                                         onValueChange = { query = it },
-                                        label = { Text(stringResource(R.string.search_query)) },
+                                        label = { Text(stringResource(Res.string.search_query)) },
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                         keyboardActions = KeyboardActions(onSearch = { runSearch() }),
@@ -275,7 +278,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                     ExpressiveIconButton(
                                         onClick = ::runSearch,
                                         icon = PlayerIcons.Search,
-                                        contentDescription = stringResource(R.string.search_online),
+                                        contentDescription = stringResource(Res.string.search_online),
                                         containerColor = MaterialTheme.colorScheme.primary,
                                         contentColor = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.padding(top = 8.dp).size(56.dp),
@@ -292,10 +295,10 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                     }
                                 }
                             }
-                            SearchState.Error -> add { shape -> ItemContainer(shape) { Note(stringResource(R.string.search_error)) } }
+                            SearchState.Error -> add { shape -> ItemContainer(shape) { Note(stringResource(Res.string.search_error)) } }
                             is SearchState.Done ->
                                 if (s.results.isEmpty()) {
-                                    add { shape -> ItemContainer(shape) { Note(stringResource(R.string.search_nothing)) } }
+                                    add { shape -> ItemContainer(shape) { Note(stringResource(Res.string.search_nothing)) } }
                                 } else {
                                     s.results.forEach { c ->
                                         add { shape ->
@@ -319,7 +322,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                     exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
                 ) {
                     Text(
-                        stringResource(R.string.search_hint) + "\n" + stringResource(R.string.search_sources),
+                        stringResource(Res.string.search_hint) + "\n" + stringResource(Res.string.search_sources),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp),
@@ -328,14 +331,14 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
             }
 
             item(key = "target") {
-                Group(stringResource(R.string.save_where)) {
+                Group(stringResource(Res.string.save_where)) {
                     listOf<@Composable (androidx.compose.ui.graphics.Shape) -> Unit>({ shape ->
                         ItemContainer(shape) {
                             Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
                                 ConnectedChoice(
                                     options = listOf(
-                                        stringResource(R.string.save_in_app),
-                                        stringResource(R.string.save_in_file),
+                                        stringResource(Res.string.save_in_app),
+                                        stringResource(Res.string.save_in_file),
                                     ),
                                     selected = target.ordinal,
                                     onSelect = { i -> SettingsStore.update { it.copy(editTarget = SaveTarget.entries[i]) } },
@@ -343,10 +346,10 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 val explanation = when {
-                                    target == SaveTarget.App -> R.string.save_in_app_desc
-                                    Build.VERSION.SDK_INT < Build.VERSION_CODES.R -> R.string.save_in_file_old
-                                    fileWritable == false -> R.string.save_in_file_unsupported
-                                    else -> R.string.save_in_file_desc
+                                    target == SaveTarget.App -> Res.string.save_in_app_desc
+                                    Build.VERSION.SDK_INT < Build.VERSION_CODES.R -> Res.string.save_in_file_old
+                                    fileWritable == false -> Res.string.save_in_file_unsupported
+                                    else -> Res.string.save_in_file_desc
                                 }
                                 val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
                                 val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
@@ -358,7 +361,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                     Text(
                                         stringResource(res),
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = if (res == R.string.save_in_file_old || res == R.string.save_in_file_unsupported) {
+                                        color = if (res == Res.string.save_in_file_old || res == Res.string.save_in_file_unsupported) {
                                             MaterialTheme.colorScheme.error
                                         } else {
                                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -394,7 +397,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                     modifier = Modifier.size(32.dp),
                                 )
                             } else {
-                                Text(stringResource(R.string.save), style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(Res.string.save), style = MaterialTheme.typography.titleMedium)
                             }
                         }
                     }
@@ -409,7 +412,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                         ) {
                             Icon(PlayerIcons.Restore, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.reset_edits))
+                            Text(stringResource(Res.string.reset_edits))
                         }
                     }
                 }
@@ -474,7 +477,7 @@ private fun CoverHeader(
             FilledTonalButton(onClick = onPick, shapes = ButtonDefaults.shapes()) {
                 Icon(PlayerIcons.Image, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.cover_gallery))
+                Text(stringResource(Res.string.cover_gallery))
             }
             AnimatedVisibility(
                 visible = canRemove,
@@ -486,7 +489,7 @@ private fun CoverHeader(
                 FilledTonalButton(onClick = onRemove, shapes = ButtonDefaults.shapes()) {
                     Icon(PlayerIcons.Delete, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.cover_remove))
+                    Text(stringResource(Res.string.cover_remove))
                 }
             }
         }
@@ -494,7 +497,7 @@ private fun CoverHeader(
 }
 
 @Composable
-private fun TagField(value: String, onChange: (String) -> Unit, label: Int, last: Boolean = false) {
+private fun TagField(value: String, onChange: (String) -> Unit, label: StringResource, last: Boolean = false) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,

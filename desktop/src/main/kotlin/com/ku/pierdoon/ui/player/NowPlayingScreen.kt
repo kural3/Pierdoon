@@ -78,8 +78,8 @@ import com.ku.pierdoon.playback.Player
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.playback.QueueState
 import com.ku.pierdoon.data.SettingsStore
-import com.ku.pierdoon.resources.*
-import com.ku.pierdoon.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.components.BlurredArtwork
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.ExpressiveToggleButton

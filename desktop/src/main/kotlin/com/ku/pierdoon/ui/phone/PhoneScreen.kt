@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.data.AppSettings
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.remote.RemoteServer
-import com.ku.pierdoon.resources.*
-import com.ku.pierdoon.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.library.AppScaffold
 import com.ku.pierdoon.ui.library.CONTENT_MAX_WIDTH

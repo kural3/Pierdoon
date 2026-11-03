@@ -1,5 +1,9 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -41,8 +45,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -74,7 +76,7 @@ fun SongsList(
     selection: SongSelection? = null,
 ) {
     if (songs.isEmpty()) {
-        FillBox { EmptyMessage(stringResource(R.string.empty_library)) }
+        FillBox { EmptyMessage(stringResource(Res.string.empty_library)) }
         return
     }
     LazyColumn(
@@ -124,8 +126,8 @@ fun ArtistsList(artists: List<Artist>, onOpen: (Route) -> Unit, topPadding: Dp, 
         items(artists, key = { it.name }) { artist ->
             CollectionRow(
                 title = artist.name,
-                subtitle = pluralStringResource(R.plurals.songs_count, artist.songs.size, artist.songs.size) + " · " +
-                    stringResource(R.string.albums_count, artist.albumCount),
+                subtitle = pluralStringResource(Res.plurals.songs_count, artist.songs.size, artist.songs.size) + " · " +
+                    stringResource(Res.string.albums_count, artist.albumCount),
                 cover = {
                     Artwork(
                         artist.coverSong.id,
@@ -152,13 +154,13 @@ fun PlaylistsScreen(
 ) {
     val haptics = LocalHapticFeedback.current
     AppScaffold(
-        title = stringResource(R.string.nav_playlists),
+        title = stringResource(Res.string.nav_playlists),
         actions = {
-            OverflowMenu(listOf(listOf(MenuEntry(stringResource(R.string.playlist_import), PlayerIcons.Download, onClick = onImport))))
+            OverflowMenu(listOf(listOf(MenuEntry(stringResource(Res.string.playlist_import), PlayerIcons.Download, onClick = onImport))))
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                text = { Text(stringResource(R.string.new_playlist)) },
+                text = { Text(stringResource(Res.string.new_playlist)) },
                 icon = { Icon(PlayerIcons.Add, contentDescription = null) },
                 onClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
@@ -177,8 +179,8 @@ fun PlaylistsScreen(
         ) {
             item(key = "favorites") {
                 CollectionRow(
-                    title = stringResource(R.string.favorites),
-                    subtitle = pluralStringResource(R.plurals.songs_count, favoritesCount, favoritesCount),
+                    title = stringResource(Res.string.favorites),
+                    subtitle = pluralStringResource(Res.plurals.songs_count, favoritesCount, favoritesCount),
                     cover = { FavoritesCover(Modifier.size(56.dp)) },
                     onClick = { onOpen(Route.Favorites) },
                 )
@@ -186,14 +188,14 @@ fun PlaylistsScreen(
             items(playlists, key = { it.id }) { p ->
                 CollectionRow(
                     title = p.name,
-                    subtitle = pluralStringResource(R.plurals.songs_count, p.songIds.size, p.songIds.size),
+                    subtitle = pluralStringResource(Res.plurals.songs_count, p.songIds.size, p.songIds.size),
                     cover = { PlaylistCover(p, resolveCover(p), Modifier.size(56.dp)) },
                     onClick = { onOpen(Route.PlaylistDetail(p.id)) },
                     onLongClick = { onPlaylistLongPress(p) },
                 )
             }
             if (playlists.isEmpty()) {
-                item(key = "empty") { EmptyMessage(stringResource(R.string.no_playlists)) }
+                item(key = "empty") { EmptyMessage(stringResource(Res.string.no_playlists)) }
             }
         }
     }

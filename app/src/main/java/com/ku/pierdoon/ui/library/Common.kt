@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -45,7 +48,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -159,7 +161,7 @@ fun SongRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${song.artist.ifEmpty { stringResource(R.string.unknown_artist) }} · ${formatDuration(song.durationMs)}",
+                text = "${song.artist.ifEmpty { stringResource(Res.string.unknown_artist) }} · ${formatDuration(song.durationMs)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant,
                 maxLines = 1,
@@ -204,7 +206,7 @@ fun AppScaffold(
                         ExpressiveIconButton(
                             onClick = onBack,
                             icon = PlayerIcons.Back,
-                            contentDescription = stringResource(R.string.back),
+                            contentDescription = stringResource(Res.string.back),
                             containerColor = Color.Transparent,
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(start = 4.dp).size(48.dp),
@@ -341,7 +343,7 @@ fun CollectionHeader(
                 ExpressiveIconButton(
                     onClick = onPlay,
                     icon = PlayerIcons.Play,
-                    contentDescription = stringResource(R.string.play_all),
+                    contentDescription = stringResource(Res.string.play_all),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     iconSize = 28.dp,
@@ -351,7 +353,7 @@ fun CollectionHeader(
                 ExpressiveIconButton(
                     onClick = onShuffle,
                     icon = PlayerIcons.Shuffle,
-                    contentDescription = stringResource(R.string.shuffle_all),
+                    contentDescription = stringResource(Res.string.shuffle_all),
                     iconSize = 26.dp,
                     haptic = HapticFeedbackType.Confirm,
                     modifier = Modifier.weight(1f).height(64.dp),

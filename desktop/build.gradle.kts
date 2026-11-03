@@ -18,7 +18,6 @@ dependencies {
     implementation(project(":ui"))
     implementation(compose.desktop.currentOs)
     implementation(libs.compose.mp.material3)
-    implementation("org.jetbrains.compose.components:components-resources:1.12.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
     implementation(libs.json)
     // Writing tags into audio files ("save to file" when editing a track).
@@ -39,12 +38,6 @@ kotlin {
         optIn.add("androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
         optIn.add("androidx.compose.material3.ExperimentalMaterial3Api")
     }
-}
-
-compose.resources {
-    publicResClass = false
-    packageOfResClass = "com.ku.pierdoon.resources"
-    generateResClass = always
 }
 
 compose.desktop {

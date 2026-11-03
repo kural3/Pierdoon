@@ -1,5 +1,10 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.annotation.StringRes
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -43,12 +47,9 @@ import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.history.ListeningStats
 import com.ku.pierdoon.data.history.Play
 import com.ku.pierdoon.data.history.StatsPeriod
-import com.ku.pierdoon.R
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.navigation.Route
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 
 /** What was listened to: time, counts, a bar per day or month, the top artists and tracks. */
 @Composable
@@ -71,11 +72,11 @@ fun StatsScreen(
     val topSongs = remember(stats) { stats?.topTracks?.map { it.song }.orEmpty() }
 
     AppScaffold(
-        title = stringResource(R.string.stats),
+        title = stringResource(Res.string.stats),
         onBack = onBack,
         actions = {
             if (!plays.isNullOrEmpty()) {
-                OverflowMenu(listOf(listOf(MenuEntry(stringResource(R.string.stats_clear), PlayerIcons.Delete, destructive = true) { confirmClear = true })))
+                OverflowMenu(listOf(listOf(MenuEntry(stringResource(Res.string.stats_clear), PlayerIcons.Delete, destructive = true) { confirmClear = true })))
             }
         },
     ) { inner ->
@@ -87,12 +88,12 @@ fun StatsScreen(
             item(key = "period") { PeriodPicker(period) { period = it } }
             if (stats == null) return@LazyColumn
             if (stats.plays == 0) {
-                item(key = "empty") { EmptyMessage(stringResource(R.string.stats_empty)) }
+                item(key = "empty") { EmptyMessage(stringResource(Res.string.stats_empty)) }
                 return@LazyColumn
             }
             item(key = "summary") { Summary(stats) }
             item(key = "timeline") { Timeline(stats.timeline) }
-            item(key = "artistsTitle") { WideSectionTitle(stringResource(R.string.stats_top_artists)) }
+            item(key = "artistsTitle") { WideSectionTitle(stringResource(Res.string.stats_top_artists)) }
             item(key = "artists") {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -102,7 +103,7 @@ fun StatsScreen(
                     itemsIndexed(stats.topArtists, key = { _, a -> a.name }) { _, a ->
                         CoverCard(
                             title = a.name,
-                            subtitle = pluralStringResource(R.plurals.plays_count, a.plays, a.plays),
+                            subtitle = pluralStringResource(Res.plurals.plays_count, a.plays, a.plays),
                             songId = a.cover.id,
                             albumId = a.cover.albumId,
                             shape = CircleShape,
@@ -112,7 +113,7 @@ fun StatsScreen(
                     }
                 }
             }
-            item(key = "tracksTitle") { WideSectionTitle(stringResource(R.string.stats_top_tracks)) }
+            item(key = "tracksTitle") { WideSectionTitle(stringResource(Res.string.stats_top_tracks)) }
             itemsIndexed(stats.topTracks, key = { _, t -> t.song.id }, contentType = { _, _ -> "song" }) { index, t ->
                 SongRow(
                     song = t.song,
@@ -130,7 +131,7 @@ fun StatsScreen(
                     },
                     trailing = {
                         Text(
-                            pluralStringResource(R.plurals.plays_count, t.plays, t.plays),
+                            pluralStringResource(Res.plurals.plays_count, t.plays, t.plays),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -143,13 +144,13 @@ fun StatsScreen(
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text(stringResource(R.string.stats_clear_title)) },
-            text = { Text(stringResource(R.string.stats_clear_text)) },
+            title = { Text(stringResource(Res.string.stats_clear_title)) },
+            text = { Text(stringResource(Res.string.stats_clear_text)) },
             confirmButton = {
-                TextButton(onClick = { confirmClear = false; onClear() }) { Text(stringResource(R.string.stats_clear)) }
+                TextButton(onClick = { confirmClear = false; onClear() }) { Text(stringResource(Res.string.stats_clear)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(Res.string.cancel)) }
             },
         )
     }
@@ -159,10 +160,10 @@ fun StatsScreen(
 private fun PeriodPicker(period: StatsPeriod, onPick: (StatsPeriod) -> Unit) {
     ConnectedChoice(
         options = listOf(
-            stringResource(R.string.stats_week),
-            stringResource(R.string.stats_month),
-            stringResource(R.string.stats_year),
-            stringResource(R.string.stats_all),
+            stringResource(Res.string.stats_week),
+            stringResource(Res.string.stats_month),
+            stringResource(Res.string.stats_year),
+            stringResource(Res.string.stats_all),
         ),
         selected = period.ordinal,
         onSelect = { onPick(StatsPeriod.entries[it]) },
@@ -180,21 +181,21 @@ private fun Summary(stats: ListeningStats) {
             color = colors.primary,
         )
         Text(
-            stringResource(R.string.stats_listened),
+            stringResource(Res.string.stats_listened),
             style = MaterialTheme.typography.titleMedium,
             color = colors.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatTile(stats.plays, R.string.stats_plays, Modifier.weight(1f))
-            StatTile(stats.tracks, R.string.stats_tracks, Modifier.weight(1f))
-            StatTile(stats.artists, R.string.stats_artists, Modifier.weight(1f))
+            StatTile(stats.plays, Res.string.stats_plays, Modifier.weight(1f))
+            StatTile(stats.tracks, Res.string.stats_tracks, Modifier.weight(1f))
+            StatTile(stats.artists, Res.string.stats_artists, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun StatTile(value: Int, @StringRes label: Int, modifier: Modifier) {
+private fun StatTile(value: Int, label: StringResource, modifier: Modifier) {
     val colors = MaterialTheme.colorScheme
     Column(
         modifier
@@ -250,6 +251,6 @@ private fun WideSectionTitle(text: String) {
 @Composable
 fun listenedTime(ms: Long): String {
     val minutes = ms / 60_000
-    return if (minutes >= 60) stringResource(R.string.time_hours_minutes, (minutes / 60).toInt(), (minutes % 60).toInt())
-    else stringResource(R.string.time_minutes, minutes.toInt())
+    return if (minutes >= 60) stringResource(Res.string.time_hours_minutes, (minutes / 60).toInt(), (minutes % 60).toInt())
+    else stringResource(Res.string.time_minutes, minutes.toInt())
 }

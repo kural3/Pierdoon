@@ -17,6 +17,8 @@ kotlin {
         namespace = "com.ku.pierdoon.ui.shared"
         compileSdk = 37
         minSdk = 24
+        // The strings both apps show (composeResources), packed into the APK.
+        androidResources { enable = true }
         compilerOptions { jvmTarget.set(JvmTarget.JVM_11) }
     }
     jvm {
@@ -35,6 +37,13 @@ kotlin {
             implementation(libs.compose.mp.ui)
             implementation(libs.compose.mp.material3)
             implementation(libs.androidx.graphics.shapes)
+            api(libs.compose.mp.resources)
         }
     }
+}
+
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "com.ku.pierdoon.ui.resources"
+    generateResClass = always
 }

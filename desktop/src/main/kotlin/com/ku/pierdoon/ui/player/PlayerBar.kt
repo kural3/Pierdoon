@@ -62,8 +62,8 @@ import com.ku.pierdoon.PositionSnapshot
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.Player
 import com.ku.pierdoon.playback.PlayerState
-import com.ku.pierdoon.resources.*
-import com.ku.pierdoon.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.Backdrop
 import com.ku.pierdoon.ui.components.ExpressiveIconButton

@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.AnimatedVisibility
@@ -35,12 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
-import com.ku.pierdoon.R
 import com.ku.pierdoon.data.MusicCollections
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.SongSort
@@ -96,21 +97,21 @@ fun LibraryScreen(
     val effects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
 
     val sortLabels = listOf(
-        SongSort.Title to R.string.sort_title,
-        SongSort.Artist to R.string.sort_artist,
-        SongSort.Album to R.string.sort_album,
-        SongSort.DateAdded to R.string.sort_date_added,
-        SongSort.Duration to R.string.sort_duration,
+        SongSort.Title to Res.string.sort_title,
+        SongSort.Artist to Res.string.sort_artist,
+        SongSort.Album to Res.string.sort_album,
+        SongSort.DateAdded to Res.string.sort_date_added,
+        SongSort.Duration to Res.string.sort_duration,
     ).map { (s, res) -> s to stringResource(res) }
-    val selectLabel = stringResource(R.string.select)
-    val descendingLabel = stringResource(R.string.sort_descending)
+    val selectLabel = stringResource(Res.string.select)
+    val descendingLabel = stringResource(Res.string.sort_descending)
 
     AppScaffold(
-        title = stringResource(R.string.nav_library),
+        title = stringResource(Res.string.nav_library),
         subtitle = when (section) {
-            0 -> stringResource(R.string.tracks_count, songs.size)
-            1 -> stringResource(R.string.albums_count, collections.albums.size)
-            else -> stringResource(R.string.artists_count, collections.artists.size)
+            0 -> stringResource(Res.string.tracks_count, songs.size)
+            1 -> stringResource(Res.string.albums_count, collections.albums.size)
+            else -> stringResource(Res.string.artists_count, collections.artists.size)
         },
         belowTitle = {
             // Search and downloads; while picking tracks the same row holds the selection tools.
@@ -129,13 +130,13 @@ fun LibraryScreen(
                         ExpressiveIconButton(
                             onClick = selection::clear,
                             icon = PlayerIcons.Close,
-                            contentDescription = stringResource(R.string.cancel),
+                            contentDescription = stringResource(Res.string.cancel),
                             containerColor = toolColor,
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(56.dp),
                         )
                         Text(
-                            stringResource(R.string.selected_count, selection.ids.size),
+                            stringResource(Res.string.selected_count, selection.ids.size),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -149,14 +150,14 @@ fun LibraryScreen(
                         )
                     } else {
                         SearchCapsule(
-                            text = stringResource(R.string.search_short),
+                            text = stringResource(Res.string.search_short),
                             onClick = { onOpen(Route.Search) },
                             modifier = Modifier.weight(1f),
                         )
                         ExpressiveIconButton(
                             onClick = { onOpen(Route.Downloads) },
                             icon = PlayerIcons.Download,
-                            contentDescription = stringResource(R.string.downloads),
+                            contentDescription = stringResource(Res.string.downloads),
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(56.dp),
@@ -183,9 +184,9 @@ fun LibraryScreen(
             }
             ConnectedChoice(
                 options = listOf(
-                    stringResource(R.string.nav_songs),
-                    stringResource(R.string.nav_albums),
-                    stringResource(R.string.nav_artists),
+                    stringResource(Res.string.nav_songs),
+                    stringResource(Res.string.nav_albums),
+                    stringResource(Res.string.nav_artists),
                 ),
                 selected = section,
                 onSelect = { section = it },
@@ -200,7 +201,7 @@ fun LibraryScreen(
                 modifier = Modifier.padding(bottom = bottomInset),
             ) {
                 ExtendedFloatingActionButton(
-                    text = { Text(stringResource(R.string.shuffle_all)) },
+                    text = { Text(stringResource(Res.string.shuffle_all)) },
                     icon = { Icon(PlayerIcons.Shuffle, contentDescription = null) },
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.Confirm)

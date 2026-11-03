@@ -44,8 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsCandidate
-import com.ku.pierdoon.resources.Res
-import com.ku.pierdoon.resources.*
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.formatDuration
 import kotlinx.coroutines.CancellationException

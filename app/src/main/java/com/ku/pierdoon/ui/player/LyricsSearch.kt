@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,11 +47,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsCandidate
-import com.ku.pierdoon.R
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.formatDuration
 import kotlinx.coroutines.CancellationException
-import androidx.compose.ui.res.stringResource
 
 /** Picking lyrics by hand, for the track playing; the app provides it to every lyrics view. */
 class LyricsSearch(
@@ -89,20 +90,20 @@ fun LyricsSearchDialog(search: LyricsSearch, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.lyrics_search)) },
+        title = { Text(stringResource(Res.string.lyrics_search)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    placeholder = { Text(stringResource(R.string.lyrics_search_hint)) },
+                    placeholder = { Text(stringResource(Res.string.lyrics_search_hint)) },
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { runs++ }),
                     trailingIcon = {
                         IconButton(onClick = { runs++ }) {
-                            Icon(PlayerIcons.Search, contentDescription = stringResource(R.string.lyrics_search))
+                            Icon(PlayerIcons.Search, contentDescription = stringResource(Res.string.lyrics_search))
                         }
                     },
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
@@ -111,9 +112,9 @@ fun LyricsSearchDialog(search: LyricsSearch, onDismiss: () -> Unit) {
                 Box(Modifier.fillMaxWidth().height(360.dp), contentAlignment = Alignment.Center) {
                     when (val s = state) {
                         SearchState.Loading -> LoadingIndicator(Modifier.size(48.dp))
-                        SearchState.Failed -> Note(stringResource(R.string.lyrics_search_failed))
+                        SearchState.Failed -> Note(stringResource(Res.string.lyrics_search_failed))
                         is SearchState.Done ->
-                            if (s.results.isEmpty()) Note(stringResource(R.string.lyrics_search_empty))
+                            if (s.results.isEmpty()) Note(stringResource(Res.string.lyrics_search_empty))
                             else LazyColumn(
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
                                 modifier = Modifier.fillMaxWidth().height(360.dp),
@@ -130,7 +131,7 @@ fun LyricsSearchDialog(search: LyricsSearch, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
         },
     )
 }
@@ -164,7 +165,7 @@ private fun CandidateRow(c: LyricsCandidate, onClick: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             val synced = c.lyrics is Lyrics.Synced
             Text(
-                stringResource(if (synced) R.string.lyrics_synced else R.string.lyrics_plain),
+                stringResource(if (synced) Res.string.lyrics_synced else Res.string.lyrics_plain),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (synced) colors.onPrimaryContainer else colors.onSurfaceVariant,
                 modifier = Modifier

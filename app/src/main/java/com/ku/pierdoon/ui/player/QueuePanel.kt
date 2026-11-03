@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -43,7 +46,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -157,7 +159,7 @@ fun QueuePanel(
 
     val placement = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val removeLabel = stringResource(R.string.remove_from_queue)
+    val removeLabel = stringResource(Res.string.remove_from_queue)
 
     LazyColumn(
         state = listState,
@@ -167,7 +169,7 @@ fun QueuePanel(
         queue.current?.let { current ->
             item(key = "label:now") {
                 val onSide = queue.tape?.takeIf { tapeMode }?.let { if (it.onSideB) "B" else "A" }
-                Label(if (onSide != null) stringResource(R.string.queue_now_on_side, onSide) else stringResource(R.string.now_playing))
+                Label(if (onSide != null) stringResource(Res.string.queue_now_on_side, onSide) else stringResource(Res.string.now_playing))
             }
             item(key = current.key) {
                 SongRow(
@@ -181,10 +183,10 @@ fun QueuePanel(
         }
         item(key = "label:next") {
             Column(Modifier.animateItem(fade, placement, fade)) {
-                Label(stringResource(R.string.up_next))
+                Label(stringResource(Res.string.up_next))
                 if (!queue.canReorder && upcoming.size > 1) {
                     Text(
-                        text = stringResource(R.string.queue_shuffled_hint),
+                        text = stringResource(Res.string.queue_shuffled_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 6.dp),
@@ -195,7 +197,7 @@ fun QueuePanel(
         if (upcoming.isEmpty()) {
             item(key = "end") {
                 Text(
-                    text = stringResource(R.string.queue_end),
+                    text = stringResource(Res.string.queue_end),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.animateItem(fade, placement, fade).padding(horizontal = 22.dp, vertical = 12.dp),
@@ -205,7 +207,7 @@ fun QueuePanel(
         upcoming.forEach { entry ->
             if (tapeMode) queue.sideStarts[entry.key]?.let { side ->
                 item(key = "side:$side") {
-                    Label(stringResource(R.string.queue_side, side), Modifier.animateItem(fade, placement, fade))
+                    Label(stringResource(Res.string.queue_side, side), Modifier.animateItem(fade, placement, fade))
                 }
             }
             item(key = entry.key) {
@@ -341,7 +343,7 @@ private fun UpcomingRow(
 
 @Composable
 private fun DragHandle(onDragStart: () -> Unit, onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
-    val description = stringResource(R.string.reorder)
+    val description = stringResource(Res.string.reorder)
     val currentOnDragStart by rememberUpdatedState(onDragStart)
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)

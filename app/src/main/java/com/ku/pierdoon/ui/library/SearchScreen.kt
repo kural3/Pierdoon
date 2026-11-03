@@ -1,5 +1,9 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,8 +36,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -70,18 +72,18 @@ fun SearchScreen(
     }
 
     AppScaffold(
-        title = stringResource(R.string.search_library),
+        title = stringResource(Res.string.search_library),
         onBack = onBack,
         belowTitle = {
             TextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text(stringResource(R.string.search_library_hint)) },
+                placeholder = { Text(stringResource(Res.string.search_library_hint)) },
                 leadingIcon = { Icon(PlayerIcons.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { query = "" }) {
-                            Icon(PlayerIcons.Close, contentDescription = stringResource(R.string.cancel))
+                            Icon(PlayerIcons.Close, contentDescription = stringResource(Res.string.cancel))
                         }
                     }
                 },
@@ -103,7 +105,7 @@ fun SearchScreen(
         },
     ) { inner ->
         if (query.isNotBlank() && found.isEmpty) {
-            FillBox { EmptyMessage(stringResource(R.string.search_library_empty)) }
+            FillBox { EmptyMessage(stringResource(Res.string.search_library_empty)) }
             return@AppScaffold
         }
         LazyColumn(
@@ -111,11 +113,11 @@ fun SearchScreen(
             modifier = Modifier.fillMaxSize().imePadding(),
         ) {
             if (found.artists.isNotEmpty()) {
-                item(key = "artists") { SectionTitle(stringResource(R.string.search_artists)) }
+                item(key = "artists") { SectionTitle(stringResource(Res.string.search_artists)) }
                 items(found.artists.take(MAX_COLLECTIONS), key = { "artist:" + it.name }) { artist ->
                     CollectionRow(
                         title = artist.name,
-                        subtitle = pluralStringResource(R.plurals.songs_count, artist.songs.size, artist.songs.size),
+                        subtitle = pluralStringResource(Res.plurals.songs_count, artist.songs.size, artist.songs.size),
                         cover = {
                             Artwork(artist.coverSong.id, artist.coverSong.albumId, Modifier.size(56.dp).clip(CircleShape))
                         },
@@ -124,7 +126,7 @@ fun SearchScreen(
                 }
             }
             if (found.albums.isNotEmpty()) {
-                item(key = "albums") { SectionTitle(stringResource(R.string.search_albums)) }
+                item(key = "albums") { SectionTitle(stringResource(Res.string.search_albums)) }
                 items(found.albums.take(MAX_COLLECTIONS), key = { "album:" + it.id }) { album ->
                     CollectionRow(
                         title = album.title,
@@ -137,7 +139,7 @@ fun SearchScreen(
                 }
             }
             if (found.songs.isNotEmpty()) {
-                item(key = "songs") { SectionTitle(stringResource(R.string.search_tracks)) }
+                item(key = "songs") { SectionTitle(stringResource(Res.string.search_tracks)) }
                 itemsIndexed(found.songs, key = { _, s -> s.id }, contentType = { _, _ -> "song" }) { index, song ->
                     SongRow(
                         song = song,

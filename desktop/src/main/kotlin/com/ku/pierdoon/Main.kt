@@ -53,11 +53,11 @@ import com.ku.pierdoon.platform.WinShell
 import com.ku.pierdoon.playback.DiscordPresence
 import com.ku.pierdoon.playback.PlaybackController
 import com.ku.pierdoon.remote.RemoteServer
-import com.ku.pierdoon.resources.Res
-import com.ku.pierdoon.resources.app_name
-import com.ku.pierdoon.resources.pierdoon
-import com.ku.pierdoon.resources.tray_quit
-import com.ku.pierdoon.resources.tray_show
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.app_name
+import com.ku.pierdoon.ui.resources.pierdoon
+import com.ku.pierdoon.ui.resources.tray_quit
+import com.ku.pierdoon.ui.resources.tray_show
 import com.ku.pierdoon.ui.PierdoonApp
 import com.ku.pierdoon.ui.desktop.BackDispatcher
 import com.ku.pierdoon.ui.desktop.Files

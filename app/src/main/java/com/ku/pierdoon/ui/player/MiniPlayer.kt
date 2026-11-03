@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.material3.Icon
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
@@ -31,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
@@ -130,7 +132,7 @@ fun MiniPlayer(
                             Spacer(Modifier.width(4.dp))
                         }
                         Text(
-                            text = nowPlaying.artist.ifEmpty { stringResource(R.string.unknown_artist) },
+                            text = nowPlaying.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.onSurfaceVariant,
                             maxLines = 1,
@@ -142,8 +144,8 @@ fun MiniPlayer(
                 PlayPauseButton(
                     isPlaying = isPlaying,
                     onClick = onTogglePlay,
-                    playLabel = stringResource(R.string.play),
-                    pauseLabel = stringResource(R.string.pause),
+                    playLabel = stringResource(Res.string.play),
+                    pauseLabel = stringResource(Res.string.pause),
                     iconSize = 26.dp,
                     modifier = Modifier.size(width = 56.dp, height = 48.dp),
                 )
@@ -151,7 +153,7 @@ fun MiniPlayer(
                 ExpressiveIconButton(
                     onClick = onNext,
                     icon = PlayerIcons.Next,
-                    contentDescription = stringResource(R.string.next),
+                    contentDescription = stringResource(Res.string.next),
                     containerColor = Color.Transparent,
                     contentColor = colors.onSurface,
                     modifier = Modifier.size(48.dp),

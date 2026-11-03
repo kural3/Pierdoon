@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui
 
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.TextButton
@@ -100,7 +103,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -304,10 +306,10 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val playlistFiles = rememberCoroutineScope()
     var exporting by remember { mutableStateOf<Playlist?>(null) }
-    val exportedText = stringResource(R.string.playlist_exported)
-    val exportFailedText = stringResource(R.string.playlist_export_failed)
-    val importFailedText = stringResource(R.string.playlist_import_failed)
-    val importNoneText = stringResource(R.string.playlist_import_none)
+    val exportedText = stringResource(Res.string.playlist_exported)
+    val exportFailedText = stringResource(Res.string.playlist_export_failed)
+    val importFailedText = stringResource(Res.string.playlist_import_failed)
+    val importNoneText = stringResource(Res.string.playlist_import_none)
     val resources = LocalResources.current
     val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(M3U_MIME)) { target ->
         val playlist = exporting
@@ -335,7 +337,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     // The system asks before the files go; saved, so a recreated activity still cleans up after it.
     var deletingSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     var afterDelete by remember { mutableStateOf<(() -> Unit)?>(null) }
-    val deletedText = stringResource(R.string.deleted)
+    val deletedText = stringResource(Res.string.deleted)
     val deleteConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
         val ids = deletingSongIds
         deletingSongIds = null
@@ -633,8 +635,8 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     }
     when (val d = dialog) {
         is PlaylistDialog.Create -> PlaylistNameDialog(
-            title = stringResource(R.string.new_playlist),
-            confirmLabel = stringResource(R.string.create),
+            title = stringResource(Res.string.new_playlist),
+            confirmLabel = stringResource(Res.string.create),
             onDismiss = { dialog = null },
             onConfirm = { name ->
                 vm.createPlaylist(name, d.songIds)
@@ -642,8 +644,8 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             },
         )
         is PlaylistDialog.Rename -> PlaylistNameDialog(
-            title = stringResource(R.string.rename),
-            confirmLabel = stringResource(R.string.save),
+            title = stringResource(Res.string.rename),
+            confirmLabel = stringResource(Res.string.save),
             initial = d.playlist.name,
             onDismiss = { dialog = null },
             onConfirm = { name ->
@@ -855,12 +857,12 @@ private fun Screens(
                         onBulk = { picked, done -> onBulk(picked, playlist?.id, done) },
                         onDelete = onDeleteSongs,
                         bottomInset = bottomInset,
-                        emptyText = stringResource(R.string.empty_playlist),
+                        emptyText = stringResource(Res.string.empty_playlist),
                         menu = if (playlist != null) {
                             listOf(
-                                MenuEntry(stringResource(R.string.cover), PlayerIcons.Image) { onPlaylistCover(playlist) },
-                                MenuEntry(stringResource(R.string.rename), PlayerIcons.Edit) { onRenamePlaylist(playlist) },
-                                MenuEntry(stringResource(R.string.delete), PlayerIcons.Delete) { onDeletePlaylist(playlist) },
+                                MenuEntry(stringResource(Res.string.cover), PlayerIcons.Image) { onPlaylistCover(playlist) },
+                                MenuEntry(stringResource(Res.string.rename), PlayerIcons.Edit) { onRenamePlaylist(playlist) },
+                                MenuEntry(stringResource(Res.string.delete), PlayerIcons.Delete) { onDeletePlaylist(playlist) },
                             )
                         } else {
                             emptyList()
@@ -877,8 +879,8 @@ private fun Screens(
                     }
                 }
                 Route.DailyMix -> CollectionScreen(
-                    title = stringResource(R.string.daily_mix),
-                    subtitle = stringResource(R.string.daily_mix_desc),
+                    title = stringResource(Res.string.daily_mix),
+                    subtitle = stringResource(Res.string.daily_mix_desc),
                     songs = dailyMix,
                     currentSongId = currentSongId,
                     cover = { m -> MixCollage(dailyMix, m) },
@@ -904,7 +906,7 @@ private fun Screens(
                 Route.Favorites -> {
                     val tracks = remember(userData.favorites, songs) { vm.resolve(userData.favorites) }
                     CollectionScreen(
-                        title = stringResource(R.string.favorites),
+                        title = stringResource(Res.string.favorites),
                         subtitle = "",
                         songs = tracks,
                         currentSongId = currentSongId,
@@ -1109,10 +1111,10 @@ private fun Route.Tab.icon() = when (this) {
 }
 
 private fun Route.Tab.label() = when (this) {
-    Route.Home -> R.string.nav_home
-    Route.Library -> R.string.nav_library
-    Route.Playlists -> R.string.nav_playlists
-    Route.Settings -> R.string.nav_settings
+    Route.Home -> Res.string.nav_home
+    Route.Library -> Res.string.nav_library
+    Route.Playlists -> Res.string.nav_playlists
+    Route.Settings -> Res.string.nav_settings
 }
 
 /** Keeps the last track around so exit animations don't render an empty player. */
@@ -1138,12 +1140,12 @@ private fun ShareTargetDialog(pcName: String, onPhone: () -> Unit, onPc: () -> U
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(PlayerIcons.Download, contentDescription = null) },
-        title = { Text(stringResource(R.string.share_where)) },
+        title = { Text(stringResource(Res.string.share_where)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
-                    Triple(PlayerIcons.Smartphone, stringResource(R.string.share_phone), onPhone),
-                    Triple(PlayerIcons.Desktop, stringResource(R.string.share_pc, pcName), onPc),
+                    Triple(PlayerIcons.Smartphone, stringResource(Res.string.share_phone), onPhone),
+                    Triple(PlayerIcons.Desktop, stringResource(Res.string.share_pc, pcName), onPc),
                 ).forEach { (icon, label, onClick) ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1162,7 +1164,7 @@ private fun ShareTargetDialog(pcName: String, onPhone: () -> Unit, onPc: () -> U
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
     )
 }
 
