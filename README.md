@@ -83,6 +83,7 @@ One Gradle build for both apps. Any JDK starts Gradle; the JDK 25 it builds with
 | `desktop/` | the Windows app |
 | `core/` | code both use: the track model, library lists and search, playlists and favourites, tag edits, lyrics (LRCLIB, parsing, sync offsets), tag search and Opus tags, listening stats and the playlist of the day, track naming, the queue, update state, version compare. Plain Kotlin/JVM, nothing platform-specific |
 | `ui/` | Compose code both draw with: every string (en, ru), expressive shapes and buttons, the colour scheme generator, transitions, the colour picker, the expanding player, the queue and lyrics panels, track rows, the welcome screen and the update dialog, the icons. Kotlin Multiplatform (Android + JVM); what each app does its own way sits in `androidMain` / `jvmMain` |
+| `baselineprofile/` | walks the Android app on a phone to record the code it runs first; the profile goes into `app/src/main/generated` and ships in the APK |
 | `docs/` | [the phone ↔ computer protocol](docs/remote-api.md) |
 
 ```
@@ -90,6 +91,8 @@ One Gradle build for both apps. Any JDK starts Gradle; the JDK 25 it builds with
 ./gradlew :desktop:run                  # start the Windows app
 ./gradlew :desktop:packageReleaseMsi    # installer, in desktop/build/compose/binaries/main-release/msi
 ./gradlew :core:test :desktop:test :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:connectedDebugAndroidTest -PsideBySideTests   # on a plugged-in phone, beside the installed app
+./gradlew :app:generateBaselineProfile  # re-record the startup profile on a plugged-in phone (its own copy of the app)
 ```
 
 Release builds of the APK are signed only if a `keystore.properties` file exists in the project root or in `Pierdoon-signing/` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`); otherwise they're left unsigned.

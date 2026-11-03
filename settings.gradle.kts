@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Pier.doon"
 // app: Android. desktop: Windows. core: code both use, plain Kotlin/JVM. ui: Compose code both draw with.
-include(":app", ":desktop", ":core", ":ui")
+// baselineprofile: walks the Android app on a phone to record which code it runs first.
+include(":app", ":desktop", ":core", ":ui", ":baselineprofile")

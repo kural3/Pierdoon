@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 // Release signing comes from an untracked keystore.properties (storeFile, storePassword,
@@ -77,6 +78,21 @@ android {
             applicationIdSuffix = ".profile"
             matchingFallbacks += "release"
         }
+        // What :baselineprofile installs and walks to record the profile. Declared here, not left
+        // to the plugin, for an id of their own: the plugin's would be the app's, and the run
+        // uninstalls what it tested, which would take the installed app's library with it.
+        for (base in listOf("release", "profile")) {
+            for (prefix in listOf("nonMinified", "benchmark")) {
+                create(prefix + base.replaceFirstChar { it.uppercase() }) {
+                    initWith(getByName(base))
+                    signingConfig = signingConfigs.getByName("debug")
+                    applicationIdSuffix = (getByName(base).applicationIdSuffix ?: "") + ".bp"
+                    matchingFallbacks += "release"
+                    // The profile is recorded under the real names; R8 maps it when the release is built.
+                    if (prefix == "nonMinified") optimization { enable = false }
+                }
+            }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -100,6 +116,12 @@ android {
             enableSplit = false
         }
     }
+}
+
+// Recorded by hand on a phone (./gradlew :app:generateBaselineProfile), kept in src/main.
+baselineProfile {
+    mergeIntoMain = true
+    automaticGenerationDuringBuild = false
 }
 
 kotlin {
@@ -128,6 +150,9 @@ dependencies {
     implementation(libs.jaudiotagger)
     // Track downloads: yt-dlp with its Python runtime. No ffmpeg (35 MB): audio is saved as the site serves it.
     implementation(libs.youtubedl)
+    // Compiles the baseline profile on install, also for APKs from GitHub rather than Play.
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
