@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui
 
+import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -631,7 +632,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
         )
     }
     if (updatePrompt) {
-        UpdateDialog(state = update, onInstall = vm::installUpdate, onDismiss = vm::dismissUpdate)
+        UpdateDialog(state = update, currentVersion = Updater.currentVersion, onInstall = vm::installUpdate, onDismiss = vm::dismissUpdate)
     }
     when (val d = dialog) {
         is PlaylistDialog.Create -> PlaylistNameDialog(

@@ -1,6 +1,5 @@
 package com.ku.pierdoon.ui.components
 
-import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -26,7 +25,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.ui.theme.LocalUiPrefs
 
-val GlassSupported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+/** Whether the blur can be drawn at all: Android has it from 12 on, Windows always. */
+expect val GlassSupported: Boolean
 
 /**
  * Pixel-style frosted glass without a library.
@@ -56,8 +56,8 @@ fun Modifier.backdropSource(backdrop: Backdrop): Modifier = this
     }
 
 /**
- * Frosted panel: blurred backdrop + translucent [tint]. Below Android 12 there is no
- * RenderEffect, so the panel falls back to the opaque [fallback] colour.
+ * Frosted panel: blurred backdrop + translucent [tint]. With glass off in the settings, or
+ * where there is no blur ([GlassSupported]), the panel is the opaque [fallback] colour instead.
  */
 @Composable
 fun Modifier.glass(

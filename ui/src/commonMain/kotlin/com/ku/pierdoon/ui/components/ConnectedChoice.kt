@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.components
 
+import androidx.compose.material3.ToggleButtonColors
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,7 +43,7 @@ fun ChoiceChip(
             }
         },
         enabled = enabled,
-        colors = ToggleButtonDefaults.toggleButtonColors(containerColor = containerColor),
+        colors = toggleColors(containerColor),
         modifier = modifier.semantics { role = Role.RadioButton },
     ) {
         Text(label, maxLines = 1, softWrap = false)
@@ -62,7 +63,7 @@ fun ConnectedChoice(
     /** Unchecked segment colour; pick one that contrasts with whatever sits behind the group. */
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
 ) {
-    val colors = ToggleButtonDefaults.toggleButtonColors(containerColor = containerColor)
+    val colors = toggleColors(containerColor)
     val haptics = LocalHapticFeedback.current
     Row(
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
@@ -92,3 +93,7 @@ fun ConnectedChoice(
         }
     }
 }
+
+/** The toggle buttons' colours over [containerColor]; Material 3 renamed the call between versions. */
+@Composable
+internal expect fun toggleColors(containerColor: Color): ToggleButtonColors

@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.LibraryState
 import com.ku.pierdoon.MainViewModel
 import com.ku.pierdoon.data.ColorSource
@@ -557,7 +558,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
         )
     }
     if (updatePrompt) {
-        UpdateDialog(state = update, onInstall = vm::installUpdate, onDismiss = vm::dismissUpdate)
+        UpdateDialog(state = update, currentVersion = Updater.currentVersion, onInstall = vm::installUpdate, onDismiss = vm::dismissUpdate)
     }
     when (val d = dialog) {
         is PlaylistDialog.Create -> PlaylistNameDialog(

@@ -22,16 +22,18 @@ import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import com.ku.pierdoon.ui.PlatformStrings
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.data.update.AppRelease
 import com.ku.pierdoon.data.update.UpdateState
-import com.ku.pierdoon.data.update.Updater
 
 /** "Version X is out": release notes, then download progress, then the system takes over. */
 @Composable
 fun UpdateDialog(
     state: UpdateState,
+    /** The version running now, for "installed" once it is the newest. */
+    currentVersion: String,
     onInstall: (AppRelease) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -54,7 +56,7 @@ fun UpdateDialog(
         text = {
             Column {
                 Text(
-                    stringResource(Res.string.update_installed_now, Updater.currentVersion),
+                    stringResource(Res.string.update_installed_now, currentVersion),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -82,7 +84,7 @@ fun UpdateDialog(
                                     LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
                                 }
                             }
-                            UpdateState.Installing::class -> Status(stringResource(Res.string.update_confirm), error = false)
+                            UpdateState.Installing::class -> Status(stringResource(PlatformStrings.updateConfirm), error = false)
                             UpdateState.InstallFailed::class -> Status(stringResource(Res.string.update_failed), error = true)
                             else -> Unit
                         }

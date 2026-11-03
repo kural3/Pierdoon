@@ -30,28 +30,6 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** A published release that has an APK attached. */
-@Immutable
-data class AppRelease(
-    val version: String,
-    val notes: String,
-    val apkUrl: String,
-    val apkSize: Long,
-)
-
-sealed interface UpdateState {
-    data object Idle : UpdateState
-    data object Checking : UpdateState
-    data object UpToDate : UpdateState
-    data object CheckFailed : UpdateState
-    data class Available(val release: AppRelease) : UpdateState
-    /** [progress] is 0..1, or null while the size is still unknown. */
-    data class Downloading(val release: AppRelease, val progress: Float?) : UpdateState
-    /** Handed to the system installer; the user confirms there. */
-    data class Installing(val release: AppRelease) : UpdateState
-    data class InstallFailed(val release: AppRelease) : UpdateState
-}
-
 /**
  * Updates straight from the GitHub releases page: the app is not in a store, so nothing else
  * would tell its users that a new version is out.
@@ -181,8 +159,8 @@ object Updater {
             return AppRelease(
                 version = o.optString("tag_name").removePrefix("android-").removePrefix("v"),
                 notes = o.optString("body"),
-                apkUrl = apk.getString("browser_download_url"),
-                apkSize = apk.optLong("size"),
+                fileUrl = apk.getString("browser_download_url"),
+                fileSize = apk.optLong("size"),
             )
         }
         return null
@@ -193,9 +171,9 @@ object Updater {
         val dir = File(app.cacheDir, "update").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "Pierdoon-${release.version}.apk")
-        val conn = open(release.apkUrl, "application/octet-stream")
+        val conn = open(release.fileUrl, "application/octet-stream")
         try {
-            val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.apkSize.takeIf { it > 0 }
+            val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.fileSize.takeIf { it > 0 }
             var read = 0L
             var lastReported = -1
             conn.inputStream.use { input ->

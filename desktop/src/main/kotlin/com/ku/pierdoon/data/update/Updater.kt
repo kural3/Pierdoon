@@ -25,30 +25,6 @@ import java.security.DigestInputStream
 import java.security.MessageDigest
 import kotlin.system.exitProcess
 
-/** A published release that has a Windows installer attached. */
-@Immutable
-data class AppRelease(
-    val version: String,
-    val notes: String,
-    val installerUrl: String,
-    val installerSize: Long,
-    /** Hex SHA-256 GitHub lists for the installer; null on releases from before it did. */
-    val installerSha256: String? = null,
-)
-
-sealed interface UpdateState {
-    data object Idle : UpdateState
-    data object Checking : UpdateState
-    data object UpToDate : UpdateState
-    data object CheckFailed : UpdateState
-    data class Available(val release: AppRelease) : UpdateState
-    /** [progress] is 0..1, or null while the size is still unknown. */
-    data class Downloading(val release: AppRelease, val progress: Float?) : UpdateState
-    /** Handed to the Windows installer; the app quits so it can be replaced. */
-    data class Installing(val release: AppRelease) : UpdateState
-    data class InstallFailed(val release: AppRelease) : UpdateState
-}
-
 /**
  * Updates straight from the GitHub releases page: the app is not in a store, so nothing else
  * would tell its users that a new version is out.
@@ -159,9 +135,9 @@ object Updater {
             return AppRelease(
                 version = o.optString("tag_name").removePrefix("desktop-").removePrefix("v"),
                 notes = o.optString("body"),
-                installerUrl = msi.getString("browser_download_url"),
-                installerSize = msi.optLong("size"),
-                installerSha256 = sha256Of(msi.optString("digest")),
+                fileUrl = msi.getString("browser_download_url"),
+                fileSize = msi.optLong("size"),
+                sha256 = sha256Of(msi.optString("digest")),
             )
         }
         return null
@@ -178,9 +154,9 @@ object Updater {
         dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "Pierdoon-${release.version}.msi")
         val digest = MessageDigest.getInstance("SHA-256")
-        val conn = open(release.installerUrl, "application/octet-stream")
+        val conn = open(release.fileUrl, "application/octet-stream")
         try {
-            val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.installerSize.takeIf { it > 0 }
+            val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.fileSize.takeIf { it > 0 }
             var read = 0L
             var lastReported: Int? = -1
             DigestInputStream(conn.inputStream, digest).use { input ->
@@ -203,7 +179,7 @@ object Updater {
             }
             if (total != null && read != total) throw IOException("Truncated download")
             val actual = digest.digest().joinToString("") { "%02x".format(it) }
-            if (release.installerSha256 != null && actual != release.installerSha256) {
+            if (release.sha256 != null && actual != release.sha256) {
                 throw IOException("Installer checksum mismatch")
             }
         } catch (e: Exception) {

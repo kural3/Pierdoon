@@ -1,8 +1,5 @@
 package com.ku.pierdoon.ui
 
-import org.jetbrains.compose.resources.stringResource
-import com.ku.pierdoon.ui.resources.Res
-import com.ku.pierdoon.ui.resources.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,8 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.ui.components.PlayerIcons
 
 @Composable
@@ -70,13 +70,13 @@ fun PermissionScreen(onGrant: () -> Unit) {
         }
         Spacer(Modifier.height(32.dp))
         Text(
-            text = stringResource(Res.string.permission_title),
+            text = stringResource(PlatformStrings.permissionTitle),
             style = MaterialTheme.typography.headlineSmallEmphasized,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = stringResource(Res.string.permission_body),
+            text = stringResource(PlatformStrings.permissionBody),
             style = MaterialTheme.typography.bodyLarge,
             color = colors.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -89,7 +89,7 @@ fun PermissionScreen(onGrant: () -> Unit) {
             },
             modifier = Modifier.height(56.dp),
         ) {
-            Text(stringResource(Res.string.permission_grant), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(PlatformStrings.permissionGrant), style = MaterialTheme.typography.titleMedium)
         }
     }
 }

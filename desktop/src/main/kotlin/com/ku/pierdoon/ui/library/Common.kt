@@ -25,9 +25,6 @@ import org.jetbrains.compose.resources.stringResource
 
 // The list rows, scaffold and headers both apps share are in ui (SongRows.kt).
 
-/** Forms and settings stop growing here on a wide window; past it the rows only got longer. */
-val CONTENT_MAX_WIDTH = 920.dp
-
 /** Cover with the count and Play / Shuffle beside it, for album, artist and playlist screens. */
 @Composable
 fun CollectionHeader(
