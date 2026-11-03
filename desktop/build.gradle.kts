@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.ku.pierdoon"
-version = "2.4.0"
+version = "2.5.0"
 
 // FFmpeg (decoding every format, remuxing downloads) is pulled in for Windows x64 only:
 // the -platform artifacts would bring every OS and CPU along, some 300 MB.
