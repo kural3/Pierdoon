@@ -96,7 +96,7 @@ class PlaybackService : MediaLibraryService() {
             .build()
 
         // History lives here, not in the UI: tracks that play with the app closed count too.
-        val library = UserLibrary.get(this)
+        val library = UserLibrary.get(this.filesDir)
         val history = PlayHistory.get(this)
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -217,7 +217,7 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onDestroy() {
         PlayHistory.get(this).flush()
-        UserLibrary.get(this).flush()
+        UserLibrary.get(this.filesDir).flush()
         widget?.release()
         widget = null
         scope.cancel()

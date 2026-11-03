@@ -1,4 +1,4 @@
-package com.ku.pierdoon.platform
+package com.ku.pierdoon.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

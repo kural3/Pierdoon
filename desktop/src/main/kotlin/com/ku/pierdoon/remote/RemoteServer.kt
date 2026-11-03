@@ -1,5 +1,6 @@
 package com.ku.pierdoon.remote
 
+import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.BuildConfig
 import com.ku.pierdoon.LibraryState
 import com.ku.pierdoon.MainViewModel
@@ -16,7 +17,7 @@ import com.ku.pierdoon.data.download.SearchSource
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.platform.ErrorLog
 import com.ku.pierdoon.platform.Images
-import com.ku.pierdoon.platform.LruCache
+import com.ku.pierdoon.data.LruCache
 import com.ku.pierdoon.platform.Prefs
 import com.ku.pierdoon.playback.PlaybackController
 import com.ku.pierdoon.playback.Player
@@ -403,7 +404,7 @@ object RemoteServer {
         val file = song.file.takeIf { it.isFile } ?: return send(ex, 404, JSONObject().put("error", "file gone"))
         ex.responseHeaders.add("Content-Type", "application/octet-stream")
         ex.responseHeaders.add("X-Pierdoon-Name", enc(file.name))
-        TagOverrides.get().get(song.id)?.let { ex.responseHeaders.add("X-Pierdoon-Tags", enc(tagsJson(it).toString())) }
+        TagOverrides.get(AppDirs.files).get(song.id)?.let { ex.responseHeaders.add("X-Pierdoon-Tags", enc(tagsJson(it).toString())) }
         ex.sendResponseHeaders(200, file.length())
         ex.responseBody.use { out -> file.inputStream().use { it.copyTo(out, COPY_BUFFER) } }
     }
@@ -430,7 +431,7 @@ object RemoteServer {
         val target = ex.requestBody.use { receiveTrack(it, length, name, dir) }
             ?: return send(ex, 400, JSONObject().put("error", "incomplete"))
         // Before the library looks, so its first look already has them.
-        tags?.let { TagOverrides.get().set(Song.idFor(target), it) }
+        tags?.let { TagOverrides.get(AppDirs.files).set(Song.idFor(target), it) }
         Downloader.announce(target)
         send(ex, 200, JSONObject().put("ok", true).put("name", target.name))
     }

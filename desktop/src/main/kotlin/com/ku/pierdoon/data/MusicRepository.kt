@@ -2,7 +2,7 @@ package com.ku.pierdoon.data
 
 import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.platform.MediaProbe
-import com.ku.pierdoon.platform.writeAtomically
+import com.ku.pierdoon.data.writeAtomically
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
@@ -23,7 +23,7 @@ import org.json.JSONObject
  */
 class MusicRepository {
 
-    private val overrides = TagOverrides.get()
+    private val overrides = TagOverrides.get(AppDirs.files)
     private val indexFile = File(AppDirs.cache, "library-index.json")
     private val lock = Any()
     private var index: MutableMap<String, Indexed>? = null

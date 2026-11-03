@@ -239,7 +239,7 @@ object Downloader {
     private fun finishGroup(group: DownloadGroup) {
         val members = _tasks.value.filter { it.group?.id == group.id }
         val songIds = members.mapNotNull { (it.status as? DownloadStatus.Done)?.songId }
-        val library = UserLibrary.get()
+        val library = UserLibrary.get(AppDirs.files)
         synchronized(groupPlaylists) {
             val existing = groupPlaylists[group.id]
             when {
@@ -479,14 +479,14 @@ object Downloader {
             // Some files take no tags: the app keeps them instead, set before the file appears so
             // the library's first look already has them.
             if (!inFile) {
-                TagOverrides.get().set(songId, TagOverride(name.title, name.artist.ifBlank { null }, album))
+                TagOverrides.get(AppDirs.files).set(songId, TagOverride(name.title, name.artist.ifBlank { null }, album))
                 cover?.let { bytes -> File(work, "cover.jpg").also { it.writeBytes(bytes) } }
                     ?.let { CoverStore.setSongCover(songId, it) }
             }
             audio.copyTo(target)
         } catch (e: Exception) {
             target.delete()
-            TagOverrides.get().set(songId, null)
+            TagOverrides.get(AppDirs.files).set(songId, null)
             CoverStore.removeSongCover(songId)
             throw if (e is DownloadException || e is CancellationException) e else DownloadException(FailReason.Save, e.message)
         }

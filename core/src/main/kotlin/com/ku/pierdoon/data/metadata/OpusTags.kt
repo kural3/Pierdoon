@@ -1,6 +1,6 @@
 package com.ku.pierdoon.data.metadata
 
-import android.util.Base64
+import java.util.Base64
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.File
@@ -14,8 +14,9 @@ import java.nio.ByteOrder
  * An Opus stream is OpusHead, then OpusTags (Vorbis-style comments), then audio. Only the
  * OpusTags packet is rebuilt; audio pages are copied byte for byte, renumbered and re-checksummed.
  * Comments other than title, artist, album and the picture are kept.
+ * java.util.Base64 is there on Android 8.0+; writing to files needs Android 11 anyway.
  */
-internal object OpusTags {
+object OpusTags {
 
     fun write(file: File, title: String, artist: String, album: String, cover: ByteArray?, removeCover: Boolean) {
         val pages = readPages(file)
@@ -40,7 +41,7 @@ internal object OpusTags {
             if (artist.isNotBlank()) add("ARTIST=$artist")
             if (album.isNotBlank()) add("ALBUM=$album")
             addAll(kept)
-            cover?.let { add("$PICTURE=" + Base64.encodeToString(pictureBlock(it), Base64.NO_WRAP)) }
+            cover?.let { add("$PICTURE=" + Base64.getEncoder().encodeToString(pictureBlock(it))) }
         }
         val serial = pages[0].serial
         val newTagPages = paginate(buildComments(vendor, fresh), serial)
@@ -151,19 +152,43 @@ internal object OpusTags {
 
     /** FLAC's picture block, which Opus and Vorbis players read from METADATA_BLOCK_PICTURE. */
     private fun pictureBlock(jpeg: ByteArray): ByteArray {
-        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, bounds)
+        val size = jpegSize(jpeg)
         val mime = "image/jpeg".toByteArray()
         return ByteBuffer.allocate(32 + mime.size + jpeg.size)
             .putInt(3) // front cover
             .putInt(mime.size).put(mime)
             .putInt(0) // no description
-            .putInt(bounds.outWidth.coerceAtLeast(0))
-            .putInt(bounds.outHeight.coerceAtLeast(0))
+            .putInt(size?.first ?: 0)
+            .putInt(size?.second ?: 0)
             .putInt(24)
             .putInt(0)
             .putInt(jpeg.size).put(jpeg)
             .array()
+    }
+
+    /**
+     * Width and height from the JPEG's frame header, without decoding a pixel; null if it
+     * isn't a JPEG or has no frame header.
+     */
+    internal fun jpegSize(jpeg: ByteArray): Pair<Int, Int>? {
+        fun u8(i: Int) = jpeg[i].toInt() and 0xFF
+        fun u16(i: Int) = (u8(i) shl 8) or u8(i + 1)
+        if (jpeg.size < 4 || u8(0) != 0xFF || u8(1) != 0xD8) return null
+        var i = 2
+        while (i + 9 < jpeg.size) {
+            if (u8(i) != 0xFF) return null
+            val marker = u8(i + 1)
+            when {
+                marker == 0xFF -> { i++; continue } // fill byte
+                marker == 0xD8 || marker == 0x01 || marker in 0xD0..0xD7 -> { i += 2; continue } // no length
+                marker == 0xD9 || marker == 0xDA -> return null // end, or scan data with no frame before it
+                // Start of frame: any of C0..CF except DHT (C4), JPG (C8) and DAC (CC).
+                marker in 0xC0..0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC ->
+                    return u16(i + 7) to u16(i + 5)
+            }
+            i += 2 + u16(i + 2)
+        }
+        return null
     }
 
     private fun ByteArray.startsWith(prefix: ByteArray) =

@@ -1,7 +1,5 @@
 package com.ku.pierdoon.data
 
-import android.content.Context
-import android.os.SystemClock
 import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,11 +41,11 @@ data class UserData(
  * so skipping through ten tracks costs one tiny write, not ten.
  *
  * One instance per process, shared by the UI and the playback service. It owns its scope,
- * so a pending write outlives the screen that made the change.
+ * so a pending write outlives the screen that made the change. Each app opens it with its own
+ * folder (`UserLibrary.get(context)` on Android, `UserLibrary.get()` on Windows).
  */
-class UserLibrary private constructor(context: Context) {
+class UserLibrary private constructor(private val file: File) {
 
-    private val file = File(context.filesDir, "library.json")
     private val scope = CoroutineScope(SupervisorJob())
     private val io = Dispatchers.IO.limitedParallelism(1)
     private val _data = MutableStateFlow(UserData())
@@ -147,7 +145,7 @@ class UserLibrary private constructor(context: Context) {
 
     /** A slower change (history) never postpones a write that is already due sooner. */
     private fun scheduleWrite(delayMs: Long) {
-        val at = SystemClock.uptimeMillis() + delayMs
+        val at = (System.nanoTime() / 1_000_000) + delayMs
         if (pendingWrite?.isActive == true && writeAtMs <= at) return
         pendingWrite?.cancel()
         writeAtMs = at
@@ -158,7 +156,7 @@ class UserLibrary private constructor(context: Context) {
     }
 
     private fun read(): UserData {
-        if (!file.exists()) return UserData(loaded = true)
+        if (!recoverAtomicWrite(file)) return UserData(loaded = true)
         return runCatching {
             val o = JSONObject(file.readText())
             val playlists = o.optJSONArray("playlists")?.let { arr ->
@@ -194,14 +192,7 @@ class UserLibrary private constructor(context: Context) {
             })
             .put("favorites", JSONArray(d.favorites.toList()))
             .put("recent", JSONArray(d.recent))
-        runCatching {
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(o.toString())
-            if (!tmp.renameTo(file)) {
-                file.delete()
-                tmp.renameTo(file)
-            }
-        }
+        writeAtomically(file, o.toString())
     }
 
     private fun JSONArray.toLongList(): List<Long> = List(length()) { getLong(it) }
@@ -209,8 +200,9 @@ class UserLibrary private constructor(context: Context) {
     companion object {
         @Volatile private var instance: UserLibrary? = null
 
-        fun get(context: Context): UserLibrary = instance ?: synchronized(this) {
-            instance ?: UserLibrary(context.applicationContext).also { instance = it }
+        /** The one instance, kept in `library.json` in [dir] (the folder of whoever asks first). */
+        fun get(dir: File): UserLibrary = instance ?: synchronized(this) {
+            instance ?: UserLibrary(File(dir, "library.json")).also { instance = it }
         }
 
         private const val MAX_RECENT = 30

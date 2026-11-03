@@ -1,8 +1,8 @@
 package com.ku.pierdoon.playback
 
 import com.ku.pierdoon.platform.AppDirs
-import com.ku.pierdoon.platform.recoverAtomicWrite
-import com.ku.pierdoon.platform.writeAtomically
+import com.ku.pierdoon.data.recoverAtomicWrite
+import com.ku.pierdoon.data.writeAtomically
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File

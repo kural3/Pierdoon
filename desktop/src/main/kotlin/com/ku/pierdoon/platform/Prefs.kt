@@ -1,5 +1,7 @@
 package com.ku.pierdoon.platform
 
+import com.ku.pierdoon.data.recoverAtomicWrite
+import com.ku.pierdoon.data.writeAtomically
 import java.io.File
 import java.util.Properties
 

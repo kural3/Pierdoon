@@ -40,7 +40,7 @@ class CarLibrary(private val context: Context) {
         }
     }
 
-    private suspend fun userData() = UserLibrary.get(context).data.first { it.loaded }
+    private suspend fun userData() = UserLibrary.get(context.filesDir).data.first { it.loaded }
 
     suspend fun children(id: String): List<MediaItem> = when (id) {
         ROOT -> listOf(

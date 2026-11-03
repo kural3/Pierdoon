@@ -1,8 +1,6 @@
 package com.ku.pierdoon.data.lyrics
 
-import android.content.Context
-import android.util.LruCache
-import com.ku.pierdoon.data.USER_AGENT
+import com.ku.pierdoon.data.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -30,10 +28,13 @@ data class LyricsQuery(
  *
  * Energy: the network is touched at most once per track. Results — including "not found" —
  * are cached on disk, so re-opening lyrics or replaying a song costs a single file read.
+ *
+ * @param cacheDir the app's cache folder; the lyrics go in a `lyrics` folder inside it.
+ * @param userAgent who the app says it is to LRCLIB.
  */
-class LyricsRepository(context: Context) {
+class LyricsRepository(cacheDir: File, private val userAgent: String) {
 
-    private val dir = File(context.cacheDir, "lyrics").apply { mkdirs() }
+    private val dir = File(cacheDir, "lyrics").apply { mkdirs() }
     private val memory = LruCache<Long, Lyrics>(48)
 
     fun peek(songId: Long): Lyrics? = memory.get(songId)
@@ -191,7 +192,7 @@ class LyricsRepository(context: Context) {
         try {
             conn.connectTimeout = 8_000
             conn.readTimeout = 10_000
-            conn.setRequestProperty("User-Agent", USER_AGENT)
+            conn.setRequestProperty("User-Agent", userAgent)
             conn.setRequestProperty("Accept", "application/json")
             val code = conn.responseCode
             if (code == HttpURLConnection.HTTP_NOT_FOUND) return null

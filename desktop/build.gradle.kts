@@ -20,7 +20,7 @@ dependencies {
     implementation(libs.compose.mp.material3)
     implementation("org.jetbrains.compose.components:components-resources:1.12.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
-    implementation("org.json:json:20260814")
+    implementation(libs.json)
     // Writing tags into audio files ("save to file" when editing a track).
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("org.bytedeco:javacv:1.5.14") { isTransitive = false }

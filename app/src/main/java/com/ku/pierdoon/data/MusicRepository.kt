@@ -14,7 +14,7 @@ data class MusicFolder(val path: String, val count: Int)
 
 class MusicRepository(private val context: Context) {
 
-    private val overrides = TagOverrides.get(context)
+    private val overrides = TagOverrides.get(context.filesDir)
 
     /** The library: every track, less those in the folders the user left out. */
     suspend fun loadSongs(): List<Song> = withContext(Dispatchers.IO) {

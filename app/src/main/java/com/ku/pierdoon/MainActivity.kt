@@ -154,6 +154,6 @@ class MainActivity : ComponentActivity() {
     // Backgrounded apps can be killed at any time: don't leave edits waiting on a timer.
     override fun onStop() {
         super.onStop()
-        UserLibrary.get(this).flush()
+        UserLibrary.get(this.filesDir).flush()
     }
 }

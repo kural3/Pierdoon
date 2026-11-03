@@ -1,7 +1,7 @@
 package com.ku.pierdoon.ui.components
 
 import com.ku.pierdoon.platform.Images
-import com.ku.pierdoon.platform.LruCache
+import com.ku.pierdoon.data.LruCache
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

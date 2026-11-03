@@ -1,5 +1,6 @@
 package com.ku.pierdoon.playback
 
+import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
@@ -41,7 +42,7 @@ object PlaybackController {
     fun start() {
         if (started) return
         started = true
-        val library = UserLibrary.get()
+        val library = UserLibrary.get(AppDirs.files)
         var lastRecorded = -1L
         PlayHistory.load()
         player.addListener { p, events ->
@@ -176,7 +177,7 @@ object PlaybackController {
     /** Writes the queue now; for quitting. */
     fun shutdown() {
         PlayHistory.flush()
-        UserLibrary.get().flush()
+        UserLibrary.get(AppDirs.files).flush()
         if (!restoring) queueStore.write(snapshot())
         MediaKeys.uninstall()
         player.release()

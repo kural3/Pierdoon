@@ -1,6 +1,9 @@
-package com.ku.pierdoon.platform
+package com.ku.pierdoon.data
 
-/** The few bits of android.util.LruCache the app uses: size-bounded, least recently used out first. */
+/**
+ * The few bits of android.util.LruCache the apps use, on plain Java so both have the same one:
+ * size-bounded, least recently used out first.
+ */
 open class LruCache<K : Any, V : Any>(private val maxSize: Int) {
     private val map = LinkedHashMap<K, V>(0, 0.75f, true)
     private var size = 0

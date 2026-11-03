@@ -1,9 +1,6 @@
 package com.ku.pierdoon.platform
 
 import java.io.File
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /**
  * Where the app keeps its files. Roaming data (playlists, settings, covers) under %APPDATA%,
@@ -40,32 +37,4 @@ object AppDirs {
         WinShell.knownFolder("{4BD8D571-6D19-48D3-BE97-422220080E43}")?.let(::File)?.takeIf { it.isDirectory }
             ?: File(home, "Music")
     }
-}
-
-/**
- * Writes [text] to [file] through a temp file, so a crash mid-write leaves the old one intact.
- * Not File.renameTo: on Windows it won't replace an existing file, and deleting the old one first
- * leaves a moment where neither exists.
- */
-fun writeAtomically(file: File, text: String) {
-    runCatching {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(text)
-        try {
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: AtomicMoveNotSupportedException) {
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
-    }
-}
-
-/**
- * Before 1.0.3 a save could stop between deleting [file] and renaming its temp file over it,
- * leaving only the complete temp file behind. Puts it back; true if [file] is there to read.
- */
-fun recoverAtomicWrite(file: File): Boolean {
-    if (file.exists()) return true
-    val tmp = File(file.parentFile, file.name + ".tmp")
-    return tmp.exists() && runCatching { Files.move(tmp.toPath(), file.toPath()) }.isSuccess
 }

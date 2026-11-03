@@ -20,5 +20,9 @@ java {
 dependencies {
     // @Immutable and @Stable only, without the Compose runtime: both apps' compilers read them.
     implementation(libs.compose.runtime.annotation)
+    implementation(libs.kotlinx.coroutines.core)
+    // Android has org.json built in; the Windows app brings its own.
+    compileOnly(libs.json)
+    testImplementation(libs.json)
     testImplementation(libs.junit)
 }

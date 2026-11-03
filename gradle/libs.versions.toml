@@ -17,6 +17,8 @@ youtubedl = "0.18.1"
 composeMultiplatform = "1.12.2"
 composeMaterial3 = "1.12.0-alpha03"
 graphicsShapes = "1.1.0"
+coroutines = "1.11.0"
+json = "20260814"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,7 +47,9 @@ compose-mp-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime"
 compose-mp-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
 compose-mp-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "composeMultiplatform" }
 compose-mp-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "composeMaterial3" }
-androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+json = { group = "org.json", name = "json", version.ref = "json" }
+androidx-graphics-shapes ={ group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

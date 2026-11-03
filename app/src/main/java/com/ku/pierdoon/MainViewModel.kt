@@ -1,5 +1,6 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.data.USER_AGENT
 import com.ku.pierdoon.data.M3uMatch
 import com.ku.pierdoon.data.M3uMatcher
 import com.ku.pierdoon.data.MusicFolder
@@ -130,8 +131,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _collections = MutableStateFlow(MusicCollections())
     val collections: StateFlow<MusicCollections> = _collections.asStateFlow()
 
-    private val userLibrary = UserLibrary.get(app)
-    private val tagOverrides = TagOverrides.get(app)
+    private val userLibrary = UserLibrary.get(app.filesDir)
+    private val tagOverrides = TagOverrides.get(app.filesDir)
     val userData: StateFlow<UserData> = userLibrary.data
 
     private val _player = MutableStateFlow(PlayerState())
@@ -163,7 +164,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PositionSnapshot())
 
-    private val lyricsRepository = LyricsRepository(app)
+    private val lyricsRepository = LyricsRepository(app.cacheDir, USER_AGENT)
     private val lyricsVisible = MutableStateFlow(false)
     private val lyricsRetry = MutableStateFlow(0)
     private var songsById: Map<Long, Song> = emptyMap()

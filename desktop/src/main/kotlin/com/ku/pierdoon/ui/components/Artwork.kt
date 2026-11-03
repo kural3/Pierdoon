@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.platform.Images
-import com.ku.pierdoon.platform.LruCache
+import com.ku.pierdoon.data.LruCache
 import com.ku.pierdoon.platform.MediaProbe
 import com.ku.pierdoon.ui.theme.SchemeGenerator
 import kotlinx.coroutines.Dispatchers

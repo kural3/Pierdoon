@@ -1,6 +1,5 @@
 package com.ku.pierdoon.data
 
-import android.content.Context
 import org.json.JSONObject
 import java.io.File
 
@@ -16,9 +15,8 @@ data class TagOverride(
  * [MusicRepository] on every load, so the whole app (and the notification) sees them.
  * Read on first use from a background thread; a few hundred bytes per edited track.
  */
-class TagOverrides private constructor(context: Context) {
+class TagOverrides private constructor(private val file: File) {
 
-    private val file = File(context.filesDir, "tag_overrides.json")
     private var map: MutableMap<Long, TagOverride>? = null
 
     @Synchronized
@@ -48,7 +46,7 @@ class TagOverrides private constructor(context: Context) {
 
     private fun read(): MutableMap<Long, TagOverride> {
         val out = HashMap<Long, TagOverride>()
-        if (!file.exists()) return out
+        if (!recoverAtomicWrite(file)) return out
         runCatching {
             val o = JSONObject(file.readText())
             o.keys().forEach { k ->
@@ -68,14 +66,7 @@ class TagOverrides private constructor(context: Context) {
                 t.album?.let { put("album", it) }
             })
         }
-        runCatching {
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(o.toString())
-            if (!tmp.renameTo(file)) {
-                file.delete()
-                tmp.renameTo(file)
-            }
-        }
+        writeAtomically(file, o.toString())
     }
 
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key)) getString(key) else null
@@ -83,8 +74,9 @@ class TagOverrides private constructor(context: Context) {
     companion object {
         @Volatile private var instance: TagOverrides? = null
 
-        fun get(context: Context): TagOverrides = instance ?: synchronized(this) {
-            instance ?: TagOverrides(context.applicationContext).also { instance = it }
+        /** The one instance, kept in `tag_overrides.json` in [dir]. */
+        fun get(dir: File): TagOverrides = instance ?: synchronized(this) {
+            instance ?: TagOverrides(File(dir, "tag_overrides.json")).also { instance = it }
         }
     }
 }

@@ -250,7 +250,7 @@ object PcTransfers {
         val name = displayName(uri) ?: return TransferFailure.Missing
         val length = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } }.getOrNull()
             ?.takeIf { it > 0 } ?: return TransferFailure.Missing
-        val tags = TagOverrides.get(app).get(song.id)?.let(::tagsJson)
+        val tags = TagOverrides.get(app.filesDir).get(song.id)?.let(::tagsJson)
         val conn = PcRemote.openUpload(name, tags, length) ?: return TransferFailure.Offline
         try {
             val input = resolver.openInputStream(uri) ?: return TransferFailure.Missing
@@ -301,7 +301,7 @@ object PcTransfers {
                 // Before publishing, so the library's first look already has them.
                 tags?.let { t ->
                     val songId = android.content.ContentUris.parseId(uri)
-                    TagOverrides.get(app).set(songId, TagOverride(t.optStringOrNull("title"), t.optStringOrNull("artist"), t.optStringOrNull("album")))
+                    TagOverrides.get(app.filesDir).set(songId, TagOverride(t.optStringOrNull("title"), t.optStringOrNull("artist"), t.optStringOrNull("album")))
                 }
                 // Published: the media scanner reads the tags and the library refreshes on its own.
                 resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
