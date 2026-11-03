@@ -67,7 +67,8 @@ class TapeSound {
 /** The deck's sounds, read once; the keys and spins come out a little different every time. */
 internal object TapeSounds {
     val flip by lazy { cassetteChangeSound() }
-    val rewind by lazy { cassetteRewindSound() }
+    /** Running the tape back after a side of [sideLengthMs]: longer for a longer side. */
+    fun rewind(sideLengthMs: Long) = cassetteRewindSound(cassetteRewindMs(sideLengthMs))
     private val winds by lazy { cassetteWindVariety() }
     private val playKeys by lazy { cassetteKeyVariety(play = true) }
     private val stopKeys by lazy { cassetteKeyVariety(play = false) }

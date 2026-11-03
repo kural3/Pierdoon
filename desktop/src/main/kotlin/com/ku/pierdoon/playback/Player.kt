@@ -64,7 +64,7 @@ class Player {
                 if (playbackState == STATE_ENDED) seekToDefaultPosition()
                 if (playbackState == STATE_IDLE) prepare()
                 // Mid-spin the tape isn't there yet: it plays once it is.
-                if (!winding) engine.play()
+                if (!winding && !changingCassette) engine.play()
             } else {
                 engine.pause()
                 // No tape left to wait for: paused on the next track.
@@ -157,6 +157,8 @@ class Player {
     private val keys = TapeSound()
     /** Set while [deck] turns or rewinds the tape: the track has run out and the next isn't loaded yet. */
     private var changingCassette = false
+    /** The entry [deck] is turning or rewinding the tape to, by queue key so queue edits meanwhile don't lose it. */
+    private var turnTargetKey: Long? = null
     /** Set while [deck] spins the tape to a track that's loaded and held until it's there. */
     private var winding = false
     /** While set, [load] leaves the track paused: the tape is about to be spun to it. */
@@ -207,10 +209,7 @@ class Player {
             }
             val end = sideEnd()
             if (end != SideEnd.None) {
-                changingCassette = true
-                TapeMotion.current.value = if (end == SideEnd.Rewind) TapeMotion.Rewind else TapeMotion.Flip
-                val sound = if (end == SideEnd.Rewind) TapeSounds.rewind else TapeSounds.flip
-                deck.play(sound, outputDevice, volume) { finishCassetteChange() }
+                turnTo(nextIndexFor(currentMediaItemIndex, repeatMode), if (end == SideEnd.Rewind) TapeMotion.Rewind else TapeMotion.Flip)
                 return
             }
             playbackState = STATE_ENDED
@@ -390,16 +389,44 @@ class Player {
         if (playbackState == STATE_IDLE) prepare()
     }
 
-    /** The next button: on a tape, the deck spins it there first. */
+    /** The next button: on a tape, the deck spins it there first, or turns it over or rewinds it. */
     fun seekToNext() {
+        // Mid-turn: no waiting for the rest of it, straight on to where it was going.
+        if (changingCassette) return finishCassetteChange()
         val n = nextIndexFor(currentMediaItemIndex, if (repeatMode == REPEAT_MODE_ONE) REPEAT_MODE_ALL else repeatMode)
-        if (n >= 0) windTo(TapeMotion.Forward) { seekToDefaultPosition(n) }
+        if (n >= 0) moveTo(n, forward = true)
     }
 
     /** Back to the start of the track, or to the previous one within the first seconds. */
-    fun seekToPrevious() = windTo(TapeMotion.Back) {
+    fun seekToPrevious() {
         val p = if (currentPosition > PREVIOUS_THRESHOLD_MS) -1 else previousIndexFor(currentMediaItemIndex)
-        if (p >= 0) seekToDefaultPosition(p) else seekTo(0)
+        if (p >= 0) moveTo(p, forward = false) else windTo(TapeMotion.Back) { seekTo(0) }
+    }
+
+    /** Next or previous to [target]: on a tape, across the middle turns it over, round to the start rewinds it. */
+    private fun moveTo(target: Int, forward: Boolean) {
+        val motion = if (!tapeMode) TapeMotion.Still else tapeView().let { t ->
+            tapeMove(t.current, t.order.indexOf(target), t.order.size, t.sides.sideBStart, forward)
+        }
+        if (motion == TapeMotion.Flip || motion == TapeMotion.Rewind) {
+            turnTo(target, motion)
+        } else {
+            windTo(if (forward) TapeMotion.Forward else TapeMotion.Back) { seekToDefaultPosition(target) }
+        }
+    }
+
+    /**
+     * The cassette turned over or rewound, then on to [target]: at a side's end, or with a button
+     * mid-track (the track stops where it is). Playing or paused, it stays so after.
+     */
+    private fun turnTo(target: Int, motion: TapeMotion) {
+        val sound = if (motion == TapeMotion.Rewind) TapeSounds.rewind(tapeView().sides.sideLengthMs) else TapeSounds.flip
+        cancelCassetteChange()
+        engine.pause()
+        changingCassette = true
+        turnTargetKey = items[target].queueKey
+        TapeMotion.current.value = motion
+        deck.play(sound, outputDevice, volume) { finishCassetteChange() }
     }
 
     /**
@@ -438,9 +465,10 @@ class Player {
         engine.setDevice(name)
     }
 
-    /** The change of cassette is over: on to the next track, or stopped if the queue changed under it. */
+    /** The cassette is turned or rewound: on to the track it was for, or the next if that one went meanwhile. */
     private fun finishCassetteChange() {
-        val n = nextIndexFor(currentMediaItemIndex, repeatMode)
+        val key = turnTargetKey
+        val n = items.indexOfFirst { it.queueKey == key }.takeIf { it >= 0 } ?: nextIndexFor(currentMediaItemIndex, repeatMode)
         cancelCassetteChange()
         if (n >= 0) {
             seekToDefaultPosition(n)
@@ -453,6 +481,7 @@ class Player {
 
     private fun cancelCassetteChange() {
         changingCassette = false
+        turnTargetKey = null
         winding = false
         TapeMotion.current.value = TapeMotion.Still
         deck.cancel()
@@ -478,10 +507,17 @@ class Player {
         if (!tapeMode) return SideEnd.None
         val next = nextIndexFor(currentMediaItemIndex, repeatMode)
         if (next < 0) return SideEnd.None
+        val t = tapeView()
+        return sideEnd(t.current, t.order.indexOf(next), t.order.size, t.sides.sideBStart)
+    }
+
+    /** The queue as a tape: play order, where the current track is in it, and the sides. */
+    private class TapeView(val order: IntArray, val current: Int, val sides: TapeSides)
+
+    private fun tapeView(): TapeView {
         val order = playOrder()
         val current = order.indexOf(currentMediaItemIndex)
-        val sides = tapeSides(order.map { items[it].song.durationMs }, current)
-        return sideEnd(current, order.indexOf(next), order.size, sides.sideBStart)
+        return TapeView(order, current, tapeSides(order.map { items[it].song.durationMs }, current))
     }
 
     private fun previousIndexFor(index: Int): Int {

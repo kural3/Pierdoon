@@ -69,6 +69,7 @@ import com.ku.pierdoon.playback.PlaybackService
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.playback.QueueEntry
 import com.ku.pierdoon.playback.QueueState
+import com.ku.pierdoon.playback.TapeMotion
 import com.ku.pierdoon.playback.nextRepeatMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -134,11 +135,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * and only while audio is actually playing. Paused or backgrounded = zero wakeups.
      */
     val position: StateFlow<PositionSnapshot> = flow {
+        var shown = 0L
         while (true) {
             val tick = eventTick.value
             val c = controller
             val playing = c?.isPlaying == true
-            emit(PositionSnapshot(c?.currentPosition ?: 0L, SystemClock.elapsedRealtime(), playing, c?.playbackParameters?.speed ?: 1f))
+            // While the deck works, what plays runs silently and is put where it belongs after.
+            // Meanwhile a track spun to stands at its start, and one the cassette is being turned
+            // over or rewound from stands where it stopped: the bar doesn't run and jump back.
+            val motion = TapeMotion.current.value
+            shown = when (motion) {
+                TapeMotion.Still -> c?.currentPosition ?: 0L
+                TapeMotion.Forward, TapeMotion.Back -> 0L
+                else -> shown
+            }
+            emit(PositionSnapshot(shown, SystemClock.elapsedRealtime(), playing && motion == TapeMotion.Still, c?.playbackParameters?.speed ?: 1f))
             if (playing) delay(POSITION_TICK_MS) else eventTick.first { it != tick }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PositionSnapshot())

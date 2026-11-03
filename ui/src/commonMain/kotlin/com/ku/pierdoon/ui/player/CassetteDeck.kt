@@ -44,7 +44,6 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.ku.pierdoon.playback.CASSETTE_REWIND_MS
 import com.ku.pierdoon.playback.CASSETTE_SOUND_MS
 import com.ku.pierdoon.playback.CASSETTE_WIND_MS
 import com.ku.pierdoon.playback.TapeMotion
@@ -63,6 +62,7 @@ import kotlin.math.sqrt
  *
  * @param sideProgress how far the side has played, 0 to 1. Read while drawing.
  * @param motion what the deck is doing with the tape besides playing it.
+ * @param rewindMs how long a [TapeMotion.Rewind] takes, which depends on the length of the side.
  * @param cover the track's picture, on the label.
  */
 @Composable
@@ -72,6 +72,7 @@ fun CassetteDeck(
     sideB: Boolean,
     isPlaying: Boolean,
     motion: TapeMotion,
+    rewindMs: Long,
     sideProgress: () -> Float,
     modifier: Modifier = Modifier,
     cover: @Composable (Modifier) -> Unit,
@@ -79,6 +80,7 @@ fun CassetteDeck(
     val colors = MaterialTheme.colorScheme
     val progress by rememberUpdatedState(sideProgress)
     val currentMotion by rememberUpdatedState(motion)
+    val currentRewindMs by rememberUpdatedState(rewindMs)
     var turnLeft by remember { mutableFloatStateOf(0f) }
     var turnRight by remember { mutableFloatStateOf(0f) }
     /** The tape as last drawn, where a rewind or a spin starts from. */
@@ -87,13 +89,14 @@ fun CassetteDeck(
     val windFrom = remember { FloatArray(1) }
     val wound = remember { Animatable(1f) }
     val flip = remember { Animatable(0f) }
+    val flipFrom = remember { FloatArray(1) }
     val knock = remember { Animatable(0f) }
 
     LaunchedEffect(motion) {
         when (motion) {
             TapeMotion.Rewind -> {
                 rewound.snapTo(shown[0])
-                rewound.animateTo(0f, tween(CASSETTE_REWIND_MS.toInt(), easing = LinearEasing))
+                rewound.animateTo(0f, tween(currentRewindMs.toInt(), easing = LinearEasing))
             }
             TapeMotion.Forward, TapeMotion.Back -> {
                 windFrom[0] = shown[0]
@@ -101,6 +104,7 @@ fun CassetteDeck(
                 wound.animateTo(1f, tween(CASSETTE_WIND_MS.toInt(), easing = FastOutSlowInEasing))
             }
             TapeMotion.Flip -> {
+                flipFrom[0] = shown[0]
                 flip.snapTo(0f)
                 flip.animateTo(1f, tween(CASSETTE_SOUND_MS.toInt(), easing = LinearEasing))
             }
@@ -126,14 +130,17 @@ fun CassetteDeck(
         knock.animateTo(0f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
     }
 
-    /** Past the middle of turning over, the other side faces up and its tape is all on the left. */
+    /**
+     * Past the middle of turning over, the other side faces up, and the reels have swapped places:
+     * the end of side A is the start of side B, and the other way round.
+     */
     fun turnedOver() = motion == TapeMotion.Flip && flipTurn(flip.value) > 90f
 
     fun played(): Float {
         val now = progress().coerceIn(0f, 1f)
         return when {
             motion == TapeMotion.Rewind -> rewound.value
-            turnedOver() -> 0f
+            turnedOver() -> 1f - flipFrom[0]
             wound.value < 1f -> windFrom[0] + (now - windFrom[0]) * wound.value
             else -> now
         }

@@ -62,6 +62,23 @@ class TapeTest {
         assertEquals(SideEnd.None, sideEnd(current = 0, next = 0, size = 1, sideBStart = 1))
     }
 
+    @Test
+    fun theButtonsTurnTheCassetteOverAcrossTheMiddleAndSpinItElsewhere() {
+        // Four tracks, side B from the third.
+        fun move(from: Int, to: Int, forward: Boolean) = tapeMove(from, to, size = 4, sideBStart = 2, forward = forward)
+        assertEquals(TapeMotion.Forward, move(0, 1, true))
+        assertEquals(TapeMotion.Flip, move(1, 2, true))
+        assertEquals(TapeMotion.Forward, move(2, 3, true))
+        // Repeat all, next on the last track: round to the start.
+        assertEquals(TapeMotion.Rewind, move(3, 0, true))
+        assertEquals(TapeMotion.Back, move(3, 2, false))
+        assertEquals(TapeMotion.Flip, move(2, 1, false))
+        // Back to the start of the same track.
+        assertEquals(TapeMotion.Back, move(2, 2, false))
+        // A tape with one side has nothing to turn over.
+        assertEquals(TapeMotion.Forward, tapeMove(0, 0, size = 1, sideBStart = 1, forward = true))
+    }
+
     private fun run(tape: TapeEffect, frames: Int, sample: (Int) -> Int = { 0 }): IntArray {
         val out = IntArray(frames)
         for (f in 0 until frames) {

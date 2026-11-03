@@ -76,6 +76,18 @@ enum class TapeMotion {
     }
 }
 
+/**
+ * What pressing next or previous to go from [current] to [target] (positions in play order) does
+ * on the tape: across the middle the cassette is turned over, round from the end of side B to the
+ * start it's rewound, anywhere else it's spun forward or back.
+ */
+fun tapeMove(current: Int, target: Int, size: Int, sideBStart: Int, forward: Boolean): TapeMotion = when {
+    sideEnd(current, target, size, sideBStart) == SideEnd.Rewind -> TapeMotion.Rewind
+    current != target && sideBStart in 1 until size && (current < sideBStart) != (target < sideBStart) -> TapeMotion.Flip
+    forward -> TapeMotion.Forward
+    else -> TapeMotion.Back
+}
+
 /** What going from [current] to [next] (positions in play order) means on the tape. */
 fun sideEnd(current: Int, next: Int, size: Int, sideBStart: Int): SideEnd = when {
     current == next || size < 2 -> SideEnd.None

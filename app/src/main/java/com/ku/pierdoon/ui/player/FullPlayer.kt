@@ -116,6 +116,7 @@ import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.playback.QueueState
 import com.ku.pierdoon.playback.TapeMotion
+import com.ku.pierdoon.playback.cassetteRewindMs
 import com.ku.pierdoon.playback.TapeSides
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.ui.components.Artwork
@@ -851,6 +852,7 @@ private fun PlayerArtwork(
                 sideB = tape.onSideB,
                 isPlaying = isPlaying,
                 motion = tapeMotion,
+                rewindMs = cassetteRewindMs(tape.sideLengthMs),
                 sideProgress = {
                     if (tape.sideLengthMs <= 0) 0f else (tape.elapsedMs + position().estimate()).toFloat() / tape.sideLengthMs
                 },

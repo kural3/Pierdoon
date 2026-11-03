@@ -22,6 +22,16 @@ private const val WIND_TO_MS = 950
 private const val WIND_STOP_FROM_MS = 2_575
 private const val WIND_FADE_MS = 30
 
+/** The rewind's parts: whir from the start, a stretch of it that loops cleanly, and the slowing down to its stop. */
+private const val REWIND_LOOP_FROM_MS = 300
+private const val REWIND_TAIL_FROM_MS = 2_250
+private const val REWIND_JOIN_MS = 40
+/** A 10-minute side rewinds in about 1.7 s, a half-hour one in 3 s, an hour or more in 4.5 s. */
+private const val REWIND_BASE_MS = 1_000L
+private const val REWIND_MS_PER_SIDE_SECOND = 1.1
+private const val REWIND_MIN_MS = 1_500L
+private const val REWIND_MAX_MS = 4_500L
+
 /** The keys in the change recording: the one pressed last ("play"), and the sharp one early on. */
 private const val PLAY_KEY_FROM_MS = 1_852
 private const val PLAY_KEY_TO_MS = 2_000
@@ -42,6 +52,42 @@ fun cassetteChangeSound(): ShortArray = readSound("/sounds/cassette_change.wav")
 
 /** The tape running back at speed: the rewind taken out of that same recording, same format. */
 fun cassetteRewindSound(): ShortArray = readSound("/sounds/cassette_rewind.wav")
+
+/**
+ * How long running the tape back takes after a side of [sideLengthMs]: a short side a moment, a
+ * long one a few seconds. The recording itself is [CASSETTE_REWIND_MS].
+ */
+fun cassetteRewindMs(sideLengthMs: Long): Long =
+    (REWIND_BASE_MS + (sideLengthMs / 1000 * REWIND_MS_PER_SIDE_SECOND).toLong()).coerceIn(REWIND_MIN_MS, REWIND_MAX_MS)
+
+/**
+ * The rewind made [ms] long: the steady whir cut short or run on (looped, the joins blended), then
+ * the slowing down and the stop as recorded.
+ */
+fun cassetteRewindSound(ms: Long): ShortArray {
+    val rewind = cassetteRewindSound()
+    val tail = rewind.slice(REWIND_TAIL_FROM_MS, Int.MAX_VALUE / 1000)
+    // The whir runs on under the first moments of the tail, where the two are blended.
+    val bodyMs = (ms - cassetteSoundMs(tail)).coerceAtLeast(REWIND_JOIN_MS * 2L).toInt() + REWIND_JOIN_MS
+    var body = rewind.slice(0, minOf(bodyMs, REWIND_TAIL_FROM_MS))
+    val loop = rewind.slice(REWIND_LOOP_FROM_MS, REWIND_TAIL_FROM_MS)
+    while (cassetteSoundMs(body) < bodyMs) body = joined(body, loop, REWIND_JOIN_MS)
+    return joined(body.copyOf(minOf(body.size, frameAt(bodyMs).toInt())), tail, REWIND_JOIN_MS)
+}
+
+/** [a] then [b], the last [fadeMs] of one blended into the first of the other. */
+private fun joined(a: ShortArray, b: ShortArray, fadeMs: Int): ShortArray {
+    val overlap = minOf(frameAt(fadeMs).toInt(), a.size, b.size) / CHANNELS * CHANNELS
+    val out = ShortArray(a.size + b.size - overlap)
+    a.copyInto(out)
+    val start = a.size - overlap
+    for (i in 0 until overlap) {
+        val t = (i / CHANNELS).toFloat() / (overlap / CHANNELS)
+        out[start + i] = (a[start + i] * (1 - t) + b[i] * t).toInt().toShort()
+    }
+    b.copyInto(out, a.size, overlap)
+    return out
+}
 
 /** A short spin of the tape to the next or previous track: a piece of the rewind, ending in its stop. */
 fun cassetteWindSound(): ShortArray {

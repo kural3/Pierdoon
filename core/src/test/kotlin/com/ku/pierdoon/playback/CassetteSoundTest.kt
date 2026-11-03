@@ -53,6 +53,28 @@ class CassetteSoundTest {
     }
 
     @Test
+    fun aLongerSideTakesLongerToRewind() {
+        assertEquals(1_500L, cassetteRewindMs(2 * 60_000L))
+        assertEquals(1_660L, cassetteRewindMs(10 * 60_000L))
+        assertEquals(2_980L, cassetteRewindMs(30 * 60_000L))
+        assertEquals(4_500L, cassetteRewindMs(3 * 3_600_000L))
+    }
+
+    @Test
+    fun theRewindIsMadeAsLongAsAskedAndStillEndsInItsStop() {
+        val stop = cassetteRewindSound().takeLast(2 * rate / 10)
+        for (ms in listOf(1_500L, 2_650L, 3_000L, 4_500L)) {
+            val rewind = cassetteRewindSound(ms)
+            assertEquals("$ms", ms.toDouble(), cassetteSoundMs(rewind).toDouble(), 5.0)
+            // The last tenth of a second is the recorded stop, untouched.
+            assertEquals("$ms", stop, rewind.takeLast(2 * rate / 10))
+            // Joins blended: no sample jumps more than the recording itself does.
+            val jump = rewind.toList().windowed(3, 2).maxOf { abs(it[2] - it[0]) }
+            assertTrue("$ms: jump $jump", jump < 30_000)
+        }
+    }
+
+    @Test
     fun keyPressesVaryButStayTheSameKey() {
         val base = cassetteKeySound(play = true)
         val keys = SoundVariety(base, pitchSpread = 0.04f, gainSpreadDb = 1.5f, random = kotlin.random.Random(7))
