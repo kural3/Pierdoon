@@ -4,6 +4,8 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.border
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -153,3 +155,8 @@ fun MenuGlass(
 
 /** How much of a menu's own colour lies over the blur: enough to read, little enough to see through. */
 private const val MENU_GLASS_ALPHA = 0.6f
+
+/** The faint edge the player bar has; cards wear it too, so they read as one family. */
+@Composable
+fun Modifier.hairline(shape: Shape): Modifier =
+    border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), shape)

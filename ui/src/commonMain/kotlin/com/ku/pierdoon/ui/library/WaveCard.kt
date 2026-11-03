@@ -1,6 +1,7 @@
 package com.ku.pierdoon.ui.library
 
 import androidx.compose.foundation.background
+import com.ku.pierdoon.ui.components.hairline
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -38,7 +39,7 @@ import com.ku.pierdoon.ui.resources.radio_my_wave
 import com.ku.pierdoon.ui.resources.radio_my_wave_desc
 import org.jetbrains.compose.resources.stringResource
 
-/** "My wave" on the home screen of both apps: the radio from what's played most and loved, with new music like it. */
+/** "Radio" on the home screen of both apps: the radio from what's played most and loved, with new music like it. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun WaveCard(onStart: () -> Unit, modifier: Modifier = Modifier) {
@@ -53,6 +54,7 @@ fun WaveCard(onStart: () -> Unit, modifier: Modifier = Modifier) {
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(colors.tertiaryContainer)
+            .hairline(RoundedCornerShape(28.dp))
             .cornerDecor(MaterialShapes.SoftBurst.toShape(), colors.onTertiaryContainer.copy(alpha = 0.08f), size = 150.dp)
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)

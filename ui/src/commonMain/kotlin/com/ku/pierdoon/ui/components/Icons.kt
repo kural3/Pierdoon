@@ -176,6 +176,20 @@ object PlayerIcons {
         )
     }
     val ChevronRight by lazy { icon("ChevronRight", "M10,6L8.59,7.41 13.17,12l-4.58,4.59L10,18l6,-6z") }
+    /** The app's mark: the note-shaped P from its icon (desktop/icons/Icon.java), in 24 units. */
+    val Logo by lazy {
+        icon(
+            "Logo",
+            "M10.92,1.92H13.32V18H10.92Z" +
+                "M10.92,1.92H13.56V4.32H10.92Z" +
+                "M10.92,10.08H13.56V12.48H10.92Z" +
+                "M13.56,1.92A5.28,5.28 0 0 1 13.56,12.48V10.08A2.88,2.88 0 0 0 13.56,4.32Z" +
+                "M5.16,18A4.08,4.08 0 1 1 13.32,18A4.08,4.08 0 1 1 5.16,18Z"
+        )
+    }
+    val Info by lazy {
+        icon("Info", "M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-6h2v6zM13,9h-2V7h2v2z")
+    }
     val More by lazy {
         icon(
             "More",

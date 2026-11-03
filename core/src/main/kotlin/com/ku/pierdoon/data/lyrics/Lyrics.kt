@@ -27,11 +27,14 @@ sealed interface Lyrics {
     }
 
     @Immutable
-    data class Plain(val lines: List<String>) : Lyrics
+    data class Plain(val lines: List<String>, val source: LyricsSource = LyricsSource.Lrclib) : Lyrics
 
     data object Instrumental : Lyrics
     data object NotFound : Lyrics
 }
+
+/** Where plain lyrics came from; synced ones are always LRCLIB's. */
+enum class LyricsSource { Lrclib, Genius }
 
 /** A search result to pick by hand when the automatic match found nothing, or the wrong thing. */
 @Immutable

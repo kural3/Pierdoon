@@ -73,7 +73,7 @@ enum class SectionGroup(val title: StringResource) {
 enum class SettingsSection(val group: SectionGroup) {
     Library(SectionGroup.Music), Lyrics(SectionGroup.Music), Downloads(SectionGroup.Music),
     Playback(SectionGroup.Sound), Equalizer(SectionGroup.Sound),
-    Appearance(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App),
+    Appearance(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App), About(SectionGroup.App),
 }
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
@@ -138,6 +138,7 @@ fun SettingsScreen(
                 SettingsSection.Downloads -> downloads(settings, onUpdate)
                 SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
                 SettingsSection.Beta -> beta(settings, onUpdate)
+                SettingsSection.About -> item(key = "about") { AboutContent(version) }
             }
         }
     }
@@ -152,6 +153,7 @@ private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Downloads -> Res.string.settings_downloads
     SettingsSection.Updates -> Res.string.settings_updates
     SettingsSection.Beta -> Res.string.settings_beta
+    SettingsSection.About -> Res.string.settings_about
 }
 
 private fun SettingsSection.icon(): ImageVector = when (this) {
@@ -163,6 +165,7 @@ private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Downloads -> PlayerIcons.Download
     SettingsSection.Updates -> PlayerIcons.Refresh
     SettingsSection.Beta -> PlayerIcons.Science
+    SettingsSection.About -> PlayerIcons.Info
 }
 
 private fun LazyListScope.sectionList(
@@ -179,6 +182,7 @@ private fun LazyListScope.sectionList(
             version = stringResource(Res.string.settings_version, version),
             status = updateStatus,
             onStatusClick = { onOpen(SettingsSection.Updates) },
+            onLogoClick = { onOpen(SettingsSection.About) },
         )
     }
     for (group in SectionGroup.entries) item(key = "sections_${group.name}") {
@@ -215,7 +219,6 @@ private fun LazyListScope.sectionList(
             )
         }
     }
-    item(key = "about") { About(version) }
 }
 
 /** What's inside a section, or how it's set, under its name on the list. */
@@ -232,25 +235,7 @@ private fun sectionSummary(s: SettingsSection, settings: AppSettings, trackCount
     SettingsSection.Downloads -> downloadsSummary(settings)
     SettingsSection.Updates -> updateStatus
     SettingsSection.Beta -> stringResource(Res.string.settings_beta_summary)
-}
-
-@Composable
-private fun About(version: String) {
-    Group(stringResource(Res.string.settings_about)) {
-        listOf<@Composable (Shape) -> Unit>(
-            { shape ->
-                ItemContainer(shape) {
-                    Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                        Text(
-                            stringResource(Res.string.settings_lyrics_source),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            },
-        )
-    }
+    SettingsSection.About -> stringResource(Res.string.about_tagline)
 }
 
 private fun LazyListScope.beta(settings: AppSettings, onUpdate: Update) {

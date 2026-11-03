@@ -29,7 +29,7 @@ import org.jetbrains.compose.resources.stringResource
 /** What a player shows of the radio: what it plays from, whether this track is a new one, and its buttons. */
 @Immutable
 data class PlayerRadio(
-    /** A track's or an artist's name; empty for "my wave". */
+    /** A track's or an artist's name; empty for the radio from the whole library. */
     val seed: String,
     val fresh: Boolean,
     val offline: Boolean,

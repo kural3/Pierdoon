@@ -192,6 +192,18 @@ object ArtworkCache {
 
     private val seeds = HashMap<String, Int?>()
 
+    /** The cover's own colours, for the Delicious mode's light; null without art. Cached per album. */
+    suspend fun coverPalette(songId: Long, albumId: Long): List<Int>? {
+        val source = source(songId, albumId)
+        synchronized(palettes) { if (source in palettes) return palettes[source] }
+        val small = smallImage(songId, albumId)
+        val palette = small?.let { withContext(io) { SchemeGenerator.paletteFromPixels(Images.pixels(it)) } }
+        synchronized(palettes) { palettes[source] = palette }
+        return palette
+    }
+
+    private val palettes = HashMap<String, List<Int>?>()
+
     /** Separable box blur, in place. Three passes approximate a gaussian. */
     private fun boxBlur(px: IntArray, w: Int, h: Int, radius: Int) {
         val tmp = IntArray(px.size)

@@ -67,6 +67,7 @@ import com.ku.pierdoon.ui.PlatformStrings
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.data.lyrics.Lyrics
+import com.ku.pierdoon.data.lyrics.LyricsSource
 import com.ku.pierdoon.data.lyrics.LyricsOffsets
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.PlayerIcons
@@ -110,6 +111,20 @@ fun LyricsPanel(
     modifier: Modifier = Modifier,
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val search = LocalLyricsSearch.current
+    var editing by remember { mutableStateOf(false) }
+    val ready = state as? LyricsState.Ready
+    val onEdit: (() -> Unit)? = if (search?.saveOwn != null) ({ editing = true }) else null
+    if (editing && search != null) {
+        LyricsEditorDialog(
+            search = search,
+            current = ready?.lyrics,
+            own = ready?.own == true,
+            position = position,
+            onSeek = onSeek,
+            onDismiss = { editing = false },
+        )
+    }
     AnimatedContent(
         targetState = state,
         contentKey = { it::class },
@@ -122,13 +137,16 @@ fun LyricsPanel(
             LyricsState.Error -> Centered {
                 Message(stringResource(Res.string.lyrics_error))
                 Spacer(Modifier.height(16.dp))
-                FilledTonalButton(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
+                    if (onEdit != null) TextButton(onClick = onEdit) { Text(stringResource(Res.string.lyrics_write)) }
+                }
             }
             is LyricsState.Ready -> when (val l = s.lyrics) {
-                is Lyrics.Synced -> SyncedLyrics(l, position, onSeek, offsetMs, onShift, onResetOffset)
-                is Lyrics.Plain -> PlainLyrics(l)
-                Lyrics.Instrumental -> Centered { Message(stringResource(Res.string.lyrics_instrumental)); SearchButton() }
-                Lyrics.NotFound -> Centered { Message(stringResource(Res.string.lyrics_not_found)); SearchButton() }
+                is Lyrics.Synced -> SyncedLyrics(l, position, onSeek, offsetMs, onShift, onResetOffset, s.own, onEdit)
+                is Lyrics.Plain -> PlainLyrics(l, s.own, onEdit)
+                Lyrics.Instrumental -> Centered { Message(stringResource(Res.string.lyrics_instrumental)); Actions(onEdit) }
+                Lyrics.NotFound -> Centered { Message(stringResource(Res.string.lyrics_not_found)); Actions(onEdit) }
             }
             LyricsState.WifiOnly -> Centered { Message(stringResource(PlatformStrings.lyricsWifiOnly)) }
         }
@@ -143,6 +161,8 @@ private fun SyncedLyrics(
     offsetMs: Long,
     onShift: (Long) -> Unit,
     onResetOffset: () -> Unit,
+    own: Boolean,
+    onEdit: (() -> Unit)?,
 ) {
     val haptics = LocalHapticFeedback.current
     val listState = rememberLazyListState()
@@ -220,7 +240,7 @@ private fun SyncedLyrics(
                     },
                 )
             }
-            item(key = "source") { SourceLabel() }
+            item(key = "source") { SourceLabel(own, onEdit) }
         }
         // Off by default (Settings). When on, it stays in immersive mode too: that's when a drift
         // is noticed. In the top corner, over the lines already sung.
@@ -318,7 +338,7 @@ private fun LyricLineItem(text: String, active: Boolean, past: Boolean, onClick:
 }
 
 @Composable
-private fun PlainLyrics(lyrics: Lyrics.Plain) {
+private fun PlainLyrics(lyrics: Lyrics.Plain, own: Boolean, onEdit: (() -> Unit)?) {
     val listState: LazyListState = rememberLazyListState()
     LazyColumn(
         state = listState,
@@ -333,18 +353,24 @@ private fun PlainLyrics(lyrics: Lyrics.Plain) {
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
-        item(key = "source") { SourceLabel() }
+        item(key = "source") { SourceLabel(own, onEdit, genius = lyrics.source == LyricsSource.Genius) }
     }
 }
 
 @Composable
-private fun SourceLabel() {
+private fun SourceLabel(own: Boolean, onEdit: (() -> Unit)?, genius: Boolean = false) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(start = 8.dp, top = 16.dp, bottom = 16.dp),
     ) {
         Text(
-            text = stringResource(Res.string.lyrics_source),
+            text = stringResource(
+                when {
+                    own -> Res.string.lyrics_own_source
+                    genius -> Res.string.lyrics_source_genius
+                    else -> Res.string.lyrics_source
+                }
+            ),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -353,18 +379,32 @@ private fun SourceLabel() {
             Text(" · ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             SearchButton(text = true)
         }
+        if (onEdit != null) {
+            Text(" · ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = onEdit) { Text(stringResource(Res.string.lyrics_edit)) }
+        }
+    }
+}
+
+/** Under "no lyrics": find them, or write them. */
+@Composable
+private fun Actions(onEdit: (() -> Unit)?) {
+    Spacer(Modifier.height(16.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SearchButton(spaced = false)
+        if (onEdit != null) TextButton(onClick = onEdit) { Text(stringResource(Res.string.lyrics_write)) }
     }
 }
 
 /** Opens the lyrics search; nothing where the app gives none. */
 @Composable
-private fun SearchButton(text: Boolean = false) {
+private fun SearchButton(text: Boolean = false, spaced: Boolean = true) {
     val search = LocalLyricsSearch.current ?: return
     var open by remember { mutableStateOf(false) }
     if (text) {
         TextButton(onClick = { open = true }) { Text(stringResource(Res.string.lyrics_search)) }
     } else {
-        Spacer(Modifier.height(16.dp))
+        if (spaced) Spacer(Modifier.height(16.dp))
         FilledTonalButton(onClick = { open = true }) { Text(stringResource(Res.string.lyrics_search)) }
     }
     if (open) LyricsSearchDialog(search, onDismiss = { open = false })

@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.player
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.runtime.produceState
+import com.ku.pierdoon.ui.components.ArtworkCache
 import com.ku.pierdoon.ui.formatDuration
 import com.ku.pierdoon.ui.components.Artwork
 import androidx.compose.ui.graphics.Shape
@@ -52,7 +55,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -124,8 +137,34 @@ fun DeliciousScreen(
 ) {
     BackHandler(onBack = onClose)
     val scheme = MaterialTheme.colorScheme
-    val palette = remember(scheme.primary, scheme.tertiary, scheme.secondary) {
-        listOf(scheme.primary, scheme.tertiary, scheme.secondary, scheme.primary, scheme.tertiary).map(::vivid)
+    // The cover's own colours, several distinct ones; the theme's only for a track without art.
+    // The previous track's stay up while the next one's are picked, then glide over.
+    val cover by produceState<List<Int>?>(null, nowPlaying.songId, nowPlaying.albumId) {
+        value = ArtworkCache.coverPalette(nowPlaying.songId, nowPlaying.albumId)
+    }
+    val target = remember(cover, scheme.primary, scheme.tertiary, scheme.secondary) {
+        // The cover's colours as they are (already lit enough to glow); only the theme's need a push.
+        val base = cover?.map { Color(it) } ?: listOf(scheme.primary, scheme.tertiary, scheme.secondary).map(::vivid)
+        List(PALETTE_SIZE) { base[it % base.size] }
+    }
+    // The cover itself, blurred to colour: the light is the picture's own, not a guess at it.
+    // A new track's fades in over the last one's.
+    val art by produceState<ImageBitmap?>(null, nowPlaying.songId, nowPlaying.albumId) {
+        value = ArtworkCache.loadBlurred(nowPlaying.songId, nowPlaying.albumId)
+    }
+    var shownArt by remember { mutableStateOf<ImageBitmap?>(null) }
+    var previousArt by remember { mutableStateOf<ImageBitmap?>(null) }
+    val artFade = remember { Animatable(1f) }
+    LaunchedEffect(art) {
+        if (art === shownArt) return@LaunchedEffect
+        previousArt = shownArt
+        shownArt = art
+        artFade.snapTo(0f)
+        artFade.animateTo(1f, tween(PALETTE_FADE_MS))
+        previousArt = null
+    }
+    val palette = List(PALETTE_SIZE) { i ->
+        animateColorAsState(target[i], tween(PALETTE_FADE_MS), label = "deliciousColor$i").value
     }
     val style = SettingsStore.settings.collectAsState().value.deliciousStyle
     val currentStyle by rememberUpdatedState(style)
@@ -165,9 +204,16 @@ fun DeliciousScreen(
                 }
             },
     ) {
+        if (shownArt != null || previousArt != null) {
+            Canvas(Modifier.fillMaxSize().blur(COVER_BLUR, BlurredEdgeTreatment.Rectangle)) {
+                frame // redraw every frame
+                previousArt?.let { drawCover(it, 1f, motion) }
+                shownArt?.let { drawCover(it, if (previousArt != null) artFade.value else 1f, motion) }
+            }
+        }
         Canvas(Modifier.fillMaxSize()) {
             frame // redraw every frame
-            drawBackdrop(motion, palette, style)
+            drawBackdrop(motion, palette, style, onCover = shownArt != null)
         }
 
         CenterText(nowPlaying, lyrics, lyricsOffsetMs, position, motion) { frame }
@@ -348,16 +394,18 @@ private class Motion {
     }
 }
 
-private fun DrawScope.drawBackdrop(m: Motion, palette: List<Color>, style: DeliciousStyle) {
-    drawRect(lerp(Color.Black, palette[0], 0.08f))
+private fun DrawScope.drawBackdrop(m: Motion, palette: List<Color>, style: DeliciousStyle, onCover: Boolean) {
+    // Over the cover the clouds only add movement; without one they are the whole light.
+    val aura = if (onCover) 0.3f else 1f
+    if (onCover) drawRect(Color.Black.copy(alpha = COVER_SHADE)) else drawRect(lerp(Color.Black, palette[0], 0.08f))
     when (style) {
-        DeliciousStyle.Aura, DeliciousStyle.Calm -> drawAura(m, palette, strength = 1f)
+        DeliciousStyle.Aura, DeliciousStyle.Calm -> drawAura(m, palette, strength = aura)
         DeliciousStyle.Waves -> {
-            drawAura(m, palette, strength = 0.45f)
+            drawAura(m, palette, strength = 0.45f * aura)
             drawWaves(m, palette)
         }
         DeliciousStyle.Dust -> {
-            drawAura(m, palette, strength = 0.4f)
+            drawAura(m, palette, strength = 0.4f * aura)
             drawDust(m, palette)
         }
     }
@@ -385,6 +433,38 @@ private fun DrawScope.drawBackdrop(m: Motion, palette: List<Color>, style: Delic
             radius = max(w, h) * 0.75f,
         )
     )
+}
+
+/**
+ * The blurred cover in three layers turning slowly against each other, a little larger on the
+ * bass: its colours drift and mix the way they sit in the picture.
+ */
+private fun DrawScope.drawCover(img: ImageBitmap, alpha: Float, m: Motion) {
+    val w = size.width
+    val h = size.height
+    val side = max(w, h)
+    val t = m.time
+    val breathe = 1f + 0.06f * m.bass + 0.03f * m.kick
+    fun layer(scale: Float, degrees: Double, dx: Double, dy: Double, a: Float) {
+        val s = side * scale * breathe
+        val cx = w / 2 + dx.toFloat()
+        val cy = h / 2 + dy.toFloat()
+        rotate((degrees % 360.0).toFloat(), pivot = Offset(cx, cy)) {
+            drawImage(
+                img,
+                srcOffset = IntOffset.Zero,
+                srcSize = IntSize(img.width, img.height),
+                dstOffset = IntOffset((cx - s / 2).toInt(), (cy - s / 2).toInt()),
+                dstSize = IntSize(s.toInt(), s.toInt()),
+                alpha = a * alpha,
+                filterQuality = FilterQuality.Low,
+                colorFilter = CoverSaturation,
+            )
+        }
+    }
+    layer(1.55f, t * 4.0, w * 0.08 * sin(t * 0.13), h * 0.06 * cos(t * 0.11), 1f)
+    layer(1.1f, -t * 6.0 + 90.0, -w * 0.14 * sin(t * 0.17 + 1.0), h * 0.1 * sin(t * 0.09), 0.6f)
+    layer(0.75f, t * 8.0 + 200.0, w * 0.2 * cos(t * 0.15), -h * 0.15 * sin(t * 0.12 + 2.0), 0.4f)
 }
 
 /**
@@ -685,6 +765,13 @@ private fun vivid(c: Color): Color {
 }
 
 private const val CHROME_HIDE_MS = 2_500L
+private const val PALETTE_SIZE = 5
+private const val PALETTE_FADE_MS = 1_200
+private val COVER_BLUR = 64.dp
+/** Blurring greys a picture's colours; this gives them back. */
+private val CoverSaturation = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.6f) })
+/** How much the cover is dimmed, so it glows rather than shouts and the words stay readable. */
+private const val COVER_SHADE = 0.3f
 /** Lines change slightly ahead of the beat, which reads as "in sync" to the ear. */
 private const val LEAD_MS = 150L
 private const val KICK_RISE_S = 0.12

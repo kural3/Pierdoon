@@ -32,7 +32,7 @@ What changed in each version is in its release notes.
 - Plays your music: tracks, albums, artists, playlists, favorites, search, sorting, selecting many tracks at once to queue, add to a playlist or delete. A track tagged "A, B" or "A feat. B" counts for each artist
 - A playlist of the day on the home screen: favourites, more of the artists you play most and some you haven't heard yet, new every day
 - Listening stats for the week, month, year or all time: time listened, top artists and tracks, a bar per day or month
-- Synced lyrics from [LRCLIB](https://lrclib.net), with a per-track sync offset. When none are found, or the wrong ones, search LRCLIB by hand and pick
+- Synced lyrics from [LRCLIB](https://lrclib.net), and plain ones from [Genius](https://genius.com) when LRCLIB has none, with a per-track sync offset. When none are found, or the wrong ones, search both by hand and pick, or write your own: a text editor with `[mm:ss]` stamps, and a sync view that stamps each line as the song plays
 - Playback speed from 0.8× to 1.25×, pitch going along (slowed, nightcore)
 - Radio (beta): an endless stream of your own music mixed with new tracks like it, downloaded ahead as it plays. "Not this" skips a track and remembers it; how much is new is up to you
 - Downloads by link or by search from YouTube, SoundCloud, Bandcamp and the other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports, with title, artist and cover; whole playlists and albums too
@@ -42,9 +42,10 @@ What changed in each version is in its release notes.
 - Crossfade of up to 12 seconds between tracks, with albums left gapless unless asked otherwise
 - Cassette mode (in Settings → Beta): tape hiss and wobble, a cassette with turning reels in place of the cover, the queue split into sides A and B. The deck's keys click on play and pause (from anywhere: the app, the notification, headphones, media keys), next and previous spin the tape to the track (paused too), the cassette is turned over after side A or when next and previous cross the middle, and rewound after side B when the queue repeats, for longer the longer the side
 - Playlists in and out as `.m3u` / `.m3u8`, finding tracks by path, then by name and tags
+- An "About" page with the icon as a coin to spin in your fingers
 - English and Russian interface: the system's language by default, or chosen in Settings → Appearance
 - Material 3 Expressive throughout: expressive shapes, a player whose toggles sit together in one capsule, frosted glass in menus and sheets
-- Expanding player, album art / wallpaper or Windows accent / custom color themes, a Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts, your own TTF or OTF file among them
+- Expanding player, album art / wallpaper or Windows accent / custom color themes (any hue and strength, from graphite to neon), a Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts, your own TTF or OTF file among them
 - The phone works as a remote for the computer over Wi-Fi: the computer's playback in the phone's own player, its queue, lyrics and library, and downloads sent to it
 - Copies tracks between the phone and the computer over Wi-Fi, byte for byte: "Send to computer" on the phone's tracks and playlists, "Save to phone" on the computer's. Tracks that look like ones already there (same title, artist and length) are pointed out first
 
@@ -63,7 +64,7 @@ What changed in each version is in its release notes.
 - Any format FFmpeg reads (MP3, M4A/AAC, FLAC, Opus, Ogg, WAV, WMA, APE, WavPack…), gapless between tracks, output device choice, skip silence
 - Media keys and the Windows media overlay, tray icon (closing the window keeps the music playing), one instance at a time
 - Discord status ("Listening to Pier.doon"), switched on in Settings → System
-- Delicious mode: the lyrics line by line, lit as they are sung, over soft visuals in the cover's colours that move with the music, in four styles, with a dock for the playback controls
+- Delicious mode: the lyrics line by line, lit as they are sung, over the cover itself, blurred and slowly turning with the music, in four styles, with a dock for the playback controls
 - Desktop layout: resizable navigation on the left, a player bar along the bottom that unfolds into a two-column full player, lyrics or queue in a frosted panel over the screen, right-click menus. Settings, downloads, the tag editor and the phone page spread into two columns on a wide window, and rows of covers scroll by dragging or by the arrows at their ends. Drop a link on the window to download it
 
 ## Downloading tracks

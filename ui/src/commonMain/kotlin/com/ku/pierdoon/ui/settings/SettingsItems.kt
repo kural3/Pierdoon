@@ -30,6 +30,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import com.ku.pierdoon.ui.theme.SchemeGenerator
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +75,8 @@ import com.ku.pierdoon.ui.resources.colors_wallpaper
 import com.ku.pierdoon.ui.resources.settings_colors_album_desc
 import com.ku.pierdoon.ui.resources.settings_colors_custom_desc
 import com.ku.pierdoon.ui.resources.settings_colors_fallback
+import com.ku.pierdoon.ui.resources.settings_colors_hue
+import com.ku.pierdoon.ui.resources.settings_colors_chroma
 import com.ku.pierdoon.ui.resources.settings_colors_pick
 import com.ku.pierdoon.ui.resources.crossfade_off
 import com.ku.pierdoon.ui.resources.crossfade_seconds
@@ -172,7 +176,15 @@ fun sectionIconShape(index: Int): Shape = SectionShapes[index % SectionShapes.si
  * stand; tapping the chip opens the updates page.
  */
 @Composable
-fun SettingsHero(name: String, version: String, status: String, onStatusClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SettingsHero(
+    name: String,
+    version: String,
+    status: String,
+    onStatusClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** The logo opens "About". */
+    onLogoClick: (() -> Unit)? = null,
+) {
     val colors = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
     Row(
@@ -187,9 +199,19 @@ fun SettingsHero(name: String, version: String, status: String, onStatusClick: (
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(76.dp).clip(MaterialShapes.Cookie12Sided.toShape()).background(colors.primary),
+            modifier = Modifier
+                .size(76.dp)
+                .clip(MaterialShapes.Cookie12Sided.toShape())
+                .background(colors.primary)
+                .then(
+                    if (onLogoClick == null) Modifier
+                    else Modifier.clickable {
+                        haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                        onLogoClick()
+                    },
+                ),
         ) {
-            Icon(PlayerIcons.MusicNote, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(36.dp))
+            Icon(PlayerIcons.Logo, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(40.dp))
         }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
@@ -516,6 +538,9 @@ fun ColorsItem(
     wallpaperDescription: String,
 ) {
     val shown = source.takeIf { it in sources } ?: ColorSource.Custom
+    // The strength the user asked for; the seed may hold less where the screen can't show more
+    // of that hue, and keeps it for hues that can.
+    var chroma by remember { mutableFloatStateOf(wantedChroma(seed)) }
     ItemContainer(shape) {
         Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
             Text(
@@ -553,14 +578,38 @@ fun ColorsItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
-                SwatchRow(selected = seed, onSelect = onSeed)
-                Spacer(Modifier.height(12.dp))
-                HuePicker(seed = seed, onSeed = onSeed)
+                SwatchRow(selected = seed, onSelect = { s -> chroma = wantedChroma(s); onSeed(s) })
+                Spacer(Modifier.height(16.dp))
+                SliderLabel(stringResource(Res.string.settings_colors_hue))
+                HuePicker(seed = seed, chroma = chroma, onSeed = onSeed)
+                Spacer(Modifier.height(4.dp))
+                SliderLabel(stringResource(Res.string.settings_colors_chroma))
+                ChromaPicker(
+                    seed = seed,
+                    chroma = chroma,
+                    onChroma = { c ->
+                        chroma = c
+                        onSeed(SchemeGenerator.seed(SchemeGenerator.hueOf(seed), c))
+                    },
+                )
             }
             Spacer(Modifier.height(16.dp))
             PalettePreview()
         }
     }
+}
+
+private fun wantedChroma(seed: Int): Float =
+    if (seed == SchemeGenerator.MONOCHROME_SEED) 60f
+    else SchemeGenerator.chromaOf(seed).coerceAtLeast(SchemeGenerator.MIN_CHROMA)
+
+@Composable
+private fun SliderLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** "Speed 1× · crossfade 5 s", under Playback on the list of sections. */

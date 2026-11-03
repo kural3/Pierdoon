@@ -1,6 +1,7 @@
 package com.ku.pierdoon.ui.library
 
 import com.ku.pierdoon.ui.components.ScrollableRow
+import com.ku.pierdoon.ui.components.hairline
 import com.ku.pierdoon.ui.library.TWO_PANE_WIDTH
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -81,7 +82,7 @@ fun HomeScreen(
     onOpen: (Route) -> Unit,
     onSongLongPress: (Song) -> Unit,
     bottomInset: Dp,
-    /** Starts "my wave"; null with the radio switched off. */
+    /** Starts the radio; null with the radio switched off. */
     onMyWave: (() -> Unit)? = null,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -263,6 +264,7 @@ private fun QuickCard(
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(container)
+            .hairline(RoundedCornerShape(28.dp))
             .cornerDecor(shape, content.copy(alpha = 0.08f))
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
@@ -427,6 +429,7 @@ private fun DailyMixCard(songs: List<Song>, onOpen: () -> Unit, onPlay: () -> Un
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(colors.secondaryContainer)
+            .hairline(RoundedCornerShape(28.dp))
             .cornerDecor(MaterialShapes.Clover8Leaf.toShape(), colors.onSecondaryContainer.copy(alpha = 0.07f), size = 150.dp)
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
@@ -503,6 +506,7 @@ private fun StatsCard(weekListenedMs: Long, onClick: () -> Unit, modifier: Modif
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(colors.surfaceContainerHigh)
+            .hairline(RoundedCornerShape(28.dp))
             .cornerDecor(MaterialShapes.Cookie6Sided.toShape(), colors.onSurface.copy(alpha = 0.05f), size = 110.dp)
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)

@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsCandidate
+import com.ku.pierdoon.data.lyrics.LyricsSource
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.ui.components.PlayerIcons
@@ -51,11 +52,22 @@ import com.ku.pierdoon.ui.formatDuration
 import kotlinx.coroutines.CancellationException
 import org.jetbrains.compose.resources.stringResource
 
-/** Picking lyrics by hand, for the track playing; the app provides it to every lyrics view. */
+/**
+ * Picking lyrics by hand, or writing them, for the track playing; the app provides it to every
+ * lyrics view. Without [saveOwn] there is no editor.
+ */
 class LyricsSearch(
     val initialText: () -> String,
     val search: suspend (String) -> List<LyricsCandidate>,
     val pick: (Lyrics) -> Unit,
+    /** The track playing, whose lyrics an editor opened now would change. */
+    val songId: () -> Long? = { null },
+    /** The user's own lyrics for a track, as written; null if none. */
+    val ownText: suspend (Long) -> String? = { null },
+    /** Keeps the editor's text as a track's lyrics; blank text drops them. */
+    val saveOwn: ((Long, String) -> Unit)? = null,
+    val removeOwn: (Long) -> Unit = {},
+    val togglePlay: () -> Unit = {},
 )
 
 val LocalLyricsSearch = staticCompositionLocalOf<LyricsSearch?> { null }
@@ -164,8 +176,13 @@ private fun CandidateRow(c: LyricsCandidate, onClick: () -> Unit) {
             )
             Spacer(Modifier.width(8.dp))
             val synced = c.lyrics is Lyrics.Synced
+            val genius = (c.lyrics as? Lyrics.Plain)?.source == LyricsSource.Genius
             Text(
-                stringResource(if (synced) Res.string.lyrics_synced else Res.string.lyrics_plain),
+                when {
+                    synced -> stringResource(Res.string.lyrics_synced)
+                    genius -> "Genius"
+                    else -> stringResource(Res.string.lyrics_plain)
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = if (synced) colors.onPrimaryContainer else colors.onSurfaceVariant,
                 modifier = Modifier

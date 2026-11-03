@@ -3,6 +3,7 @@ package com.ku.pierdoon.ui
 import androidx.compose.ui.draw.shadow
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInHorizontally
+import com.ku.pierdoon.ui.components.hairline
 import com.ku.pierdoon.ui.components.LocalBackdrop
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedContent
@@ -197,7 +198,17 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val queue by vm.queue.collectAsState()
     val update by vm.update.collectAsState()
     val updatePrompt by vm.updatePrompt.collectAsState()
-    val lyricsSearch = remember(vm) { LyricsSearch(vm::lyricsSearchText, vm::searchLyrics, vm::pickLyrics) }
+    val lyricsSearch = remember(vm) { LyricsSearch(
+            initialText = vm::lyricsSearchText,
+            search = vm::searchLyrics,
+            pick = vm::pickLyrics,
+            songId = vm::currentSongId,
+            ownText = vm::ownLyrics,
+            saveOwn = vm::saveOwnLyrics,
+            removeOwn = vm::removeOwnLyrics,
+            togglePlay = vm::togglePlay,
+        )
+    }
     val settings by SettingsStore.settings.collectAsState()
     val nowPlaying = rememberLastNonNull(player.nowPlaying)
     val backdrop = rememberBackdrop()
@@ -635,6 +646,7 @@ private fun SidePanelContent(
                 fallback = colors.surfaceContainerLow,
                 blurRadius = 40.dp,
             )
+            .hairline(shape)
             .padding(top = 16.dp, start = 12.dp, end = 12.dp),
     ) {
         Text(
@@ -985,7 +997,7 @@ private fun NavRail(nav: Navigator, width: Float, onResize: (Float) -> Unit, bot
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(14.dp)).background(colors.primaryContainer),
                 ) {
-                    Icon(PlayerIcons.MusicNote, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                    Icon(PlayerIcons.Logo, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(26.dp))
                 }
                 if (!compact) {
                     Spacer(Modifier.width(12.dp))

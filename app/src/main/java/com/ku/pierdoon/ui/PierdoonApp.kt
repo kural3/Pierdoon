@@ -210,7 +210,17 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     val queue by vm.queue.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
     val updatePrompt by vm.updatePrompt.collectAsStateWithLifecycle()
-    val lyricsSearch = remember(vm) { LyricsSearch(vm::lyricsSearchText, vm::searchLyrics, vm::pickLyrics) }
+    val lyricsSearch = remember(vm) { LyricsSearch(
+            initialText = vm::lyricsSearchText,
+            search = vm::searchLyrics,
+            pick = vm::pickLyrics,
+            songId = vm::currentSongId,
+            ownText = vm::ownLyrics,
+            saveOwn = vm::saveOwnLyrics,
+            removeOwn = vm::removeOwnLyrics,
+            togglePlay = vm::togglePlay,
+        )
+    }
     val nowPlaying = rememberLastNonNull(player.nowPlaying)
     val backdrop = rememberBackdrop()
     val nav = rememberNavigator()

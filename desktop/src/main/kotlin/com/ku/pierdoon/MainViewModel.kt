@@ -119,7 +119,7 @@ class MainViewModel {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PositionSnapshot())
 
-    private val lyricsRepository = LyricsRepository(AppDirs.cache, USER_AGENT)
+    private val lyricsRepository = LyricsRepository(AppDirs.cache, USER_AGENT, AppDirs.files)
     private val lyricsVisible = MutableStateFlow(false)
     private val lyricsRetry = MutableStateFlow(0)
     private var songsById: Map<Long, Song> = emptyMap()
@@ -134,7 +134,7 @@ class MainViewModel {
         .flatMapLatest { np ->
             if (np == null) return@flatMapLatest flowOf<LyricsState>(LyricsState.Idle)
             flow<LyricsState> {
-                lyricsRepository.peek(np.songId)?.let { emit(LyricsState.Ready(it)); return@flow }
+                lyricsRepository.peek(np.songId)?.let { emit(LyricsState.Ready(it, lyricsRepository.isOwn(np.songId))); return@flow }
                 emit(LyricsState.Loading)
                 val song = songsById[np.songId]
                 val query = LyricsQuery(
@@ -146,7 +146,10 @@ class MainViewModel {
                 )
                 emit(
                     try {
-                        LyricsState.Ready(lyricsRepository.get(query, allowNetwork = networkAllowed()))
+                        LyricsState.Ready(
+                            lyricsRepository.get(query, allowNetwork = networkAllowed()),
+                            lyricsRepository.isOwn(np.songId),
+                        )
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: NetworkNotAllowedException) {
@@ -503,6 +506,25 @@ class MainViewModel {
         val id = _player.value.nowPlaying?.songId ?: return
         viewModelScope.launch {
             lyricsRepository.choose(id, lyrics)
+            lyricsRetry.update { it + 1 }
+        }
+    }
+
+    fun currentSongId(): Long? = _player.value.nowPlaying?.songId
+
+    suspend fun ownLyrics(songId: Long): String? = lyricsRepository.ownText(songId)
+
+    /** Lyrics the user wrote in the editor: they stay over anything found, until removed. */
+    fun saveOwnLyrics(songId: Long, text: String) {
+        viewModelScope.launch {
+            runCatching { lyricsRepository.saveOwn(songId, text) }
+            lyricsRetry.update { it + 1 }
+        }
+    }
+
+    fun removeOwnLyrics(songId: Long) {
+        viewModelScope.launch {
+            lyricsRepository.removeOwn(songId)
             lyricsRetry.update { it + 1 }
         }
     }

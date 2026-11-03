@@ -35,12 +35,19 @@ object SchemeGenerator {
     fun scheme(seed: Int, dark: Boolean): ColorScheme {
         val (_, c, h) = Lab.argbToLch(seed)
         val mono = c < MONO_CHROMA
-        val primary = Palette(h, if (mono) 0.0 else maxOf(c, 48.0))
-        val secondary = Palette(h, if (mono) 0.0 else 16.0)
-        val tertiary = Palette((h + 60.0) % 360.0, if (mono) 0.0 else 28.0)
-        val neutral = Palette(h, if (mono) 0.0 else 4.0)
-        val neutralVariant = Palette(h, if (mono) 0.0 else 9.0)
+        // A muted seed stays muted (slate, sage, sand), short of going grey.
+        val primary = Palette(h, if (mono) 0.0 else maxOf(c, 26.0))
+        // The other palettes follow the seed's strength: a vivid seed gives livelier containers
+        // and surfaces, a muted one quieter. At the hue picker's default chroma (60) these are
+        // the usual Material values.
+        val secondary = Palette(h, if (mono) 0.0 else (c * 0.27).coerceIn(8.0, 32.0))
+        val tertiary = Palette((h + 60.0) % 360.0, if (mono) 0.0 else (c * 0.47).coerceIn(14.0, 52.0))
+        val neutral = Palette(h, if (mono) 0.0 else (c * 0.07).coerceIn(2.0, 8.0))
+        val neutralVariant = Palette(h, if (mono) 0.0 else (c * 0.15).coerceIn(4.0, 15.0))
         val error = Palette(30.0, 80.0)
+        // Dark theme: a strong seed's primary sits a little deeper than tone 80, where the screen
+        // can show more of its colour; it still reads well against its tone-20 text.
+        val darkPrimary = 80 - (((c - 60.0) / 30.0).coerceIn(0.0, 1.0) * 10).roundToInt()
 
         return if (!dark) lightColorScheme(
             primary = primary.tone(40), onPrimary = primary.tone(100),
@@ -63,7 +70,7 @@ object SchemeGenerator {
             surfaceContainer = neutral.tone(94), surfaceContainerHigh = neutral.tone(92),
             surfaceContainerHighest = neutral.tone(90),
         ) else darkColorScheme(
-            primary = primary.tone(80), onPrimary = primary.tone(20),
+            primary = primary.tone(darkPrimary), onPrimary = primary.tone(20),
             primaryContainer = primary.tone(30), onPrimaryContainer = primary.tone(90),
             inversePrimary = primary.tone(40),
             secondary = secondary.tone(80), onSecondary = secondary.tone(20),
@@ -75,7 +82,7 @@ object SchemeGenerator {
             background = neutral.tone(6), onBackground = neutral.tone(90),
             surface = neutral.tone(6), onSurface = neutral.tone(90),
             surfaceVariant = neutralVariant.tone(30), onSurfaceVariant = neutralVariant.tone(80),
-            surfaceTint = primary.tone(80),
+            surfaceTint = primary.tone(darkPrimary),
             inverseSurface = neutral.tone(90), inverseOnSurface = neutral.tone(20),
             outline = neutralVariant.tone(60), outlineVariant = neutralVariant.tone(30),
             surfaceBright = neutral.tone(24), surfaceDim = neutral.tone(6),
@@ -91,6 +98,17 @@ object SchemeGenerator {
     private const val MONO_CHROMA = 4.0
 
     fun hueOf(argb: Int): Float = Lab.argbToLch(argb).third.toFloat()
+
+    fun chromaOf(argb: Int): Float = Lab.argbToLch(argb).second.toFloat()
+
+    /** Seed of that hue and strength; strength beyond what the screen can show is cut down. */
+    fun seed(hue: Float, chroma: Float): Int = Lab.lchToArgb(50.0, chroma.toDouble(), hue.toDouble())
+
+    /** The strongest a seed of this hue can be. */
+    fun maxChroma(hue: Float): Float = chromaOf(seed(hue, 160f))
+
+    /** The quietest a seed may be before the scheme reads it as grey. */
+    const val MIN_CHROMA: Float = 26f
 
     /**
      * Picks a theme seed from a tiny image: chroma-weighted hue histogram, so a small vivid
@@ -117,6 +135,54 @@ object SchemeGenerator {
         if (best < 0 || bestScore < pixels.size * 2.0) return MONOCHROME_SEED
         val hue = best * 10.0 + 5.0
         return Lab.lchToArgb(50.0, 60.0, hue)
+    }
+
+    /**
+     * The picture's own colours, for light drawn from it: up to [count] hues at least ~40° apart,
+     * strongest first, each near the lightness and saturation it has in the picture (lifted
+     * enough to glow on black). Only colours the picture has; greyscale art gives soft whites.
+     */
+    fun paletteFromPixels(pixels: IntArray, count: Int = 4): List<Int> {
+        val weight = DoubleArray(36)
+        val lSum = DoubleArray(36)
+        val cSum = DoubleArray(36)
+        val hx = DoubleArray(36)
+        val hy = DoubleArray(36)
+        for (p in pixels) {
+            if ((p ushr 24) < 128) continue
+            val (l, c, h) = Lab.argbToLch(p)
+            if (l < 12 || l > 97 || c < 10) continue
+            val bin = (h / 10.0).toInt().coerceIn(0, 35)
+            val rad = Math.toRadians(h)
+            weight[bin] += c
+            lSum[bin] += l * c
+            cSum[bin] += c * c
+            hx[bin] += cos(rad) * c
+            hy[bin] += sin(rad) * c
+        }
+        val score = DoubleArray(36) { i -> weight[i] + 0.5 * (weight[(i + 35) % 36] + weight[(i + 1) % 36]) }
+        val taken = BooleanArray(36)
+        val out = ArrayList<Int>()
+        var top = 0.0
+        while (out.size < count) {
+            var best = -1
+            for (i in 0 until 36) if (!taken[i] && (best < 0 || score[i] > score[best])) best = i
+            if (best < 0) break
+            val s = score[best]
+            if (out.isEmpty()) top = s
+            // A colour has to be more than a speck: a share of the strongest, and of the picture.
+            if (s <= 0.0 || s < top * 0.12 || s < pixels.size * 0.6) break
+            var w = 0.0; var l = 0.0; var c = 0.0; var x = 0.0; var y = 0.0
+            for (d in -1..1) {
+                val i = (best + d + 36) % 36
+                w += weight[i]; l += lSum[i]; c += cSum[i]; x += hx[i]; y += hy[i]
+            }
+            val hue = (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
+            out += Lab.lchToArgb((l / w).coerceIn(58.0, 82.0), maxOf(c / w, 42.0), hue)
+            for (d in -3..3) taken[(best + d + 36) % 36] = true
+        }
+        if (out.isEmpty()) return listOf(0xFFF2F2F2.toInt(), 0xFFC9CDD3.toInt(), 0xFFE6E1DA.toInt())
+        return out
     }
 }
 

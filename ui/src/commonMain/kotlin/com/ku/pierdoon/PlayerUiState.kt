@@ -7,7 +7,8 @@ import com.ku.pierdoon.ui.elapsedRealtime
 sealed interface LyricsState {
     data object Idle : LyricsState
     data object Loading : LyricsState
-    data class Ready(val lyrics: Lyrics) : LyricsState
+    /** [own]: the user wrote them in the editor. */
+    data class Ready(val lyrics: Lyrics, val own: Boolean = false) : LyricsState
     data object Error : LyricsState
     data object WifiOnly : LyricsState
 }
