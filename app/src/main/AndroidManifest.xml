@@ -58,6 +58,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <!-- Settings → Downloads → Sign in to YouTube. -->
+        <activity
+            android:name=".YouTubeLoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Pierdoon" />
 
         <service
             android:name=".playback.PlaybackService"

@@ -58,6 +58,7 @@ import com.ku.pierdoon.ui.resources.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.ku.pierdoon.radio.RadioMemory
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -72,7 +73,7 @@ enum class SectionGroup(val title: StringResource) {
 enum class SettingsSection(val group: SectionGroup) {
     Library(SectionGroup.Music), Lyrics(SectionGroup.Music), Downloads(SectionGroup.Music),
     Playback(SectionGroup.Sound), Equalizer(SectionGroup.Sound),
-    Appearance(SectionGroup.App), Updates(SectionGroup.App),
+    Appearance(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App),
 }
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
@@ -136,6 +137,7 @@ fun SettingsScreen(
                 SettingsSection.Library -> library(settings, onUpdate, trackCount, onRescan, musicFolders)
                 SettingsSection.Downloads -> downloads(settings, onUpdate)
                 SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
+                SettingsSection.Beta -> beta(settings, onUpdate)
             }
         }
     }
@@ -149,6 +151,7 @@ private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Library -> Res.string.settings_library
     SettingsSection.Downloads -> Res.string.settings_downloads
     SettingsSection.Updates -> Res.string.settings_updates
+    SettingsSection.Beta -> Res.string.settings_beta
 }
 
 private fun SettingsSection.icon(): ImageVector = when (this) {
@@ -159,6 +162,7 @@ private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Library -> PlayerIcons.Library
     SettingsSection.Downloads -> PlayerIcons.Download
     SettingsSection.Updates -> PlayerIcons.Refresh
+    SettingsSection.Beta -> PlayerIcons.Science
 }
 
 private fun LazyListScope.sectionList(
@@ -169,6 +173,14 @@ private fun LazyListScope.sectionList(
     version: String,
     settings: AppSettings,
 ) {
+    item(key = "hero") {
+        SettingsHero(
+            name = stringResource(Res.string.app_name),
+            version = stringResource(Res.string.settings_version, version),
+            status = updateStatus,
+            onStatusClick = { onOpen(SettingsSection.Updates) },
+        )
+    }
     for (group in SectionGroup.entries) item(key = "sections_${group.name}") {
         Group(stringResource(group.title)) {
             // Downloads need Android 10; before that the section would only say so.
@@ -182,6 +194,8 @@ private fun LazyListScope.sectionList(
                             title = stringResource(s.title()),
                             summary = sectionSummary(s, settings, trackCount, updateStatus),
                             onClick = { onOpen(s) },
+                            tone = sectionTone(group.ordinal),
+                            iconShape = sectionIconShape(s.ordinal),
                         )
                     }
                 }
@@ -196,6 +210,8 @@ private fun LazyListScope.sectionList(
                 title = stringResource(Res.string.pc_open),
                 summary = paired?.name ?: stringResource(Res.string.pc_summary_none),
                 onClick = onOpenComputer,
+                tone = sectionTone(group.ordinal),
+                iconShape = sectionIconShape(SettingsSection.entries.size),
             )
         }
     }
@@ -215,6 +231,7 @@ private fun sectionSummary(s: SettingsSection, settings: AppSettings, trackCount
     ).joinToString(" · ")
     SettingsSection.Downloads -> downloadsSummary(settings)
     SettingsSection.Updates -> updateStatus
+    SettingsSection.Beta -> stringResource(Res.string.settings_beta_summary)
 }
 
 @Composable
@@ -224,13 +241,6 @@ private fun About(version: String) {
             { shape ->
                 ItemContainer(shape) {
                     Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                        Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(Res.string.settings_version, version),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
                         Text(
                             stringResource(Res.string.settings_lyrics_source),
                             style = MaterialTheme.typography.bodySmall,
@@ -239,6 +249,20 @@ private fun About(version: String) {
                     }
                 }
             },
+        )
+    }
+}
+
+private fun LazyListScope.beta(settings: AppSettings, onUpdate: Update) {
+    item(key = "beta") {
+        val context = LocalContext.current
+        BetaGroups(
+            settings = settings,
+            onRadio = { on -> onUpdate { it.shared { copy(radioEnabled = on) } } },
+            onNovelty = { n -> onUpdate { it.shared { copy(radioNovelty = n) } } },
+            onBuffer = { n -> onUpdate { it.shared { copy(radioBuffer = n) } } },
+            onForgetDislikes = { RadioMemory.get(context.filesDir).clear() },
+            onCassette = { v -> onUpdate { it.shared { copy(cassetteMode = v) } } },
         )
     }
 }
@@ -476,19 +500,6 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
             )
         }
     }
-    item(key = "modes") {
-        Group(stringResource(Res.string.settings_modes)) {
-            listOf<@Composable (Shape) -> Unit>({ shape ->
-                SwitchItem(
-                    shape = shape,
-                    title = stringResource(Res.string.settings_cassette_mode),
-                    subtitle = stringResource(Res.string.settings_cassette_mode_desc),
-                    checked = settings.cassetteMode,
-                    onChange = { v -> onUpdate { it.shared { copy(cassetteMode = v) } } },
-                )
-            })
-        }
-    }
 }
 
 private fun LazyListScope.equalizer(settings: AppSettings, onUpdate: Update) {
@@ -685,6 +696,30 @@ private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update) {
             )
         }
     }
+    item(key = "youtube_sign_in") {
+        val context = LocalContext.current
+        val signedIn by Downloader.youtubeSignedIn.collectAsStateWithLifecycle()
+        Group(stringResource(Res.string.youtube_group)) {
+            listOf<@Composable (Shape) -> Unit>({ shape ->
+                if (signedIn) {
+                    ActionItem(
+                        shape = shape,
+                        title = stringResource(Res.string.youtube_sign_out),
+                        subtitle = stringResource(Res.string.youtube_signed_in),
+                        onClick = Downloader::signOutOfYouTube,
+                    )
+                } else {
+                    ActionItem(
+                        shape = shape,
+                        title = stringResource(Res.string.youtube_sign_in),
+                        subtitle = stringResource(Res.string.youtube_sign_in_desc),
+                        onClick = { context.startActivity(android.content.Intent(context, com.ku.pierdoon.YouTubeLoginActivity::class.java)) },
+                    )
+                }
+            })
+        }
+    }
+    downloadLog(Downloader.log.entries, Downloader.log::clear)
 }
 
 private fun LazyListScope.updates(

@@ -11,8 +11,10 @@ import androidx.media3.common.MediaMetadata
 
 // What a Song is to MediaStore and Media3: Android only, so not in the shared Song.
 
+/** MediaStore's, or the file's for a radio track played from the app's cache. */
 val Song.uri: Uri
-    get() = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+    get() = if (path.isNotEmpty()) Uri.fromFile(file)
+    else ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
 
 /**
  * A cover picked in the app wins over the file's own. From Android 10 that's the track's own art,

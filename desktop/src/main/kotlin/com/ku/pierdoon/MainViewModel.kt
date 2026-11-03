@@ -42,6 +42,10 @@ import com.ku.pierdoon.playback.Player
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.playback.QueueEntry
 import com.ku.pierdoon.playback.QueueState
+import com.ku.pierdoon.playback.Radio
+import com.ku.pierdoon.radio.RadioStart
+import com.ku.pierdoon.radio.RadioState
+import com.ku.pierdoon.radio.RadioTrack
 import com.ku.pierdoon.playback.nextRepeatMode
 import com.ku.pierdoon.ui.components.ArtworkCache
 import java.awt.Desktop
@@ -386,7 +390,22 @@ class MainViewModel {
     fun addToPlaylist(id: Long, songIds: List<Long>) = userLibrary.addToPlaylist(id, songIds)
     fun removeFromPlaylist(id: Long, songIds: Set<Long>) = userLibrary.removeFromPlaylist(id, songIds)
 
-    fun toggleFavorite(songId: Long) = userLibrary.toggleFavorite(songId)
+    /** For a radio track not in the library yet, the heart keeps it: downloaded into it, as a favourite. */
+    fun toggleFavorite(songId: Long) {
+        if (RadioTrack.isRadio(songId)) Radio.keep(songId) else userLibrary.toggleFavorite(songId)
+    }
+
+    /** The radio playing now (beta), or null. */
+    val radio: StateFlow<RadioState?> = Radio.state
+
+    fun startRadio(start: RadioStart) {
+        val songs = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
+        Radio.start(songs, start)
+    }
+
+    fun dislikeRadio(songId: Long) = Radio.dislike(songId)
+
+    fun stopRadio() = Radio.stop()
     fun createPlaylist(name: String, initialSongs: List<Long> = emptyList()) =
         userLibrary.createPlaylist(name, initialSongs)
     fun renamePlaylist(id: Long, name: String) = userLibrary.renamePlaylist(id, name)

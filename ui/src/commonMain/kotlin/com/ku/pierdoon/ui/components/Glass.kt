@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.components
 
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -8,19 +11,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.ui.theme.LocalUiPrefs
@@ -49,7 +57,7 @@ fun rememberBackdrop(): Backdrop {
 
 /** Marks the content that glass panels blur. Glass must not be inside this content. */
 fun Modifier.backdropSource(backdrop: Backdrop): Modifier = this
-    .onGloballyPositioned { backdrop.origin = it.positionInRoot() }
+    .onGloballyPositioned { backdrop.origin = it.positionInWindow() }
     .drawWithContent {
         backdrop.layer.record { this@drawWithContent.drawContent() }
         drawLayer(backdrop.layer)
@@ -70,7 +78,7 @@ fun Modifier.glass(
     var origin by remember { mutableStateOf(Offset.Zero) }
     val enabled = GlassSupported && LocalUiPrefs.current.glass
     return this
-        .onGloballyPositioned { origin = it.positionInRoot() }
+        .onGloballyPositioned { origin = it.positionInWindow() }
         .clip(shape)
         .drawWithCache {
             val blurPx = blurRadius.toPx()
@@ -95,3 +103,53 @@ fun Modifier.glass(
             }
         }
 }
+
+/**
+ * The window's backdrop, for glass in menus and sheets that open over the screen; null where the
+ * app hasn't provided one. Positions are taken in the window, so a menu's own layer lines up.
+ */
+val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+
+/**
+ * A menu's or sheet's backdrop, laid under its content (fill the menu with it, first in a Box):
+ * the window behind it blurred, with [color] translucent on top; or plain [color] where there's
+ * no backdrop or glass is off.
+ *
+ * A menu opens in a layer of its own, which can't draw the window's live picture, so it blurs a
+ * still of it taken as it opens; under a menu the screen hardly moves anyway. [layerOrigin] is
+ * where that layer sits in the window, as positions inside it start from its own corner.
+ */
+@Composable
+fun MenuGlass(
+    shape: Shape,
+    color: Color,
+    modifier: Modifier = Modifier,
+    blurRadius: Dp = 36.dp,
+    layerOrigin: () -> Offset = { Offset.Zero },
+) {
+    val backdrop = LocalBackdrop.current
+    val enabled = backdrop != null && GlassSupported && LocalUiPrefs.current.glass
+    var still by remember { mutableStateOf<ImageBitmap?>(null) }
+    if (enabled) LaunchedEffect(backdrop) { still = runCatching { backdrop!!.layer.toImageBitmap() }.getOrNull() }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val image = still
+    Box(modifier.onGloballyPositioned { origin = it.positionInRoot() }.clip(shape)) {
+        if (enabled && image != null) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .blur(blurRadius, BlurredEdgeTreatment.Rectangle)
+                    .drawBehind {
+                        val delta = backdrop!!.origin - (layerOrigin() + origin)
+                        drawImage(image, topLeft = delta)
+                    },
+            )
+            Box(Modifier.matchParentSize().drawBehind { drawRect(color.copy(alpha = MENU_GLASS_ALPHA)) })
+        } else {
+            Box(Modifier.matchParentSize().drawBehind { drawRect(color) })
+        }
+    }
+}
+
+/** How much of a menu's own colour lies over the blur: enough to read, little enough to see through. */
+private const val MENU_GLASS_ALPHA = 0.6f

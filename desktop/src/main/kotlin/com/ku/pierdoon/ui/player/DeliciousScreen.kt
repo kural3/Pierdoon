@@ -1,5 +1,13 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.formatDuration
+import com.ku.pierdoon.ui.components.Artwork
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.material3.toShape
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
@@ -90,7 +98,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * The Delicious mode (beta): the screen given over to light in the cover's colours, drawn in one of
+ * The Delicious mode: the screen given over to light in the cover's colours, drawn in one of
  * the [DeliciousStyle]s: flowing clouds, rolling waves, drifting dust, or calm clouds that ignore
  * the music. Everything eases in and out, with no flashes. The current line of the lyrics sits in
  * the centre. The controls show while the
@@ -166,81 +174,143 @@ fun DeliciousScreen(
 
         // Controls ------------------------------------------------------------------------
         AnimatedVisibility(chrome, enter = fadeIn(tween(250)), exit = fadeOut(tween(600)), modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().padding(28.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.align(Alignment.TopStart)) {
+            Box(Modifier.fillMaxSize().padding(24.dp)) {
+                // The mode's name in a capsule of glass, the close button at its start.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .glass(CircleShape)
+                        .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+                ) {
                     ExpressiveIconButton(
                         onClick = onClose,
                         icon = PlayerIcons.Close,
                         contentDescription = stringResource(Res.string.delicious_close),
-                        containerColor = Color.White.copy(alpha = 0.12f),
+                        containerColor = Color.White.copy(alpha = 0.14f),
                         contentColor = Color.White,
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(40.dp),
                     )
-                    Spacer(Modifier.width(14.dp))
-                    Text("Delicious", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(Res.string.delicious_beta),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.White.copy(alpha = 0.16f))
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
+                    Spacer(Modifier.width(12.dp))
+                    Icon(PlayerIcons.Sparkle, contentDescription = null, tint = palette[0], modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Delicious", style = MaterialTheme.typography.titleMediumEmphasized, color = Color.White)
                 }
-                StylePicker(style, Modifier.align(Alignment.TopEnd))
-                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-                    ThinProgress(position, durationMs) { frame }
-                    Spacer(Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                nowPlaying.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                nowPlaying.artist,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.7f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            ExpressiveIconButton(
-                                onClick = onPrevious,
-                                icon = PlayerIcons.Previous,
-                                contentDescription = stringResource(Res.string.previous),
-                                containerColor = Color.White.copy(alpha = 0.12f),
-                                contentColor = Color.White,
-                                modifier = Modifier.size(52.dp),
-                            )
-                            PlayPauseButton(
-                                isPlaying = isPlaying,
-                                onClick = onTogglePlay,
-                                playLabel = stringResource(Res.string.play),
-                                pauseLabel = stringResource(Res.string.pause),
-                                iconSize = 30.dp,
-                                modifier = Modifier.size(width = 80.dp, height = 60.dp),
-                            )
-                            ExpressiveIconButton(
-                                onClick = onNext,
-                                icon = PlayerIcons.Next,
-                                contentDescription = stringResource(Res.string.next),
-                                containerColor = Color.White.copy(alpha = 0.12f),
-                                contentColor = Color.White,
-                                modifier = Modifier.size(52.dp),
-                            )
-                        }
-                        Spacer(Modifier.weight(1f))
-                    }
-                }
+                StylePicker(style, palette[0], Modifier.align(Alignment.TopEnd))
+                Dock(
+                    nowPlaying = nowPlaying,
+                    isPlaying = isPlaying,
+                    position = position,
+                    durationMs = durationMs,
+                    accent = palette[0],
+                    onTogglePlay = onTogglePlay,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                    frame = { frame },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
+    }
+}
+
+/** Frosted dark glass over the light: the Delicious chrome's surfaces. */
+private fun Modifier.glass(shape: Shape): Modifier =
+    clip(shape)
+        .background(Color.Black.copy(alpha = 0.32f))
+        .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+
+/**
+ * The floating bar along the bottom: the cover, the track, the transport in the middle and the
+ * time, with the progress as a line along its top edge.
+ */
+@Composable
+private fun Dock(
+    nowPlaying: NowPlaying,
+    isPlaying: Boolean,
+    position: () -> PositionSnapshot,
+    durationMs: Long,
+    accent: Color,
+    onTogglePlay: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    frame: () -> Long,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(36.dp)
+    Column(
+        modifier
+            .widthIn(max = 1100.dp)
+            .fillMaxWidth()
+            .glass(shape)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Artwork(
+                    songId = nowPlaying.songId,
+                    albumId = nowPlaying.albumId,
+                    placeholderIconSize = 24.dp,
+                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)),
+                )
+                Spacer(Modifier.width(14.dp))
+                Column {
+                    Text(
+                        nowPlaying.title,
+                        style = MaterialTheme.typography.titleMediumEmphasized,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        nowPlaying.artist,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                ExpressiveIconButton(
+                    onClick = onPrevious,
+                    icon = PlayerIcons.Previous,
+                    contentDescription = stringResource(Res.string.previous),
+                    containerColor = Color.White.copy(alpha = 0.12f),
+                    contentColor = Color.White,
+                    modifier = Modifier.size(52.dp),
+                )
+                PlayPauseButton(
+                    isPlaying = isPlaying,
+                    onClick = onTogglePlay,
+                    playLabel = stringResource(Res.string.play),
+                    pauseLabel = stringResource(Res.string.pause),
+                    iconSize = 30.dp,
+                    modifier = Modifier.size(width = 84.dp, height = 60.dp),
+                )
+                ExpressiveIconButton(
+                    onClick = onNext,
+                    icon = PlayerIcons.Next,
+                    contentDescription = stringResource(Res.string.next),
+                    containerColor = Color.White.copy(alpha = 0.12f),
+                    contentColor = Color.White,
+                    modifier = Modifier.size(52.dp),
+                )
+            }
+            // The time, on the right, balancing the track on the left.
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                val time by remember(durationMs) {
+                    derivedStateOf {
+                        frame()
+                        val p = position().estimate().coerceIn(0L, durationMs.coerceAtLeast(0L))
+                        "${formatDuration(p)} / ${formatDuration(durationMs)}"
+                    }
+                }
+                Text(time, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f))
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        ThinProgress(position, durationMs, accent, frame)
     }
 }
 
@@ -435,6 +505,7 @@ private fun CenterText(
     val shadow = Shadow(Color.Black.copy(alpha = 0.55f), blurRadius = 28f)
     BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 64.dp, vertical = 110.dp), contentAlignment = Alignment.Center) {
         val big = if (maxWidth > 900.dp) MaterialTheme.typography.displayLarge else MaterialTheme.typography.displayMedium
+        val tall = maxHeight > 560.dp
         AnimatedContent(
             targetState = if (synced != null && index >= 0) index else -1,
             transitionSpec = {
@@ -459,6 +530,28 @@ private fun CenterText(
                     .padding(32.dp),
             ) {
                 if (synced == null || i < 0) {
+                    // No line to sing: the cover in a scalloped frame, turning slowly with the music.
+                    val coverShape = MaterialShapes.Cookie12Sided.toShape()
+                    Artwork(
+                        songId = nowPlaying.songId,
+                        albumId = nowPlaying.albumId,
+                        large = true,
+                        placeholderIconSize = 64.dp,
+                        modifier = Modifier
+                            .size(if (tall) 260.dp else 180.dp)
+                            .graphicsLayer {
+                                frame()
+                                rotationZ = (motion.time * 18.0 % 360.0).toFloat()
+                                shape = coverShape
+                                clip = true
+                            }
+                            .graphicsLayer {
+                                // Turned back inside the frame, so the picture itself stays upright.
+                                frame()
+                                rotationZ = -(motion.time * 18.0 % 360.0).toFloat()
+                            },
+                    )
+                    Spacer(Modifier.height(28.dp))
                     Text(
                         nowPlaying.title,
                         style = big.copy(fontWeight = FontWeight.Bold, shadow = shadow),
@@ -566,13 +659,13 @@ private fun SungLine(
 
 /** A hairline of progress along the bottom. */
 @Composable
-private fun ThinProgress(position: () -> PositionSnapshot, durationMs: Long, frame: () -> Long) {
-    Canvas(Modifier.fillMaxWidth().height(3.dp)) {
+private fun ThinProgress(position: () -> PositionSnapshot, durationMs: Long, accent: Color, frame: () -> Long) {
+    Canvas(Modifier.fillMaxWidth().height(4.dp)) {
         frame()
         val f = if (durationMs > 0) (position().estimate().toFloat() / durationMs).coerceIn(0f, 1f) else 0f
         val r = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
-        drawRoundRect(Color.White.copy(alpha = 0.2f), cornerRadius = r)
-        drawRoundRect(Color.White, size = size.copy(width = size.width * f), cornerRadius = r)
+        drawRoundRect(Color.White.copy(alpha = 0.16f), cornerRadius = r)
+        drawRoundRect(accent, size = size.copy(width = size.width * f), cornerRadius = r)
     }
 }
 
@@ -606,10 +699,13 @@ private const val GLYPH_OVERHANG = 0.2f
 private const val SING_BASE_MS = 1_500L
 private const val SING_PER_CHAR_MS = 350L
 
-/** The styles as small pills; the chosen one filled. */
+/** The styles in one capsule of glass; the chosen one filled with the light's colour. */
 @Composable
-private fun StylePicker(selected: DeliciousStyle, modifier: Modifier = Modifier) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = modifier) {
+private fun StylePicker(selected: DeliciousStyle, accent: Color, modifier: Modifier = Modifier) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.glass(CircleShape).padding(5.dp),
+    ) {
         DeliciousStyle.entries.forEach { s ->
             val on = s == selected
             Text(
@@ -622,12 +718,12 @@ private fun StylePicker(selected: DeliciousStyle, modifier: Modifier = Modifier)
                     }
                 ),
                 style = MaterialTheme.typography.labelLarge,
-                color = if (on) Color.Black else Color.White,
+                color = if (on) Color.Black else Color.White.copy(alpha = 0.85f),
                 modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(if (on) Color.White else Color.White.copy(alpha = 0.12f))
+                    .clip(CircleShape)
+                    .background(if (on) accent else Color.Transparent)
                     .clickable { SettingsStore.update { it.copy(deliciousStyle = s) } }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
             )
         }
     }

@@ -17,6 +17,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
@@ -125,4 +133,26 @@ fun Modifier.animatedShapeClip(target: RoundedPolygon): Modifier {
     }
     val morph = remember(from, to) { Morph(from, to) }
     return morphClip(morph, progress.asState())
+}
+
+/**
+ * An oversized [shape] peeking in from the card's top-right corner, behind its content: the
+ * home and settings cards' mark. Drawn, not laid out, and cached until the card resizes.
+ * Goes after the card's background and before its padding.
+ */
+fun Modifier.cornerDecor(
+    shape: Shape,
+    color: Color,
+    size: Dp = 132.dp,
+    rotation: Float = 18f,
+): Modifier = drawWithCache {
+    val px = size.toPx()
+    val outline = shape.createOutline(Size(px, px), layoutDirection, this)
+    onDrawBehind {
+        translate(left = this.size.width - px * 0.62f, top = -px * 0.34f) {
+            rotate(rotation, pivot = Offset(px / 2, px / 2)) {
+                drawOutline(outline, color)
+            }
+        }
+    }
 }

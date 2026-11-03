@@ -22,7 +22,10 @@ import com.ku.pierdoon.data.COVER_MAX_PX
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.TagOverride
 import com.ku.pierdoon.data.TagOverrides
+import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserLibrary
+import com.ku.pierdoon.radio.RadioTrack
+import com.ku.pierdoon.radio.YouTubeMix
 import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.TagWriter
 import com.yausername.youtubedl_android.YoutubeDL
@@ -53,7 +56,7 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import kotlin.coroutines.coroutineContext
 
-enum class FailReason { Unsupported, Unavailable, Drm, NoAudio, Network, Save, Other }
+enum class FailReason { Unsupported, Unavailable, Bot, Drm, NoAudio, Network, Save, Other }
 
 sealed interface DownloadStatus {
     data object Queued : DownloadStatus
@@ -122,6 +125,34 @@ object Downloader {
     private var running: Pair<Long, Job>? = null
     private var nextId = 1L
 
+    /** YouTube's cookies from [com.ku.pierdoon.YouTubeLoginActivity], in the Netscape format yt-dlp reads. */
+    private val cookieFile get() = File(app.filesDir, "youtube-cookies.txt")
+
+    private val _youtubeSignedIn = MutableStateFlow(false)
+    val youtubeSignedIn: StateFlow<Boolean> = _youtubeSignedIn.asStateFlow()
+
+    /** Keeps a signed-in browser's YouTube cookies ("a=1; b=2"), for yt-dlp to send with every request. */
+    fun saveYouTubeCookies(header: String) {
+        // The browser doesn't tell when they expire; a year is longer than YouTube keeps them anyway.
+        val expires = System.currentTimeMillis() / 1000 + 365L * 24 * 60 * 60
+        val lines = header.split(";").mapNotNull { pair ->
+            val name = pair.substringBefore("=").trim()
+            val value = pair.substringAfter("=", "").trim()
+            if (name.isEmpty()) null else listOf(".youtube.com", "TRUE", "/", "TRUE", "$expires", name, value).joinToString("\t")
+        }
+        com.ku.pierdoon.data.writeAtomically(cookieFile, (listOf("# Netscape HTTP Cookie File") + lines).joinToString("\n", postfix = "\n"))
+        _youtubeSignedIn.value = cookieFile.isFile
+    }
+
+    fun signOutOfYouTube() {
+        cookieFile.delete()
+        android.webkit.CookieManager.getInstance().removeAllCookies(null)
+        _youtubeSignedIn.value = false
+    }
+
+    /** How past downloads ended, kept between runs. Read only after [init]. */
+    val log: DownloadLog by lazy { DownloadLog(File(app.filesDir, "download-log.json")) }
+
     private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
     val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
 
@@ -141,6 +172,7 @@ object Downloader {
     fun init(context: Context) {
         if (::app.isInitialized) return
         app = context.applicationContext
+        _youtubeSignedIn.value = cookieFile.isFile
         CoverStore.init(app)
         scope.launch { for (u in wake) drain() }
     }
@@ -273,6 +305,12 @@ object Downloader {
         return true
     }
 
+    /** Notes how [task] ended in [log], under the name it had by then (the page may have given it one). */
+    private fun record(task: DownloadTask, ok: Boolean, reason: FailReason? = null, message: String? = null) {
+        val now = _tasks.value.firstOrNull { it.id == task.id } ?: task
+        log.add(DownloadLogEntry(System.currentTimeMillis(), ok, task.url, now.title, now.artist, reason?.name, message))
+    }
+
     private fun set(id: Long, transform: (DownloadTask) -> DownloadTask) =
         _tasks.update { list -> list.map { if (it.id == id) transform(it) else it } }
 
@@ -285,15 +323,18 @@ object Downloader {
             if (task.group == null && !looksLikeSingleTrack(task.url) && expand(task)) return
             val info = fetch(task, work)
             set(task.id) { it.copy(status = DownloadStatus.Saving) }
-            val songId = save(task, info, work)
+            val songId = save(info, work)
             set(task.id) { it.copy(status = DownloadStatus.Done(songId)) }
+            record(task, ok = true)
         } catch (e: CancellationException) {
             throw e
         } catch (e: DownloadException) {
             set(task.id) { it.copy(status = DownloadStatus.Failed(e.reason, e.detail)) }
+            record(task, ok = false, reason = e.reason, message = e.detail)
         } catch (e: Exception) {
             Log.w(TAG, "Download failed: ${task.url}", e)
             set(task.id) { it.copy(status = DownloadStatus.Failed(classify(e.message), errorLine(e.message))) }
+            record(task, ok = false, reason = classify(e.message), message = e.message ?: e.toString())
         } finally {
             work.deleteRecursively()
         }
@@ -329,20 +370,8 @@ object Downloader {
 
     /** Runs yt-dlp: the audio file and its .info.json land in [work]. */
     private suspend fun fetch(task: DownloadTask, work: File): JSONObject {
-        val request = YoutubeDLRequest(task.url).apply {
-            addOption("--no-playlist")
-            addOption("--no-mtime")
-            addOption("--newline")
-            addOption("--write-info-json")
-            addOption("-f", formatSelector(task.format))
-            addOption("-o", File(work, "%(id)s.%(ext)s").path)
-            // Links come from sites too (search results, playlist entries): after "--" one that
-            // starts with "-" is still a link, never an option such as --exec. The library puts
-            // the link last, right after these commands.
-            addCommands(listOf("--"))
-        }
-        execute(request, "pierdoon-${task.id}") { progress, line ->
-            if (!line.startsWith("[download]")) return@execute
+        download(task.url, task.format, work, "pierdoon-${task.id}") { progress, line ->
+            if (!line.startsWith("[download]")) return@download
             set(task.id) {
                 it.copy(status = DownloadStatus.Downloading(if (progress > 0f) (progress / 100f).coerceIn(0f, 1f) else null))
             }
@@ -354,12 +383,144 @@ object Downloader {
         return info
     }
 
+    private suspend fun download(
+        url: String,
+        format: DownloadFormat,
+        work: File,
+        processId: String,
+        onLine: ((Float, String) -> Unit)? = null,
+    ): YoutubeDLResponse {
+        val request = YoutubeDLRequest(url).apply {
+            addOption("--no-playlist")
+            addOption("--no-mtime")
+            addOption("--newline")
+            addOption("--write-info-json")
+            addOption("-f", formatSelector(format))
+            addOption("-o", File(work, "%(id)s.%(ext)s").path)
+            // Links come from sites too (search results, playlist entries): after "--" one that
+            // starts with "-" is still a link, never an option such as --exec. The library puts
+            // the link last, right after these commands.
+            addCommands(listOf("--"))
+        }
+        return execute(request, processId, onLine)
+    }
+
+    // ---- Radio: new tracks played from a cache, kept only when asked. ----
+
+    private val radioDir get() = File(app.cacheDir, "radio")
+
+    /** Whatever an earlier radio left behind (the app closed mid-way): played tracks aren't kept. */
+    fun clearRadioCache() {
+        if (::app.isInitialized) radioDir.deleteRecursively()
+    }
+
+    /** The first video YouTube finds for [query]. */
+    suspend fun radioFind(query: String): RadioTrack? = withContext(Dispatchers.IO) {
+        radioLogged("find '$query'") {
+            ensureEngine(update = true)
+            val request = YoutubeDLRequest("ytsearch1:${query.trim()}").apply {
+                addOption("--flat-playlist")
+                addOption("-J")
+            }
+            YouTubeMix.parse(execute(request, "pierdoon-radio-find").out).firstOrNull()
+        }
+    }
+
+    suspend fun radioMix(videoId: String): List<RadioTrack> = withContext(Dispatchers.IO) {
+        radioLogged("mix $videoId") {
+            ensureEngine(update = true)
+            val request = YoutubeDLRequest(YouTubeMix.url(videoId)).apply {
+                addOption("--flat-playlist")
+                addOption("-J")
+                addCommands(listOf("--"))
+            }
+            YouTubeMix.parse(execute(request, "pierdoon-radio-mix").out)
+        }
+    }
+
+    /** The radio swallows its failures, so they are at least logged here. */
+    private suspend fun <T> radioLogged(what: String, block: suspend () -> T): T =
+        try {
+            block().also { Log.i(TAG, "Radio $what: ${if (it is List<*>) "${it.size} tracks" else it}") }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Log.w(TAG, "Radio $what failed", e)
+            throw e
+        }
+
+    /** Downloads [track] into the radio's cache with a cover; as it stands, ExoPlayer plays it. */
+    suspend fun radioFetch(track: RadioTrack, format: DownloadFormat): Song? = withContext(Dispatchers.IO) {
+        ensureEngine(update = false)
+        val work = File(radioDir, track.videoId).apply { deleteRecursively(); mkdirs() }
+        try {
+            download(track.url, format, work, "pierdoon-radio-${track.videoId}")
+            val info = readInfo(work) ?: return@withContext null
+            val audio = audioIn(work) ?: return@withContext null
+            info.str("thumbnail")?.let { MetadataSearch.download(it) }?.let(::squareJpeg)
+                ?.let { bytes -> File(work, "cover.jpg").also { it.writeBytes(bytes) } }
+                ?.let { CoverStore.setSongCover(track.songId, it) }
+            val name = info.trackName()
+            Song(
+                id = track.songId,
+                title = name.title.ifBlank { track.title },
+                artist = name.artist.ifBlank { track.artist },
+                album = info.str("album") ?: "",
+                albumId = 0,
+                durationMs = (info.optDouble("duration").takeIf { !it.isNaN() } ?: 0.0).times(1000).toLong(),
+                path = audio.path,
+            )
+        } catch (e: CancellationException) {
+            work.deleteRecursively()
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Radio fetch failed: ${track.videoId}", e)
+            work.deleteRecursively()
+            null
+        }
+    }
+
+    fun radioDiscard(track: RadioTrack) {
+        CoverStore.removeSongCover(track.songId)
+        File(radioDir, track.videoId).deleteRecursively()
+    }
+
+    /**
+     * Moves a radio track into Music/Pier.doon, tagged and with its cover, and into the favourites.
+     * Its library id, or null if it couldn't (Android 9 and older can't save at all).
+     */
+    suspend fun radioKeep(track: RadioTrack): Long? = withContext(Dispatchers.IO) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return@withContext null
+        val cached = File(radioDir, track.videoId)
+        val info = readInfo(cached) ?: return@withContext null
+        // A copy to save from: the player may still be reading the cached one.
+        val work = File(app.cacheDir, "downloads/radio-${track.videoId}").apply { deleteRecursively(); mkdirs() }
+        try {
+            cached.listFiles { f -> f.name != "cover.jpg" }?.forEach { it.copyTo(File(work, it.name), overwrite = true) }
+            val songId = save(info, work)
+            UserLibrary.get(app.filesDir).addFavorites(listOf(songId))
+            songId
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Radio keep failed: ${track.videoId}", e)
+            null
+        } finally {
+            work.deleteRecursively()
+        }
+    }
+
+    private fun audioIn(work: File): File? =
+        work.listFiles { f -> !f.name.endsWith(".json") && !f.name.endsWith(".part") && f.name != "cover.jpg" }
+            ?.maxByOrNull { it.length() }
+
     /** Runs yt-dlp; a cancelled coroutine kills the Python process instead of waiting for it. */
     private suspend fun execute(
         request: YoutubeDLRequest,
         processId: String,
         onLine: ((Float, String) -> Unit)? = null,
     ): YoutubeDLResponse {
+        if (cookieFile.isFile) request.addOption("--cookies", cookieFile.path)
         val stop = coroutineContext.job.invokeOnCompletion { cause ->
             if (cause is CancellationException) YoutubeDL.destroyProcessById(processId)
         }
@@ -387,10 +548,8 @@ object Downloader {
 
     /** Tags the file, gives it a cover and moves it into Music/Pier.doon. Returns its MediaStore id. */
     @RequiresApi(Build.VERSION_CODES.Q)
-    private suspend fun save(task: DownloadTask, info: JSONObject, work: File): Long {
-        var audio = work.listFiles { f -> !f.name.endsWith(".json") && !f.name.endsWith(".part") }
-            ?.maxByOrNull { it.length() }
-            ?: throw DownloadException(FailReason.Other, null)
+    private suspend fun save(info: JSONObject, work: File): Long {
+        var audio = audioIn(work) ?: throw DownloadException(FailReason.Other, null)
         if (audio.extension.equals("webm", ignoreCase = true)) {
             val opus = File(work, audio.nameWithoutExtension + ".opus")
             if (!remux(audio, opus, MediaMuxer.OutputFormat.MUXER_OUTPUT_OGG, MediaFormat.MIMETYPE_AUDIO_OPUS)) {
@@ -506,6 +665,8 @@ private fun classify(message: String?): FailReason {
     val m = message.orEmpty()
     return when {
         "Unsupported URL" in m || "is not a valid URL" in m -> FailReason.Unsupported
+        // Before "unavailable": the bot check also says "Sign in".
+        "not a bot" in m || "Sign in to confirm" in m -> FailReason.Bot
         "DRM" in m -> FailReason.Drm
         "Requested format is not available" in m -> FailReason.NoAudio
         "Unable to download" in m || "Errno" in m || "timed out" in m || "getaddrinfo" in m -> FailReason.Network

@@ -87,6 +87,8 @@ fun SongActionsSheet(
     onEdit: () -> Unit,
     /** Null where the system can't ask for consent to delete (below Android 11). */
     onDelete: (() -> Unit)?,
+    /** A radio from this track; null with the radio switched off. */
+    onRadio: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     var pickingPlaylist by remember { mutableStateOf(false) }
@@ -131,6 +133,9 @@ fun SongActionsSheet(
                     if (!picking) {
                         ActionItem(PlayerIcons.PlayNext, stringResource(Res.string.play_next)) { act(onPlayNext) }
                         ActionItem(PlayerIcons.Queue, stringResource(Res.string.add_to_queue)) { act(onAddToQueue) }
+                        if (onRadio != null) {
+                            ActionItem(PlayerIcons.Radio, stringResource(Res.string.radio_start)) { act(onRadio) }
+                        }
                         ActionItem(
                             if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
                             stringResource(if (isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites),

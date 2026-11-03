@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.download
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.lazy.LazyListScope
+import com.ku.pierdoon.ui.library.TWO_PANE_WIDTH
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
@@ -136,30 +139,9 @@ fun DownloadScreen(onBack: (() -> Unit)?, onPlay: (Long) -> Unit, bottomInset: D
         }
     }
 
-    AppScaffold(title = stringResource(Res.string.downloads), onBack = onBack) { inner ->
-        LazyColumn(
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = inner.calculateTopPadding(),
-                bottom = listBottomPadding(bottomInset),
-            ),
-            // A readable width on a wide window, lined up under the title.
-            modifier = Modifier.fillMaxHeight().widthIn(max = CONTENT_MAX_WIDTH).imePadding(),
-        ) {
-            if (!Downloader.supported) {
-                item(key = "unsupported") {
-                    Text(
-                        stringResource(Res.string.download_unsupported_os),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(20.dp),
-                    )
-                }
-                return@LazyColumn
-            }
-
-            item(key = "link") {
+    // The search and its results, as list items.
+    // The field for a link or a name, with the source to search.
+    val linkField: @Composable () -> Unit = {
                 Column(Modifier.padding(top = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         LinkField(
@@ -209,8 +191,9 @@ fun DownloadScreen(onBack: (() -> Unit)?, onPlay: (Long) -> Unit, bottomInset: D
                         )
                     }
                 }
-            }
-
+    }
+    // What a search found.
+    val resultItems: LazyListScope.() -> Unit = {
             if (search != SearchState.Idle) {
                 item(key = "results") {
                     Group(null) {
@@ -246,8 +229,13 @@ fun DownloadScreen(onBack: (() -> Unit)?, onPlay: (Long) -> Unit, bottomInset: D
                 }
             }
 
-            if (tasks.isNotEmpty()) {
-                item(key = "queue") {
+    }
+    val searchItems: LazyListScope.() -> Unit = {
+        item(key = "link") { linkField() }
+        resultItems()
+    }
+    // The downloads so far, newest first.
+    val queue: @Composable () -> Unit = {
                     QueueHeader(canClear = tasks.any { !it.active })
                     // Newest first, but a playlist's own tracks keep their order under its header.
                     val rows = queueRuns(tasks).asReversed().flatMap { run ->
@@ -270,14 +258,51 @@ fun DownloadScreen(onBack: (() -> Unit)?, onPlay: (Long) -> Unit, bottomInset: D
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         rows.forEachIndexed { i, row -> row(groupShape(i, rows.size)) }
                     }
+    }
+
+    AppScaffold(title = stringResource(Res.string.downloads), onBack = onBack) { inner ->
+        val padding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = inner.calculateTopPadding(),
+            bottom = listBottomPadding(bottomInset),
+        )
+        if (!Downloader.supported) {
+            Text(
+                stringResource(Res.string.download_unsupported_os),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(padding).padding(20.dp),
+            )
+            return@AppScaffold
+        }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val searching = search != SearchState.Idle
+            if (maxWidth >= TWO_PANE_WIDTH && searching && tasks.isNotEmpty()) {
+                // Wide, with results and downloads both: the field across the top, the two side by side under it.
+                Column(Modifier.fillMaxSize().imePadding()) {
+                    Box(Modifier.padding(start = 16.dp, end = 16.dp, top = inner.calculateTopPadding())) { linkField() }
+                    val below = PaddingValues(start = 16.dp, end = 16.dp, bottom = listBottomPadding(bottomInset))
+                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyColumn(contentPadding = below, modifier = Modifier.weight(1f).fillMaxHeight()) { resultItems() }
+                        LazyColumn(contentPadding = below, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            item(key = "queue") { queue() }
+                        }
+                    }
                 }
-            } else if (search == SearchState.Idle) {
-                item(key = "empty") { EmptyHint() }
+            } else {
+                LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize().imePadding()) {
+                    searchItems()
+                    if (tasks.isNotEmpty()) {
+                        item(key = "queue") { queue() }
+                    } else if (!searching) {
+                        item(key = "empty") { EmptyHint() }
+                    }
+                }
             }
         }
     }
 }
-
 private sealed interface SearchState {
     data object Idle : SearchState
     data object Loading : SearchState
@@ -338,41 +363,6 @@ private fun LinkField(
     )
 }
 
-/** What the page is for, until there's something to show. */
-@Composable
-private fun EmptyHint() {
-    val colors = MaterialTheme.colorScheme
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 56.dp),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(96.dp)
-                .clip(MaterialShapes.Cookie9Sided.toShape())
-                .background(colors.secondaryContainer),
-        ) {
-            Icon(PlayerIcons.Download, contentDescription = null, tint = colors.onSecondaryContainer, modifier = Modifier.size(40.dp))
-        }
-        Spacer(Modifier.height(20.dp))
-        Text(
-            stringResource(Res.string.download_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = colors.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 420.dp),
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            stringResource(Res.string.download_rights),
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.outline,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
 /** "Загрузки" over the list, with a way to drop the finished ones. */
 @Composable
 private fun QueueHeader(canClear: Boolean) {
@@ -382,7 +372,7 @@ private fun QueueHeader(canClear: Boolean) {
     ) {
         Text(
             stringResource(Res.string.download_queue),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.titleSmallEmphasized,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),
         )
@@ -602,6 +592,7 @@ private fun statusText(task: DownloadTask): String {
                 when (s.reason) {
                     FailReason.Unsupported -> Res.string.download_fail_unsupported
                     FailReason.Unavailable -> Res.string.download_fail_unavailable
+                    FailReason.Bot -> Res.string.download_fail_bot
                     FailReason.Drm -> Res.string.download_fail_drm
                     FailReason.NoAudio -> Res.string.download_fail_no_audio
                     FailReason.Network -> Res.string.download_fail_network

@@ -14,6 +14,8 @@ import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.platform.Images
 import com.ku.pierdoon.platform.Prefs
+import com.ku.pierdoon.radio.RadioTrack
+import com.ku.pierdoon.radio.YouTubeMix
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -42,7 +44,7 @@ import java.net.URL
 import java.security.DigestInputStream
 import java.security.MessageDigest
 
-enum class FailReason { Unsupported, Unavailable, Drm, NoAudio, Network, Save, Other }
+enum class FailReason { Unsupported, Unavailable, Bot, Drm, NoAudio, Network, Save, Other }
 
 sealed interface DownloadStatus {
     data object Queued : DownloadStatus
@@ -109,6 +111,9 @@ object Downloader {
     private var nextId = 1L
     private var started = false
 
+    /** How past downloads ended, kept between runs. */
+    val log: DownloadLog by lazy { DownloadLog(File(AppDirs.files, "download-log.json")) }
+
     private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
     val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
 
@@ -134,6 +139,9 @@ object Downloader {
     private val groupPlaylists = mutableMapOf<Long, Long>()
 
     private val ytDlp get() = File(AppDirs.tools, "yt-dlp.exe")
+    /** The JavaScript runtime yt-dlp solves YouTube's player with; without it YouTube offers fewer formats and is quicker to see a bot. */
+    private val deno get() = File(AppDirs.tools, "deno.exe")
+    private val denoFetching = java.util.concurrent.atomic.AtomicBoolean(false)
     private val prefs by lazy { Prefs("downloader") }
 
     /** Where downloads go: the folder chosen in the settings, else one of their own inside the user's Music. */
@@ -261,6 +269,12 @@ object Downloader {
         return true
     }
 
+    /** Notes how [task] ended in [log], under the name it had by then (the page may have given it one). */
+    private fun record(task: DownloadTask, ok: Boolean, reason: FailReason? = null, message: String? = null) {
+        val now = _tasks.value.firstOrNull { it.id == task.id } ?: task
+        log.add(DownloadLogEntry(System.currentTimeMillis(), ok, task.url, now.title, now.artist, reason?.name, message))
+    }
+
     private fun set(id: Long, transform: (DownloadTask) -> DownloadTask) =
         _tasks.update { list -> list.map { if (it.id == id) transform(it) else it } }
 
@@ -274,13 +288,16 @@ object Downloader {
             set(task.id) { it.copy(status = DownloadStatus.Saving) }
             val songId = save(info, work)
             set(task.id) { it.copy(status = DownloadStatus.Done(songId)) }
+            record(task, ok = true)
             _added.tryEmit(songId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: DownloadException) {
             set(task.id) { it.copy(status = DownloadStatus.Failed(e.reason, e.detail)) }
+            record(task, ok = false, reason = e.reason, message = e.detail)
         } catch (e: Exception) {
             set(task.id) { it.copy(status = DownloadStatus.Failed(classify(e.message), errorLine(e.message))) }
+            record(task, ok = false, reason = classify(e.message), message = e.message ?: e.toString())
         } finally {
             work.deleteRecursively()
         }
@@ -293,6 +310,7 @@ object Downloader {
             prefs.edit { putLong(K_CHECKED, System.currentTimeMillis()) }
             refreshVersion()
         }
+        if (!deno.exists()) fetchDenoInBackground()
         val checked = prefs.getLong(K_CHECKED, 0L)
         if (update && System.currentTimeMillis() - checked > UPDATE_EVERY_MS) {
             // A stale yt-dlp is the usual reason a site stops working; failing to update isn't fatal,
@@ -305,6 +323,36 @@ object Downloader {
         runInterruptible { runYtDlp(listOf("-U")) }
         prefs.edit { putLong(K_CHECKED, System.currentTimeMillis()) }
         refreshVersion()
+    }
+
+    /**
+     * Fetches deno.exe once, alongside the downloads rather than ahead of them (it is some 40 MB):
+     * the ones until it lands just go without it. Checked against the release's own SHA-256.
+     */
+    private fun fetchDenoInBackground() {
+        if (!denoFetching.compareAndSet(false, true)) return
+        scope.launch {
+            val zip = File(deno.parentFile, "deno.zip.part")
+            val tmp = File(deno.parentFile, "deno.exe.part")
+            try {
+                val expected = Regex("""(?i)\b[0-9a-f]{64}\b""")
+                    .find(httpGet(DENO_SUMS_URL) { it.readBytes().toString(Charsets.UTF_8) })?.value?.lowercase()
+                    ?: return@launch
+                val digest = MessageDigest.getInstance("SHA-256")
+                httpGet(DENO_URL) { input -> DigestInputStream(input, digest).use { d -> zip.outputStream().use { d.copyTo(it) } } }
+                if (digest.digest().joinToString("") { "%02x".format(it) } != expected) return@launch
+                java.util.zip.ZipInputStream(zip.inputStream()).use { z ->
+                    generateSequence { z.nextEntry }.firstOrNull { it.name == "deno.exe" } ?: return@launch
+                    tmp.outputStream().use { z.copyTo(it) }
+                }
+                if (!tmp.renameTo(deno)) { tmp.copyTo(deno, overwrite = true); tmp.delete() }
+            } catch (_: Exception) {
+                // Tried again on the next run; downloads work without it meanwhile.
+            } finally {
+                zip.delete()
+                tmp.delete()
+            }
+        }
     }
 
     /**
@@ -384,18 +432,117 @@ object Downloader {
         return info
     }
 
+    // ---- Radio: new tracks played from a cache, kept only when asked. ----
+
+    private val radioDir get() = File(AppDirs.cache, "radio")
+
+    /** Whatever an earlier radio left behind (the app closed mid-way): played tracks aren't kept. */
+    fun clearRadioCache() {
+        radioDir.deleteRecursively()
+    }
+
+    /** The first video YouTube finds for [query]. */
+    suspend fun radioFind(query: String): RadioTrack? = withContext(Dispatchers.IO) {
+        ensureEngine(update = true)
+        YouTubeMix.parse(execute(listOf("ytsearch1:${query.trim()}", "--flat-playlist", "-J"))).firstOrNull()
+    }
+
+    suspend fun radioMix(videoId: String): List<RadioTrack> = withContext(Dispatchers.IO) {
+        ensureEngine(update = true)
+        YouTubeMix.parse(execute(listOf("--flat-playlist", "-J", "--", YouTubeMix.url(videoId))))
+    }
+
+    /** Downloads [track] into the radio's cache with a cover, as a song to queue; null if it couldn't. */
+    suspend fun radioFetch(track: RadioTrack, format: DownloadFormat): Song? = withContext(Dispatchers.IO) {
+        ensureEngine(update = false)
+        val work = File(radioDir, track.videoId).apply { deleteRecursively(); mkdirs() }
+        try {
+            execute(
+                listOf(
+                    "--no-playlist", "--no-mtime", "--write-info-json",
+                    "-f", formatSelector(format),
+                    "-x", "--audio-format", "best",
+                    "--ffmpeg-location", ffmpegPath(),
+                    "-o", File(work, "%(id)s.%(ext)s").path,
+                    "--", track.url,
+                ),
+            )
+            val info = readInfo(work) ?: return@withContext null
+            val audio = audioIn(work)?.takeIf { it.extension.lowercase() in AUDIO } ?: return@withContext null
+            info.str("thumbnail")?.let { MetadataSearch.download(it) }?.let(::squareJpeg)
+                ?.let { bytes -> File(work, "cover.jpg").also { it.writeBytes(bytes) } }
+                ?.let { CoverStore.setSongCover(track.songId, it) }
+            val name = info.trackName()
+            Song(
+                id = track.songId,
+                title = name.title.ifBlank { track.title },
+                artist = name.artist.ifBlank { track.artist },
+                album = info.str("album") ?: "",
+                albumId = 0,
+                durationMs = (info.optDouble("duration").takeIf { !it.isNaN() } ?: 0.0).times(1000).toLong(),
+                path = audio.path,
+            )
+        } catch (e: CancellationException) {
+            work.deleteRecursively()
+            throw e
+        } catch (e: Exception) {
+            work.deleteRecursively()
+            null
+        }
+    }
+
+    fun radioDiscard(track: RadioTrack) {
+        CoverStore.removeSongCover(track.songId)
+        File(radioDir, track.videoId).deleteRecursively()
+    }
+
+    /** Moves a radio track into the downloads folder, tagged and with its cover, and into the favourites. */
+    suspend fun radioKeep(track: RadioTrack): Long? = withContext(Dispatchers.IO) {
+        val cached = File(radioDir, track.videoId)
+        val info = readInfo(cached) ?: return@withContext null
+        // A copy to save from: the player may still be reading the cached one.
+        val work = File(AppDirs.cache, "downloads/radio-${track.videoId}").apply { deleteRecursively(); mkdirs() }
+        try {
+            cached.listFiles { f -> f.name != "cover.jpg" }?.forEach { it.copyTo(File(work, it.name), overwrite = true) }
+            val songId = save(info, work)
+            UserLibrary.get(AppDirs.files).addFavorites(listOf(songId))
+            _added.tryEmit(songId)
+            songId
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } finally {
+            work.deleteRecursively()
+        }
+    }
+
+    private fun audioIn(work: File): File? =
+        work.listFiles { f ->
+            !f.name.endsWith(".json") && !f.name.endsWith(".part") && !f.name.endsWith(".ytdl") && f.name != "cover.jpg"
+        }?.maxByOrNull { it.length() }
+
     /** Runs yt-dlp; a cancelled coroutine kills the process instead of waiting for it. */
-    private suspend fun execute(args: List<String>, onLine: ((String) -> Unit)? = null): String =
-        runInterruptible { runYtDlp(args, onLine) }
+    private suspend fun execute(args: List<String>, onLine: ((String) -> Unit)? = null): String = runInterruptible {
+        try {
+            runYtDlp(args, onLine)
+        } catch (e: IOException) {
+            // A browser that won't give its cookies up (Chrome locks and encrypts them) stops yt-dlp
+            // before it reads anything: the link is tried again without them.
+            val m = e.message.orEmpty()
+            if (SettingsStore.settings.value.cookiesBrowser.ytDlpName == null || !COOKIE_ERROR.containsMatchIn(m)) throw e
+            runYtDlp(args, onLine, cookies = false)
+        }
+    }
 
     /**
      * @return its standard output.
      * @throws IOException with the error lines when yt-dlp fails.
      */
-    private fun runYtDlp(args: List<String>, onLine: ((String) -> Unit)? = null): String {
+    private fun runYtDlp(args: List<String>, onLine: ((String) -> Unit)? = null, cookies: Boolean = true): String {
         // --ignore-config: a yt-dlp.conf of the user's (in %APPDATA%, say) could change the output
         // format or the -J json this reads.
-        val process = ProcessBuilder(listOf(ytDlp.absolutePath, "--ignore-config", "--encoding", "utf-8") + args)
+        val process = ProcessBuilder(listOf(ytDlp.absolutePath, "--ignore-config", "--encoding", "utf-8") + extraArgs(args, cookies) + args)
             .redirectErrorStream(false)
             .apply { environment()["PYTHONIOENCODING"] = "utf-8" }
             .start()
@@ -425,6 +572,15 @@ object Downloader {
             process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly()
             throw e
+        }
+    }
+
+    /** deno and the browser's cookies, for everything that reads a page (not for -U or --version). */
+    private fun extraArgs(args: List<String>, cookies: Boolean): List<String> {
+        if (args.firstOrNull() == "-U" || args.firstOrNull() == "--version") return emptyList()
+        return buildList {
+            if (deno.isFile) addAll(listOf("--js-runtimes", "deno:${deno.absolutePath}"))
+            if (cookies) SettingsStore.settings.value.cookiesBrowser.ytDlpName?.let { addAll(listOf("--cookies-from-browser", it)) }
         }
     }
 
@@ -490,6 +646,9 @@ object Downloader {
     private const val SEARCH_RESULTS = 15
     private const val YT_DLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
     private const val YT_DLP_SUMS_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS"
+    private val COOKIE_ERROR = Regex("""(?i)(could not (copy|find|open).*cookie|failed to decrypt|cookie database|DPAPI)""")
+    private const val DENO_URL = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip"
+    private const val DENO_SUMS_URL = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip.sha256sum"
     private val PROGRESS = Regex("""^\[download]\s+([\d.]+)%""")
     private val AUDIO = setOf("m4a", "mp3", "opus", "ogg", "flac", "wav", "aac", "webm", "mka")
 }
@@ -529,6 +688,8 @@ private fun classify(message: String?): FailReason {
     val m = message.orEmpty()
     return when {
         "Unsupported URL" in m || "is not a valid URL" in m -> FailReason.Unsupported
+        // Before "unavailable": the bot check also says "Sign in".
+        "not a bot" in m || "Sign in to confirm" in m -> FailReason.Bot
         "DRM" in m -> FailReason.Drm
         "Requested format is not available" in m -> FailReason.NoAudio
         "Unable to download" in m || "Errno" in m || "timed out" in m || "getaddrinfo" in m -> FailReason.Network

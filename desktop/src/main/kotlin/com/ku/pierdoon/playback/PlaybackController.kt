@@ -5,6 +5,7 @@ import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserLibrary
+import com.ku.pierdoon.radio.RadioTrack
 import com.ku.pierdoon.ui.components.ArtworkCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -46,14 +48,15 @@ object PlaybackController {
         var lastRecorded = -1L
         PlayHistory.load()
         player.addListener { p, events ->
-            val song = p.currentMediaItem?.song
+            // Radio tracks not kept aren't in the library: no history, no stats.
+            val song = p.currentMediaItem?.song?.takeUnless { RadioTrack.isRadio(it.id) }
             PlayHistory.tracker.update(
                 song?.id, song?.durationMs ?: 0, p.isPlaying, System.nanoTime() / 1_000_000, System.currentTimeMillis(),
                 newItem = Player.Event.Transition in events,
             )
             if (Player.Event.Transition in events || Player.Event.IsPlaying in events) {
                 // History counts what was actually played, not what was skipped past while paused.
-                val id = p.currentMediaItem?.song?.id
+                val id = song?.id
                 if (id != null && p.playWhenReady && id != lastRecorded) {
                     lastRecorded = id
                     library.recordPlayed(id)
@@ -63,6 +66,7 @@ object PlaybackController {
             syncMediaControls()
         }
         player.onOutputUnavailable = { _outputUnavailable.tryEmit(Unit) }
+        Radio.start()
 
         scope.launch {
             SettingsStore.settings
@@ -90,7 +94,10 @@ object PlaybackController {
         }
 
         scope.launch {
-            SettingsStore.settings.map { it.cassetteMode }.distinctUntilChanged().collect { player.tapeMode = it }
+            // No tape on the radio: an endless queue has no sides to turn or rewind.
+            combine(SettingsStore.settings.map { it.cassetteMode }, Radio.state.map { it != null }) { tape, radio -> tape && !radio }
+                .distinctUntilChanged()
+                .collect { player.tapeMode = it }
         }
 
         scope.launch {
@@ -192,7 +199,11 @@ object PlaybackController {
     }
 
     private fun snapshot() = SavedQueue(
-        songIds = List(player.mediaItemCount) { player.getMediaItemAt(it).song.id },
+        // A radio's download is gone after a restart; one kept in the library is saved as that.
+        songIds = List(player.mediaItemCount) { i ->
+            val id = player.getMediaItemAt(i).song.id
+            if (RadioTrack.isRadio(id)) Radio.libraryId(id) ?: -1L else id
+        },
         index = player.currentMediaItemIndex,
         positionMs = player.currentPosition,
         shuffle = player.shuffleModeEnabled,

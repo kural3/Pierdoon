@@ -1,5 +1,12 @@
 package com.ku.pierdoon.ui.edit
 
+import com.ku.pierdoon.ui.library.TWO_PANE_WIDTH
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material3.toShape
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.ui.graphics.graphicsLayer
 import com.ku.pierdoon.ui.desktop.Files
 import com.ku.pierdoon.ui.desktop.Toast
 import androidx.compose.animation.AnimatedContent
@@ -35,7 +42,9 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import com.ku.pierdoon.ui.components.SoftFieldShape
+import com.ku.pierdoon.ui.components.softFieldColors
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -189,15 +198,14 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
     }
 
     AppScaffold(title = stringResource(Res.string.edit_track_title), subtitle = song.title, onBack = onBack) { inner ->
-        LazyColumn(
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = inner.calculateTopPadding(),
-                bottom = listBottomPadding(bottomInset),
-            ),
-            modifier = Modifier.fillMaxSize().imePadding(),
-        ) {
+        val padding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = inner.calculateTopPadding(),
+            bottom = listBottomPadding(bottomInset),
+        )
+        // The cover and the tags.
+        val tagItems: LazyListScope.() -> Unit = {
             item(key = "cover") {
                 CoverHeader(
                     song = song,
@@ -232,7 +240,9 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                     })
                 }
             }
-
+        }
+        // Looking the track up online.
+        val searchItems: LazyListScope.() -> Unit = {
             item(key = "search") {
                 Group(stringResource(Res.string.search_online)) {
                     buildList<@Composable (androidx.compose.ui.graphics.Shape) -> Unit> {
@@ -242,7 +252,9 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 16.dp),
                                 ) {
-                                    OutlinedTextField(
+                                    TextField(
+                                        shape = SoftFieldShape,
+                                        colors = softFieldColors(),
                                         value = query,
                                         onValueChange = { query = it },
                                         label = { Text(stringResource(Res.string.search_query)) },
@@ -258,7 +270,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                         contentDescription = stringResource(Res.string.search_online),
                                         containerColor = MaterialTheme.colorScheme.primary,
                                         contentColor = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.padding(top = 8.dp).size(56.dp),
+                                        modifier = Modifier.size(56.dp),
                                     )
                                 }
                             }
@@ -306,7 +318,9 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                     )
                 }
             }
-
+        }
+        // Where it's saved, and the save button.
+        val saveItems: LazyListScope.() -> Unit = {
             item(key = "target") {
                 Group(stringResource(Res.string.save_where)) {
                     listOf<@Composable (androidx.compose.ui.graphics.Shape) -> Unit>({ shape ->
@@ -394,6 +408,24 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                 }
             }
         }
+        BoxWithConstraints(Modifier.fillMaxSize().imePadding()) {
+            if (maxWidth >= TWO_PANE_WIDTH) {
+                // Wide: the track's own details on the left, the online search beside them.
+                Row(Modifier.fillMaxSize()) {
+                    LazyColumn(contentPadding = padding, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        tagItems()
+                        saveItems()
+                    }
+                    LazyColumn(contentPadding = padding, modifier = Modifier.weight(1f).fillMaxHeight()) { searchItems() }
+                }
+            } else {
+                LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize()) {
+                    tagItems()
+                    searchItems()
+                    saveItems()
+                }
+            }
+        }
     }
 }
 
@@ -413,6 +445,14 @@ private fun CoverHeader(
     ) {
         Box(contentAlignment = Alignment.Center) {
             val shape = RoundedCornerShape(40.dp)
+            // A scalloped tile of the theme colour turned behind the cover.
+            Box(
+                Modifier
+                    .size(248.dp)
+                    .graphicsLayer { rotationZ = 14f }
+                    .clip(MaterialShapes.Cookie12Sided.toShape())
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+            )
             val cover = Modifier.size(200.dp).clip(shape)
             Crossfade(
                 targetState = picked ?: if (removed) "" else null,
@@ -474,7 +514,9 @@ private fun CoverHeader(
 
 @Composable
 private fun TagField(value: String, onChange: (String) -> Unit, label: StringResource, last: Boolean = false) {
-    OutlinedTextField(
+    TextField(
+        shape = SoftFieldShape,
+        colors = softFieldColors(),
         value = value,
         onValueChange = onChange,
         label = { Text(stringResource(label)) },

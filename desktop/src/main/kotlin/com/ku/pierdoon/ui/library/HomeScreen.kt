@@ -1,5 +1,9 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.components.ScrollableRow
+import com.ku.pierdoon.ui.library.TWO_PANE_WIDTH
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -57,6 +61,7 @@ import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.components.animatePressAsState
+import com.ku.pierdoon.ui.components.cornerDecor
 import com.ku.pierdoon.ui.components.scaleBy
 import com.ku.pierdoon.ui.navigation.Route
 import java.util.Calendar
@@ -76,7 +81,37 @@ fun HomeScreen(
     onOpen: (Route) -> Unit,
     onSongLongPress: (Song) -> Unit,
     bottomInset: Dp,
+    /** Starts "my wave"; null with the radio switched off. */
+    onMyWave: (() -> Unit)? = null,
 ) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val wide = maxWidth >= TWO_PANE_WIDTH
+    val shuffleCard: @Composable (Modifier) -> Unit = { m ->
+        QuickCard(
+            title = stringResource(Res.string.shuffle_all),
+            icon = PlayerIcons.Shuffle,
+            shape = MaterialShapes.Cookie9Sided.toShape(),
+            container = MaterialTheme.colorScheme.primaryContainer,
+            content = MaterialTheme.colorScheme.onPrimaryContainer,
+            onClick = onShuffleAll,
+            modifier = m,
+        )
+    }
+    val favoritesCard: @Composable (Modifier) -> Unit = { m ->
+        QuickCard(
+            title = stringResource(Res.string.favorites),
+            subtitle = pluralStringResource(Res.plurals.songs_count, favoritesCount, favoritesCount),
+            icon = PlayerIcons.Favorite,
+            shape = MaterialShapes.Sunny.toShape(),
+            container = MaterialTheme.colorScheme.tertiaryContainer,
+            content = MaterialTheme.colorScheme.onTertiaryContainer,
+            onClick = { onOpen(Route.Favorites) },
+            modifier = m,
+        )
+    }
+    val mixCard: @Composable (Modifier) -> Unit = { m ->
+        DailyMixCard(songs = dailyMix, onOpen = { onOpen(Route.DailyMix) }, onPlay = { onPlay(dailyMix, 0) }, modifier = m)
+    }
     LazyColumn(
         contentPadding = PaddingValues(bottom = listBottomPadding(bottomInset)),
         modifier = Modifier.fillMaxSize(),
@@ -91,47 +126,54 @@ fun HomeScreen(
                     .padding(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 20.dp),
             )
         }
+        if (wide) {
+            // A wide window: the cards side by side in two rows, each row as tall as its tallest.
+            item(key = "quick") {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp).height(IntrinsicSize.Min),
+                ) {
+                    shuffleCard(Modifier.weight(1f).fillMaxHeight())
+                    favoritesCard(Modifier.weight(1f).fillMaxHeight())
+                    if (dailyMix.isNotEmpty()) mixCard(Modifier.weight(2f).fillMaxHeight())
+                }
+            }
+            if (onMyWave != null || weekListenedMs != null) {
+                item(key = "wave") {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).height(IntrinsicSize.Min),
+                    ) {
+                        if (onMyWave != null) WaveCard(onMyWave, Modifier.weight(1f).fillMaxHeight())
+                        if (weekListenedMs != null) {
+                            StatsCard(weekListenedMs, onClick = { onOpen(Route.Stats) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        }
+                    }
+                }
+            }
+        } else {
         item(key = "quick") {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.padding(horizontal = 16.dp),
             ) {
-                QuickCard(
-                    title = stringResource(Res.string.shuffle_all),
-                    icon = PlayerIcons.Shuffle,
-                    shape = MaterialShapes.Cookie9Sided.toShape(),
-                    container = MaterialTheme.colorScheme.primaryContainer,
-                    content = MaterialTheme.colorScheme.onPrimaryContainer,
-                    onClick = onShuffleAll,
-                    modifier = Modifier.weight(1f),
-                )
-                QuickCard(
-                    title = stringResource(Res.string.favorites),
-                    subtitle = pluralStringResource(Res.plurals.songs_count, favoritesCount, favoritesCount),
-                    icon = PlayerIcons.Favorite,
-                    shape = MaterialShapes.Sunny.toShape(),
-                    container = MaterialTheme.colorScheme.tertiaryContainer,
-                    content = MaterialTheme.colorScheme.onTertiaryContainer,
-                    onClick = { onOpen(Route.Favorites) },
-                    modifier = Modifier.weight(1f),
-                )
+                shuffleCard(Modifier.weight(1f))
+                favoritesCard(Modifier.weight(1f))
             }
         }
-
         if (dailyMix.isNotEmpty()) {
-            item(key = "mix") {
-                DailyMixCard(
-                    songs = dailyMix,
-                    onOpen = { onOpen(Route.DailyMix) },
-                    onPlay = { onPlay(dailyMix, 0) },
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
-                )
+            item(key = "mix") { mixCard(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) }
+        }
+        if (onMyWave != null) {
+            item(key = "wave") {
+                WaveCard(onMyWave, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp))
             }
         }
         if (weekListenedMs != null) {
             item(key = "stats") {
                 StatsCard(weekListenedMs, onClick = { onOpen(Route.Stats) }, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp))
             }
+        }
         }
 
         if (recent.isNotEmpty()) {
@@ -141,9 +183,10 @@ fun HomeScreen(
         if (collections.recentlyAdded.isNotEmpty()) {
             item(key = "addedTitle") { SectionTitle(stringResource(Res.string.recently_added)) }
             item(key = "added") {
-                LazyRow(
+                ScrollableRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    firstKey = collections.recentlyAdded.firstOrNull()?.id,
                 ) {
                     itemsIndexed(collections.recentlyAdded, key = { _, s -> s.id }) { i, song ->
                         CoverCard(
@@ -161,7 +204,7 @@ fun HomeScreen(
         if (collections.albums.isNotEmpty()) {
             item(key = "albumsTitle") { SectionTitle(stringResource(Res.string.nav_albums)) }
             item(key = "albums") {
-                LazyRow(
+                ScrollableRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -172,7 +215,7 @@ fun HomeScreen(
         if (playlists.isNotEmpty()) {
             item(key = "playlistsTitle") { SectionTitle(stringResource(Res.string.your_playlists)) }
             item(key = "playlists") {
-                LazyRow(
+                ScrollableRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -190,6 +233,7 @@ fun HomeScreen(
                 }
             }
         }
+    }
     }
 }
 
@@ -219,6 +263,7 @@ private fun QuickCard(
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(container)
+            .cornerDecor(shape, content.copy(alpha = 0.08f))
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 onClick()
@@ -258,9 +303,10 @@ private fun QuickCard(
 @Composable
 private fun RecentRow(songs: List<Song>, onPlay: (List<Song>, Int) -> Unit) {
     val haptics = LocalHapticFeedback.current
-    LazyRow(
+    ScrollableRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        firstKey = songs.firstOrNull()?.id,
     ) {
         itemsIndexed(songs, key = { _, s -> s.id }) { index, song ->
             val source = remember { MutableInteractionSource() }
@@ -381,6 +427,7 @@ private fun DailyMixCard(songs: List<Song>, onOpen: () -> Unit, onPlay: () -> Un
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(colors.secondaryContainer)
+            .cornerDecor(MaterialShapes.Clover8Leaf.toShape(), colors.onSecondaryContainer.copy(alpha = 0.07f), size = 150.dp)
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onOpen()
@@ -456,6 +503,7 @@ private fun StatsCard(weekListenedMs: Long, onClick: () -> Unit, modifier: Modif
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(colors.surfaceContainerHigh)
+            .cornerDecor(MaterialShapes.Cookie6Sided.toShape(), colors.onSurface.copy(alpha = 0.05f), size = 110.dp)
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onClick()

@@ -60,7 +60,7 @@
     <string name="exclude_folder">Исключить папку</string>
     <string name="exclude_folder_desc">Её треки и вложенные папки пропадут из библиотеки, файлы останутся на месте</string>
     <string name="choose_excluded_folder">Выберите папку, которую не сканировать</string>
-    <string name="settings_downloads_summary">Папка, формат, yt-dlp</string>
+    <string name="settings_downloads_summary">Папка, формат, yt-dlp, журнал</string>
     <string name="download_folder">Куда сохранять</string>
     <string name="download_folder_choose">Выбрать другую папку</string>
     <string name="download_folder_choose_desc">Папка сама добавится в библиотеку</string>
@@ -71,13 +71,15 @@
     <string name="delete_song_body">«%1$s» будет перемещён в корзину</string>
     <string name="delete_songs_body">Треков: %1$d. Файлы будут перемещены в корзину</string>
     <string name="drop_link">Отпустите, чтобы скачать</string>
-    <string name="delicious_open">Режим Delicious (бета)</string>
+    <string name="delicious_open">Режим Delicious</string>
     <string name="delicious_close">Выйти из Delicious</string>
-    <string name="delicious_beta">бета</string>
     <string name="delicious_aura">Аура</string>
     <string name="delicious_waves">Волны</string>
     <string name="delicious_dust">Пыль</string>
     <string name="delicious_calm">Спокойно</string>
     <string name="settings_system">Система</string>
     <string name="settings_system_summary">Трей, статус в Discord</string>
+    <string name="youtube_cookies">Куки из браузера</string>
+    <string name="youtube_cookies_off">Не брать</string>
+    <string name="youtube_cookies_desc">Браузер, в котором вы вошли в YouTube: тогда он не примет загрузки за бота. Chrome и Edge часто не дают прочитать свои куки, надёжнее всего Firefox</string>
 </resources>

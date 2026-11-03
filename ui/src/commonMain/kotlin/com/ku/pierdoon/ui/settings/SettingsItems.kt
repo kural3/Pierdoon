@@ -21,11 +21,13 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -36,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -52,6 +55,7 @@ import com.ku.pierdoon.playback.PlaybackSpeed
 import com.ku.pierdoon.ui.components.ChoiceChip
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.PlayerIcons
+import com.ku.pierdoon.ui.components.cornerDecor
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.data.AppLanguage
 import com.ku.pierdoon.data.ColorSource
@@ -59,7 +63,6 @@ import com.ku.pierdoon.data.SharedSettings
 import com.ku.pierdoon.ui.resources.language_english
 import com.ku.pierdoon.ui.resources.language_russian
 import com.ku.pierdoon.ui.resources.language_system
-import com.ku.pierdoon.ui.resources.settings_cassette_on
 import com.ku.pierdoon.ui.resources.settings_crossfade_summary
 import com.ku.pierdoon.ui.resources.settings_equalizer_off
 import com.ku.pierdoon.ui.resources.settings_equalizer_on
@@ -101,7 +104,7 @@ import kotlin.math.roundToInt
 
 /** Shapes for grouped items: large outer corners, tight inner ones. */
 fun groupShape(index: Int, count: Int): Shape {
-    val outer = 24.dp
+    val outer = 28.dp
     val inner = 6.dp
     return RoundedCornerShape(
         topStart = if (index == 0) outer else inner,
@@ -120,9 +123,9 @@ fun Group(title: String?, items: () -> List<@Composable (Shape) -> Unit>) {
         if (title != null) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.titleSmallEmphasized,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 20.dp, top = 28.dp, bottom = 10.dp),
             )
         } else {
             Spacer(Modifier.height(12.dp))
@@ -134,20 +137,113 @@ fun Group(title: String?, items: () -> List<@Composable (Shape) -> Unit>) {
 }
 
 @Composable
-fun ItemContainer(shape: Shape, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun ItemContainer(
+    shape: Shape,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.surfaceContainer,
+    content: @Composable () -> Unit,
+) {
     Column(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(color)
     ) { content() }
+}
+
+/** The colour a section's icon sits on: each heading of the list gets its own. */
+enum class SectionTone { Primary, Secondary, Tertiary }
+
+/** The section list's headings, in order, each in its own colour. */
+fun sectionTone(groupIndex: Int): SectionTone = SectionTone.entries[groupIndex % SectionTone.entries.size]
+
+private val SectionShapes = listOf(
+    MaterialShapes.Cookie9Sided, MaterialShapes.Clover4Leaf, MaterialShapes.Sunny, MaterialShapes.Cookie6Sided,
+    MaterialShapes.Gem, MaterialShapes.Pentagon, MaterialShapes.Clover8Leaf, MaterialShapes.Cookie7Sided,
+    MaterialShapes.SoftBurst, MaterialShapes.Puffy,
+)
+
+/** A shape of its own for the section at [index] on the list, so each icon reads apart. */
+@Composable
+fun sectionIconShape(index: Int): Shape = SectionShapes[index % SectionShapes.size].toShape()
+
+/**
+ * The top of the settings list: the app's mark, name and version, and a chip with how updates
+ * stand; tapping the chip opens the updates page.
+ */
+@Composable
+fun SettingsHero(name: String, version: String, status: String, onStatusClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val haptics = LocalHapticFeedback.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(32.dp))
+            .background(colors.primaryContainer)
+            .cornerDecor(MaterialShapes.Flower.toShape(), colors.onPrimaryContainer.copy(alpha = 0.07f), size = 170.dp)
+            .padding(16.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(76.dp).clip(MaterialShapes.Cookie12Sided.toShape()).background(colors.primary),
+        ) {
+            Icon(PlayerIcons.MusicNote, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(36.dp))
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.headlineSmallEmphasized, color = colors.onPrimaryContainer, maxLines = 1)
+            Text(version, style = MaterialTheme.typography.bodyMedium, color = colors.onPrimaryContainer.copy(alpha = 0.75f), maxLines = 1)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(colors.onPrimaryContainer.copy(alpha = 0.10f))
+                    .clickable {
+                        haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                        onStatusClick()
+                    }
+                    .padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+            ) {
+                Icon(PlayerIcons.Refresh, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    status,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.onPrimaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
 }
 
 /** A section on the main settings list: icon, name, a hint of what's inside, and a chevron. */
 @Composable
-fun SectionItem(shape: Shape, icon: ImageVector, title: String, summary: String, onClick: () -> Unit) {
+fun SectionItem(
+    shape: Shape,
+    icon: ImageVector,
+    title: String,
+    summary: String,
+    onClick: () -> Unit,
+    tone: SectionTone = SectionTone.Secondary,
+    iconShape: Shape = CircleShape,
+    /** The section open beside the list, on a wide window. */
+    selected: Boolean = false,
+    /** Off where the section opens beside the list rather than on a page of its own. */
+    chevron: Boolean = true,
+) {
+    val colors = MaterialTheme.colorScheme
+    val (iconContainer, iconContent) = when (tone) {
+        SectionTone.Primary -> colors.primaryContainer to colors.onPrimaryContainer
+        SectionTone.Secondary -> colors.secondaryContainer to colors.onSecondaryContainer
+        SectionTone.Tertiary -> colors.tertiaryContainer to colors.onTertiaryContainer
+    }
     val haptics = LocalHapticFeedback.current
-    ItemContainer(shape) {
+    ItemContainer(shape, color = if (selected) colors.secondaryContainer else colors.surfaceContainer) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -161,14 +257,14 @@ fun SectionItem(shape: Shape, icon: ImageVector, title: String, summary: String,
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                    .size(46.dp)
+                    .clip(iconShape)
+                    .background(iconContainer),
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    tint = iconContent,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -184,7 +280,7 @@ fun SectionItem(shape: Shape, icon: ImageVector, title: String, summary: String,
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Icon(PlayerIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (chevron) Icon(PlayerIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -467,12 +563,11 @@ fun ColorsItem(
     }
 }
 
-/** "Speed 1× · crossfade 5 s · cassette", under Playback on the list of sections. */
+/** "Speed 1× · crossfade 5 s", under Playback on the list of sections. */
 @Composable
 fun playbackSummary(settings: SharedSettings): String = listOfNotNull(
     stringResource(Res.string.settings_playback_speed_summary, PlaybackSpeed.label(settings.playbackSpeed)),
     settings.crossfadeSeconds.takeIf { it > 0 }?.let { stringResource(Res.string.settings_crossfade_summary, crossfadeLabel(it)) },
-    if (settings.cassetteMode) stringResource(Res.string.settings_cassette_on) else null,
 ).joinToString(" · ")
 
 /** "Off" or "On · Rock", under Equalizer on the list of sections. */

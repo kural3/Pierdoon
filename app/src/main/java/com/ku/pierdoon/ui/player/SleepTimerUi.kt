@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.components.GlassSheet
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import com.ku.pierdoon.ui.resources.Res
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -71,7 +71,7 @@ fun SleepTimerSheet(state: SleepTimerState?, onDismiss: () -> Unit) {
         block()
         onDismiss()
     }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    GlassSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Text(
                 stringResource(Res.string.sleep_timer),

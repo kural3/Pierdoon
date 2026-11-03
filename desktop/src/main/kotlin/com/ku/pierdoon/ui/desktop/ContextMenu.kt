@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.desktop
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import com.ku.pierdoon.ui.components.MenuGlass
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
@@ -67,19 +70,23 @@ fun ContextMenu(onDismiss: () -> Unit, width: Dp = 272.dp, content: @Composable 
             enter = fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()) +
                 scaleIn(MaterialTheme.motionScheme.fastSpatialSpec(), initialScale = 0.9f, transformOrigin = provider.origin),
         ) {
+            val shape = RoundedCornerShape(20.dp)
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = shape,
+                color = Color.Transparent,
                 shadowElevation = 12.dp,
                 modifier = Modifier.width(width),
             ) {
-                Column(
-                    Modifier
-                        .heightIn(max = 560.dp)
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = 6.dp),
-                    content = content,
-                )
+                Box {
+                    MenuGlass(shape, MaterialTheme.colorScheme.surfaceContainerHigh, Modifier.matchParentSize())
+                    Column(
+                        Modifier
+                            .heightIn(max = 560.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(vertical = 6.dp),
+                        content = content,
+                    )
+                }
             }
         }
     }
@@ -89,12 +96,16 @@ fun ContextMenu(onDismiss: () -> Unit, width: Dp = 272.dp, content: @Composable 
 @Composable
 fun DesktopSheet(onDismiss: () -> Unit, width: Dp = 440.dp, content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
+        val shape = RoundedCornerShape(28.dp)
         Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = shape,
+            color = Color.Transparent,
             modifier = Modifier.width(width),
         ) {
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 20.dp), content = content)
+            Box {
+                MenuGlass(shape, MaterialTheme.colorScheme.surfaceContainerLow, Modifier.matchParentSize())
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 20.dp), content = content)
+            }
         }
     }
 }

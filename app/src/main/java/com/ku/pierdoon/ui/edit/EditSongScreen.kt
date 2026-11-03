@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.edit
 
+import androidx.compose.material3.toShape
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.ui.graphics.graphicsLayer
 import org.jetbrains.compose.resources.StringResource
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
@@ -44,7 +47,9 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import com.ku.pierdoon.ui.components.SoftFieldShape
+import com.ku.pierdoon.ui.components.softFieldColors
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -264,7 +269,9 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 16.dp),
                                 ) {
-                                    OutlinedTextField(
+                                    TextField(
+                                        shape = SoftFieldShape,
+                                        colors = softFieldColors(),
                                         value = query,
                                         onValueChange = { query = it },
                                         label = { Text(stringResource(Res.string.search_query)) },
@@ -280,7 +287,7 @@ fun EditSongScreen(song: Song, vm: MainViewModel, onBack: () -> Unit, bottomInse
                                         contentDescription = stringResource(Res.string.search_online),
                                         containerColor = MaterialTheme.colorScheme.primary,
                                         contentColor = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.padding(top = 8.dp).size(56.dp),
+                                        modifier = Modifier.size(56.dp),
                                     )
                                 }
                             }
@@ -436,6 +443,14 @@ private fun CoverHeader(
     ) {
         Box(contentAlignment = Alignment.Center) {
             val shape = RoundedCornerShape(40.dp)
+            // A scalloped tile of the theme colour turned behind the cover.
+            Box(
+                Modifier
+                    .size(248.dp)
+                    .graphicsLayer { rotationZ = 14f }
+                    .clip(MaterialShapes.Cookie12Sided.toShape())
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+            )
             val cover = Modifier.size(200.dp).clip(shape)
             Crossfade(
                 targetState = picked ?: if (removed) "" else null,
@@ -497,7 +512,9 @@ private fun CoverHeader(
 
 @Composable
 private fun TagField(value: String, onChange: (String) -> Unit, label: StringResource, last: Boolean = false) {
-    OutlinedTextField(
+    TextField(
+        shape = SoftFieldShape,
+        colors = softFieldColors(),
         value = value,
         onValueChange = onChange,
         label = { Text(stringResource(label)) },

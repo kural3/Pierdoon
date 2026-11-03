@@ -1,5 +1,9 @@
 package com.ku.pierdoon.ui
 
+import androidx.compose.ui.draw.shadow
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInHorizontally
+import com.ku.pierdoon.ui.components.LocalBackdrop
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -87,6 +91,10 @@ import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.history.DailyMix
+import com.ku.pierdoon.radio.RadioStart
+import com.ku.pierdoon.radio.RadioState
+import com.ku.pierdoon.radio.RadioTrack
+import com.ku.pierdoon.ui.player.PlayerRadio
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserData
@@ -185,6 +193,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val lyrics by vm.lyrics.collectAsState()
     val lyricsOffset by vm.lyricsOffset.collectAsState()
     val userData by vm.userData.collectAsState()
+    val radio by vm.radio.collectAsState()
     val queue by vm.queue.collectAsState()
     val update by vm.update.collectAsState()
     val updatePrompt by vm.updatePrompt.collectAsState()
@@ -260,7 +269,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val noFolders = settings.musicFolders.none { File(it).isDirectory }
     val chooseFolder = stringResource(Res.string.choose_folder)
 
-    CompositionLocalProvider(LocalLyricsSearch provides lyricsSearch) {
+    CompositionLocalProvider(LocalLyricsSearch provides lyricsSearch, LocalBackdrop provides backdrop) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).trackPointer()) {
             Box(
                 Modifier
@@ -315,39 +324,42 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                             )
                         }
                     }
-                    AnimatedVisibility(
-                        visible = sidePanel != null && nowPlaying != null && ready,
-                        enter = expandHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeIn(effects),
-                        exit = shrinkHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeOut(effects),
-                    ) {
-                        SidePanelContent(
-                            panel = sidePanel ?: SidePanel.Lyrics,
-                            bottomInset = bottomInset,
-                            lyrics = { modifier ->
-                                LyricsPanel(
-                                    state = lyrics,
-                                    position = { position.value },
-                                    onSeek = vm::seekTo,
-                                    onRetry = vm::retryLyrics,
-                                    offsetMs = lyricsOffset,
-                                    onShift = vm::shiftLyrics,
-                                    onResetOffset = vm::resetLyricsOffset,
-                                    modifier = modifier,
-                                )
-                            },
-                            queue = { modifier ->
-                                QueuePanel(
-                                    queue = queue,
-                                    onPlay = vm::playQueueEntry,
-                                    onRemove = vm::removeQueueEntry,
-                                    onMove = vm::moveQueueEntry,
-                                    onLongPress = { songAction = SongActionTarget(it) },
-                                    modifier = modifier,
-                                )
-                            },
-                        )
-                    }
                 }
+            }
+            // Over the screen rather than beside it, on frosted glass: opening it moves nothing.
+            AnimatedVisibility(
+                visible = sidePanel != null && nowPlaying != null && ready,
+                enter = slideInHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) { it / 3 } + fadeIn(effects),
+                exit = slideOutHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) { it / 3 } + fadeOut(effects),
+                modifier = Modifier.align(Alignment.TopEnd).graphicsLayer { alpha = if (covered) 0f else 1f },
+            ) {
+                SidePanelContent(
+                    panel = sidePanel ?: SidePanel.Lyrics,
+                    bottomInset = bottomInset,
+                    backdrop = backdrop,
+                    lyrics = { modifier ->
+                        LyricsPanel(
+                            state = lyrics,
+                            position = { position.value },
+                            onSeek = vm::seekTo,
+                            onRetry = vm::retryLyrics,
+                            offsetMs = lyricsOffset,
+                            onShift = vm::shiftLyrics,
+                            onResetOffset = vm::resetLyricsOffset,
+                            modifier = modifier,
+                        )
+                    },
+                    queue = { modifier ->
+                        QueuePanel(
+                            queue = queue,
+                            onPlay = vm::playQueueEntry,
+                            onRemove = vm::removeQueueEntry,
+                            onMove = vm::moveQueueEntry,
+                            onLongPress = { songAction = SongActionTarget(it) },
+                            modifier = modifier,
+                        )
+                    },
+                )
             }
 
             if (ready) {
@@ -365,7 +377,8 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                             nowPlaying = np,
                             state = player,
                             position = { position.value },
-                            isFavorite = np.songId in userData.favorites,
+                            isFavorite = np.songId in userData.favorites || radio?.kept?.containsKey(np.songId) == true,
+                            radio = playerRadio(radio, np.songId, vm),
                             volume = settings.volume,
                             muted = settings.muted,
                             showLyrics = sidePanel == SidePanel.Lyrics,
@@ -406,7 +419,8 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                         showLyrics = sidePanel != SidePanel.Queue,
                         queue = queue,
                         showQueue = sidePanel == SidePanel.Queue,
-                        isFavorite = np.songId in userData.favorites,
+                        isFavorite = np.songId in userData.favorites || radio?.kept?.containsKey(np.songId) == true,
+                        radio = playerRadio(radio, np.songId, vm),
                         volume = settings.volume,
                         muted = settings.muted,
                         onToggleFavorite = { vm.toggleFavorite(np.songId) },
@@ -465,7 +479,6 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
 
             ToastHost(Modifier.align(Alignment.BottomCenter).padding(bottom = bottomInset + 16.dp))
         }
-    }
 
     songAction?.let { target ->
         SongActionsSheet(
@@ -484,6 +497,11 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                 nav.push(Route.EditSong(target.song.id))
             },
             onDelete = { deleteSongs(listOf(target.song)) {} },
+            onRadio = if (settings.radioEnabled && !RadioTrack.isRadio(target.song.id)) {
+                { vm.startRadio(RadioStart.track(target.song)) }
+            } else {
+                null
+            },
         )
     }
     bulk?.let { target ->
@@ -591,23 +609,32 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
         )
         null -> Unit
     }
+    }
 }
 
 @Composable
 private fun SidePanelContent(
     panel: SidePanel,
     bottomInset: Dp,
+    backdrop: Backdrop,
     lyrics: @Composable (Modifier) -> Unit,
     queue: @Composable (Modifier) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(28.dp)
     Column(
         Modifier
             .width(SIDE_PANEL_WIDTH)
             .fillMaxHeight()
             .padding(top = 12.dp, end = 12.dp, bottom = bottomInset + 12.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(colors.surfaceContainerLow)
+            .shadow(16.dp, shape)
+            .glass(
+                backdrop = backdrop,
+                shape = shape,
+                tint = colors.surfaceContainerLow.copy(alpha = 0.62f),
+                fallback = colors.surfaceContainerLow,
+                blurRadius = 40.dp,
+            )
             .padding(top = 16.dp, start = 12.dp, end = 12.dp),
     ) {
         Text(
@@ -691,6 +718,11 @@ private fun Screens(
                         onOpen = nav::push,
                         onSongLongPress = { onSongLongPress(it, null) },
                         bottomInset = bottomInset,
+                        onMyWave = if (settings.radioEnabled && songs.isNotEmpty()) {
+                            { vm.startRadio(RadioStart.wave(dailyMix.ifEmpty { songs.shuffled().take(DailyMix.SIZE) })) }
+                        } else {
+                            null
+                        },
                     )
                 }
                 Route.Library -> LibraryScreen(
@@ -1083,4 +1115,16 @@ private fun rememberLastNonNull(value: NowPlaying?): NowPlaying? {
     val holder = remember { arrayOfNulls<NowPlaying>(1) }
     if (value != null) holder[0] = value
     return holder[0]
+}
+
+/** What the players show of the radio for the track [songId], or null without one. */
+private fun playerRadio(radio: RadioState?, songId: Long, vm: MainViewModel): PlayerRadio? = radio?.let { r ->
+    PlayerRadio(
+        seed = r.seed,
+        // Kept in the library, it's no longer new.
+        fresh = songId in r.fresh && songId !in r.kept,
+        offline = r.offline,
+        onDislike = { vm.dislikeRadio(songId) },
+        onStop = vm::stopRadio,
+    )
 }

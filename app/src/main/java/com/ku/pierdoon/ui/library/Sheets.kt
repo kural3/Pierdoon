@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.components.GlassSheet
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -39,7 +40,6 @@ import androidx.compose.material3.toShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -90,6 +90,8 @@ fun SongActionsSheet(
     onDelete: (() -> Unit)?,
     /** Null without a paired computer. */
     onSendToComputer: (() -> Unit)? = null,
+    /** A radio from this track; null with the radio switched off. */
+    onRadio: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     var pickingPlaylist by remember { mutableStateOf(false) }
@@ -100,7 +102,7 @@ fun SongActionsSheet(
         onDismiss()
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    GlassSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -135,6 +137,9 @@ fun SongActionsSheet(
                     if (!picking) {
                         ActionItem(PlayerIcons.PlayNext, stringResource(Res.string.play_next)) { act(onPlayNext) }
                         ActionItem(PlayerIcons.Queue, stringResource(Res.string.add_to_queue)) { act(onAddToQueue) }
+                        if (onRadio != null) {
+                            ActionItem(PlayerIcons.Radio, stringResource(Res.string.radio_start)) { act(onRadio) }
+                        }
                         ActionItem(
                             if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
                             stringResource(if (isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites),
@@ -187,7 +192,7 @@ fun PlaylistActionsSheet(
     onSendToComputer: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    GlassSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Text(
                 playlist.name,
@@ -309,7 +314,7 @@ fun PlaylistCoverSheet(
     val selectedShape = PlaylistShapes.all.firstOrNull { it.first == playlist.shape }?.first
         ?: PlaylistShapes.all.first().first
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    GlassSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 16.dp),

@@ -60,6 +60,7 @@ import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.animatePressAsState
+import com.ku.pierdoon.ui.components.cornerDecor
 import com.ku.pierdoon.ui.components.scaleBy
 import com.ku.pierdoon.ui.navigation.Route
 import java.util.Calendar
@@ -79,6 +80,8 @@ fun HomeScreen(
     onOpen: (Route) -> Unit,
     onSongLongPress: (Song) -> Unit,
     bottomInset: Dp,
+    /** Starts "my wave"; null with the radio switched off. */
+    onMyWave: (() -> Unit)? = null,
 ) {
     LazyColumn(
         contentPadding = PaddingValues(bottom = listBottomPadding(bottomInset)),
@@ -142,6 +145,11 @@ fun HomeScreen(
                     onPlay = { onPlay(dailyMix, 0) },
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
                 )
+            }
+        }
+        if (onMyWave != null) {
+            item(key = "wave") {
+                WaveCard(onMyWave, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp))
             }
         }
         if (weekListenedMs != null) {
@@ -235,6 +243,7 @@ private fun QuickCard(
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(container)
+            .cornerDecor(shape, content.copy(alpha = 0.08f))
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 onClick()
@@ -405,6 +414,7 @@ private fun DailyMixCard(songs: List<Song>, onOpen: () -> Unit, onPlay: () -> Un
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(colors.secondaryContainer)
+            .cornerDecor(MaterialShapes.Clover8Leaf.toShape(), colors.onSecondaryContainer.copy(alpha = 0.07f), size = 150.dp)
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onOpen()
@@ -480,6 +490,7 @@ private fun StatsCard(weekListenedMs: Long, onClick: () -> Unit, modifier: Modif
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(colors.surfaceContainerHigh)
+            .cornerDecor(MaterialShapes.Cookie6Sided.toShape(), colors.onSurface.copy(alpha = 0.05f), size = 110.dp)
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onClick()

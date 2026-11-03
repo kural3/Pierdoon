@@ -1,6 +1,13 @@
 package com.ku.pierdoon.ui.settings
 
+import com.ku.pierdoon.ui.library.TWO_PANE_WIDTH
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.graphics.RectangleShape
+import com.ku.pierdoon.data.CookieBrowser
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +40,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.BuildConfig
+import com.ku.pierdoon.radio.RadioMemory
+import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.data.AppFont
 import com.ku.pierdoon.data.AppLanguage
 import com.ku.pierdoon.data.AppSettings
@@ -75,7 +84,7 @@ enum class SectionGroup(val title: StringResource) {
 enum class SettingsSection(val group: SectionGroup) {
     Library(SectionGroup.Music), Lyrics(SectionGroup.Music), Downloads(SectionGroup.Music),
     Playback(SectionGroup.Sound), Equalizer(SectionGroup.Sound),
-    Appearance(SectionGroup.App), System(SectionGroup.App), Updates(SectionGroup.App),
+    Appearance(SectionGroup.App), System(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App),
 }
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
@@ -117,34 +126,69 @@ fun SettingsScreen(
         UpdateState.Idle -> stringResource(Res.string.update_current, version)
     }
 
-    AppScaffold(
-        title = stringResource(section?.title() ?: Res.string.nav_settings),
-        onBack = if (section != null) onBack else null,
-    ) { inner ->
-        LazyColumn(
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = inner.calculateTopPadding(),
-                bottom = listBottomPadding(bottomInset),
-            ),
-            // A readable width on a wide window, lined up under the title.
-            modifier = Modifier.fillMaxHeight().widthIn(max = CONTENT_MAX_WIDTH),
-        ) {
-            when (section) {
-                null -> sectionList(onOpen, settings, trackCount, updateStatus, version)
-                SettingsSection.Appearance -> appearance(settings, onUpdate)
-                SettingsSection.System -> system(settings, onUpdate)
-                SettingsSection.Playback -> playback(settings, onUpdate)
-                SettingsSection.Equalizer -> equalizer(settings, onUpdate)
-                SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
-                SettingsSection.Library -> library(settings, trackCount, onRescan, onAddFolder, onRemoveFolder, onExcludeFolder, onUnexcludeFolder)
-                SettingsSection.Downloads -> downloads(settings, onUpdate, onDownloadFolder)
-                SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
+    // One page's items, whichever layout holds them.
+    val page: LazyListScope.(SettingsSection) -> Unit = { s ->
+        when (s) {
+            SettingsSection.Appearance -> appearance(settings, onUpdate)
+            SettingsSection.System -> system(settings, onUpdate)
+            SettingsSection.Playback -> playback(settings, onUpdate)
+            SettingsSection.Equalizer -> equalizer(settings, onUpdate)
+            SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
+            SettingsSection.Library -> library(settings, trackCount, onRescan, onAddFolder, onRemoveFolder, onExcludeFolder, onUnexcludeFolder)
+            SettingsSection.Downloads -> downloads(settings, onUpdate, onDownloadFolder)
+            SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
+            SettingsSection.Beta -> beta(settings, onUpdate)
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        if (maxWidth >= TWO_PANE_WIDTH) {
+            // Wide: the sections stay listed on the left and the one picked opens beside them.
+            var picked by remember(section) { mutableStateOf(section ?: SettingsSection.entries.first()) }
+            AppScaffold(
+                title = stringResource(Res.string.nav_settings),
+                onBack = null,
+            ) { inner ->
+                val padding = PaddingValues(top = inner.calculateTopPadding(), bottom = listBottomPadding(bottomInset))
+                Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    LazyColumn(contentPadding = padding, modifier = Modifier.width(SECTION_LIST_WIDTH).fillMaxHeight()) {
+                        sectionList({ picked = it }, settings, trackCount, updateStatus, version, selected = picked)
+                    }
+                    LazyColumn(contentPadding = padding, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        item(key = "pageTitle_${picked.name}") {
+                            Text(
+                                stringResource(picked.title()),
+                                style = MaterialTheme.typography.headlineMediumEmphasized,
+                                modifier = Modifier.padding(start = 20.dp, top = 4.dp),
+                            )
+                        }
+                        page(picked)
+                    }
+                }
+            }
+            return@BoxWithConstraints
+        }
+        AppScaffold(
+            title = stringResource(section?.title() ?: Res.string.nav_settings),
+            onBack = if (section != null) onBack else null,
+        ) { inner ->
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = inner.calculateTopPadding(),
+                    bottom = listBottomPadding(bottomInset),
+                ),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (section == null) sectionList(onOpen, settings, trackCount, updateStatus, version) else page(section)
             }
         }
     }
 }
+
+/** The list of sections beside an open one on a wide window. */
+private val SECTION_LIST_WIDTH = 400.dp
 
 private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Appearance -> Res.string.settings_appearance
@@ -155,6 +199,7 @@ private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Library -> Res.string.settings_library
     SettingsSection.Downloads -> Res.string.settings_downloads
     SettingsSection.Updates -> Res.string.settings_updates
+    SettingsSection.Beta -> Res.string.settings_beta
 }
 
 private fun SettingsSection.icon(): ImageVector = when (this) {
@@ -166,6 +211,7 @@ private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Library -> PlayerIcons.Library
     SettingsSection.Downloads -> PlayerIcons.Download
     SettingsSection.Updates -> PlayerIcons.Refresh
+    SettingsSection.Beta -> PlayerIcons.Science
 }
 
 private fun LazyListScope.sectionList(
@@ -174,7 +220,16 @@ private fun LazyListScope.sectionList(
     trackCount: Int,
     updateStatus: String,
     version: String,
+    selected: SettingsSection? = null,
 ) {
+    item(key = "hero") {
+        SettingsHero(
+            name = stringResource(Res.string.app_name),
+            version = stringResource(Res.string.settings_version, version),
+            status = updateStatus,
+            onStatusClick = { onOpen(SettingsSection.Updates) },
+        )
+    }
     for (group in SectionGroup.entries) item(key = "sections_${group.name}") {
         Group(stringResource(group.title)) {
             SettingsSection.entries.filter { it.group == group }.map { s ->
@@ -195,8 +250,13 @@ private fun LazyListScope.sectionList(
                             )
                             SettingsSection.Downloads -> stringResource(Res.string.settings_downloads_summary)
                             SettingsSection.Updates -> updateStatus
+                            SettingsSection.Beta -> stringResource(Res.string.settings_beta_summary)
                         },
                         onClick = { onOpen(s) },
+                        selected = s == selected,
+                        chevron = selected == null,
+                        tone = sectionTone(group.ordinal),
+                        iconShape = sectionIconShape(s.ordinal),
                     )
                 }
             }
@@ -208,13 +268,6 @@ private fun LazyListScope.sectionList(
                 { shape ->
                     ItemContainer(shape) {
                         Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                            Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                stringResource(Res.string.settings_version, version),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(8.dp))
                             Text(
                                 stringResource(Res.string.settings_lyrics_source),
                                 style = MaterialTheme.typography.bodySmall,
@@ -370,6 +423,19 @@ private fun rememberFontPicker(onUpdate: Update): () -> Unit {
     }
 }
 
+private fun LazyListScope.beta(settings: AppSettings, onUpdate: Update) {
+    item(key = "beta") {
+        BetaGroups(
+            settings = settings,
+            onRadio = { on -> onUpdate { it.shared { copy(radioEnabled = on) } } },
+            onNovelty = { n -> onUpdate { it.shared { copy(radioNovelty = n) } } },
+            onBuffer = { n -> onUpdate { it.shared { copy(radioBuffer = n) } } },
+            onForgetDislikes = { RadioMemory.get(AppDirs.files).clear() },
+            onCassette = { v -> onUpdate { it.shared { copy(cassetteMode = v) } } },
+        )
+    }
+}
+
 private fun LazyListScope.system(settings: AppSettings, onUpdate: Update) {
     item(key = "system") {
         Group(null) {
@@ -445,19 +511,6 @@ private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
                     )
                 },
             )
-        }
-    }
-    item(key = "modes") {
-        Group(stringResource(Res.string.settings_modes)) {
-            listOf<@Composable (Shape) -> Unit>({ shape ->
-                SwitchItem(
-                    shape = shape,
-                    title = stringResource(Res.string.settings_cassette_mode),
-                    subtitle = stringResource(Res.string.settings_cassette_mode_desc),
-                    checked = settings.cassetteMode,
-                    onChange = { v -> onUpdate { it.shared { copy(cassetteMode = v) } } },
-                )
-            })
         }
     }
 }
@@ -717,6 +770,31 @@ private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update, onD
             )
         }
     }
+    item(key = "youtube_cookies") {
+        Group(stringResource(Res.string.youtube_group)) {
+            listOf<@Composable (Shape) -> Unit>({ shape ->
+                ItemContainer(shape) {
+                    Column {
+                        DropdownItem(
+                            shape = RectangleShape,
+                            title = stringResource(Res.string.youtube_cookies),
+                            options = CookieBrowser.entries,
+                            selected = settings.cookiesBrowser,
+                            label = { b -> if (b == CookieBrowser.Off) stringResource(Res.string.youtube_cookies_off) else b.label },
+                            onSelect = { b -> onUpdate { it.copy(cookiesBrowser = b) } },
+                        )
+                        Text(
+                            stringResource(Res.string.youtube_cookies_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp),
+                        )
+                    }
+                }
+            })
+        }
+    }
+    downloadLog(Downloader.log.entries, Downloader.log::clear)
 }
 
 private fun LazyListScope.updates(

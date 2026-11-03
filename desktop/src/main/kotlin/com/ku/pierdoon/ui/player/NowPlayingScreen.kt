@@ -130,6 +130,8 @@ fun NowPlayingScreen(
     modifier: Modifier = Modifier,
     /** The expanding sheet's drag: pulling the player down shrinks it back into the bar. */
     dragModifier: Modifier = Modifier,
+    /** The radio playing (beta), or null. */
+    radio: PlayerRadio? = null,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         if (maxWidth < WIDE) {
@@ -163,6 +165,7 @@ fun NowPlayingScreen(
                 onCollapse = onCollapse,
                 onOpenDelicious = onOpenDelicious,
                 dragModifier = dragModifier,
+                radio = radio,
             )
         } else {
             WideNowPlaying(
@@ -170,7 +173,7 @@ fun NowPlayingScreen(
                 onToggleFavorite, onToggleLyrics, onToggleQueue, onPlayQueueEntry, onRemoveQueueEntry,
                 onMoveQueueEntry, onSongLongPress, onRetryLyrics, lyricsOffsetMs, onShiftLyrics,
                 onResetLyricsOffset, onTogglePlay, onPrevious, onNext, onSeek, onToggleShuffle,
-                onCycleRepeat, onVolume, onToggleMute, onOpenArtist, onCollapse, onOpenDelicious, dragModifier,
+                onCycleRepeat, onVolume, onToggleMute, onOpenArtist, onCollapse, onOpenDelicious, dragModifier, radio,
             )
         }
     }
@@ -212,9 +215,12 @@ private fun WideNowPlaying(
     onCollapse: () -> Unit,
     onOpenDelicious: () -> Unit,
     dragModifier: Modifier,
+    radio: PlayerRadio?,
 ) {
     val colors = MaterialTheme.colorScheme
     val nothing = LocalUiPrefs.current.nothing
+    // No tape on the radio: an endless queue has no sides.
+    val cassetteMode = SettingsStore.settings.collectAsState().value.cassetteMode && radio == null
     val glassButton = if (nothing) colors.surfaceContainerHigh else colors.surfaceContainerHighest.copy(alpha = 0.45f)
     val panel = if (showQueue) PlayerPanel.Queue else PlayerPanel.Lyrics
     // Immersive lyrics, as on the phone: after a few idle seconds with lyrics showing, the top
@@ -287,7 +293,12 @@ private fun WideNowPlaying(
                         contentColor = colors.onSurface,
                         modifier = Modifier.size(44.dp),
                     )
-                    Text(stringResource(Res.string.now_playing), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 14.dp))
+                    // The radio's name takes "Now playing"'s place.
+                    if (radio != null) {
+                        RadioTitle(radio, Modifier.padding(horizontal = 14.dp))
+                    } else {
+                        Text(stringResource(Res.string.now_playing), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 14.dp))
+                    }
                     Spacer(Modifier.weight(1f))
                     SpeedButton(glassButton)
                     Spacer(Modifier.width(8.dp))
@@ -326,7 +337,7 @@ private fun WideNowPlaying(
                             durationMs = state.durationMs,
                             onTap = onTogglePlay,
                             onSeek = onSeek,
-                            tape = queue.tape.takeIf { SettingsStore.settings.collectAsState().value.cassetteMode },
+                            tape = queue.tape.takeIf { cassetteMode },
                             modifier = Modifier.align(Alignment.CenterHorizontally).scaledSquare(normal, roomy) { grow.value },
                         )
                         Spacer(Modifier.height(20.dp))
@@ -355,7 +366,7 @@ private fun WideNowPlaying(
                             } else {
                                 Column(Modifier.fillMaxWidth()) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        TrackTitle(nowPlaying, onOpenArtist, Modifier.weight(1f))
+                                        TrackTitle(nowPlaying, onOpenArtist, Modifier.weight(1f), fresh = radio?.fresh == true)
                                         FavoriteButton(isFavorite = isFavorite, onClick = onToggleFavorite, containerColor = glassButton)
                                     }
                                     Spacer(Modifier.height(8.dp))
@@ -372,11 +383,13 @@ private fun WideNowPlaying(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth(),
                                     ) {
+                                        // The radio picks its own order and never ends: "not this"
+                                        // and "stop" in place of shuffle and repeat.
                                         ExpressiveToggleButton(
-                                            checked = state.shuffle,
-                                            onClick = onToggleShuffle,
-                                            icon = PlayerIcons.Shuffle,
-                                            contentDescription = stringResource(Res.string.shuffle),
+                                            checked = radio == null && state.shuffle,
+                                            onClick = radio?.onDislike ?: onToggleShuffle,
+                                            icon = if (radio != null) PlayerIcons.ThumbDown else PlayerIcons.Shuffle,
+                                            contentDescription = stringResource(if (radio != null) Res.string.radio_dislike else Res.string.shuffle),
                                             iconSize = 20.dp,
                                             uncheckedColor = Color.Transparent,
                                             modifier = Modifier.size(44.dp),
@@ -408,10 +421,14 @@ private fun WideNowPlaying(
                                             modifier = Modifier.size(56.dp),
                                         )
                                         ExpressiveToggleButton(
-                                            checked = state.repeatMode != Player.REPEAT_MODE_OFF,
-                                            onClick = onCycleRepeat,
-                                            icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
-                                            contentDescription = stringResource(Res.string.repeat),
+                                            checked = radio == null && state.repeatMode != Player.REPEAT_MODE_OFF,
+                                            onClick = radio?.onStop ?: onCycleRepeat,
+                                            icon = when {
+                                                radio != null -> PlayerIcons.Close
+                                                state.repeatMode == Player.REPEAT_MODE_ONE -> PlayerIcons.RepeatOne
+                                                else -> PlayerIcons.Repeat
+                                            },
+                                            contentDescription = stringResource(if (radio != null) Res.string.radio_stop else Res.string.repeat),
                                             iconSize = 20.dp,
                                             uncheckedColor = Color.Transparent,
                                             modifier = Modifier.size(44.dp),
@@ -468,7 +485,7 @@ private fun WideNowPlaying(
                                     onRemove = onRemoveQueueEntry,
                                     onMove = onMoveQueueEntry,
                                     onLongPress = onSongLongPress,
-                                    tapeMode = SettingsStore.settings.collectAsState().value.cassetteMode,
+                                    tapeMode = cassetteMode,
                                     modifier = Modifier.fillMaxSize(),
                                 )
                                 else -> LyricsPanel(
@@ -493,7 +510,7 @@ private fun WideNowPlaying(
 
 /** Title and artist; a new track slides in from the side the way the art changes. */
 @Composable
-private fun TrackTitle(nowPlaying: NowPlaying, onOpenArtist: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun TrackTitle(nowPlaying: NowPlaying, onOpenArtist: (String) -> Unit, modifier: Modifier = Modifier, fresh: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -508,12 +525,20 @@ private fun TrackTitle(nowPlaying: NowPlaying, onOpenArtist: (String) -> Unit, m
         modifier = modifier,
     ) { np ->
         Column {
-            Text(
-                text = np.title,
-                style = MaterialTheme.typography.headlineSmallEmphasized,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // A radio's track the library hasn't got.
+                if (fresh) {
+                    NewBadge()
+                    Spacer(Modifier.width(10.dp))
+                }
+                Text(
+                    text = np.title,
+                    style = MaterialTheme.typography.headlineSmallEmphasized,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
             ArtistLink(
                 artist = np.artist,
                 style = MaterialTheme.typography.titleMedium,

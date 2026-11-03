@@ -55,6 +55,12 @@ interface SharedSettings {
     val crossfadeAlbums: Boolean
     /** The queue as a tape: its sound, a cassette in the player, two sides, the deck's keys and spins. */
     val cassetteMode: Boolean
+    /** Beta: the radio, a never-ending queue that mixes the library with new tracks from YouTube. */
+    val radioEnabled: Boolean
+    /** How much of the radio is new tracks, 0 (only the library) to 100 (only new). */
+    val radioNovelty: Int
+    /** New tracks the radio downloads ahead of the one playing, [RADIO_BUFFER_RANGE]. */
+    val radioBuffer: Int
     val eqEnabled: Boolean
     /** Gain per band in dB, [com.ku.pierdoon.playback.EQ_BANDS] long; a preset copies its own in. */
     val eqGains: List<Float>
@@ -68,6 +74,9 @@ interface SharedSettings {
     val songSort: SongSort
     val songSortDescending: Boolean
 }
+
+/** How many new tracks the radio may download ahead. */
+val RADIO_BUFFER_RANGE = 1..10
 
 @Immutable
 data class CommonSettings(
@@ -90,6 +99,9 @@ data class CommonSettings(
     override val playbackSpeed: Float = 1f,
     override val crossfadeAlbums: Boolean = false,
     override val cassetteMode: Boolean = false,
+    override val radioEnabled: Boolean = false,
+    override val radioNovelty: Int = 50,
+    override val radioBuffer: Int = 1,
     override val eqEnabled: Boolean = false,
     override val eqGains: List<Float> = EQ_FLAT,
     override val eqPreset: EqPreset = EqPreset.Flat,
@@ -121,6 +133,9 @@ data class CommonSettings(
         putFloat(K_SPEED, playbackSpeed)
         putBoolean(K_CROSSFADE_ALBUMS, crossfadeAlbums)
         putBoolean(K_CASSETTE_MODE, cassetteMode)
+        putBoolean(K_RADIO, radioEnabled)
+        putInt(K_RADIO_NOVELTY, radioNovelty)
+        putInt(K_RADIO_BUFFER, radioBuffer)
         putBoolean(K_EQ, eqEnabled)
         putString(K_EQ_GAINS, formatEqGains(eqGains))
         putString(K_EQ_PRESET, eqPreset.name)
@@ -155,6 +170,9 @@ data class CommonSettings(
                 playbackSpeed = PlaybackSpeed.nearest(getFloat(K_SPEED, d.playbackSpeed)),
                 crossfadeAlbums = getBoolean(K_CROSSFADE_ALBUMS, d.crossfadeAlbums),
                 cassetteMode = getBoolean(K_CASSETTE_MODE, d.cassetteMode),
+                radioEnabled = getBoolean(K_RADIO, d.radioEnabled),
+                radioNovelty = getInt(K_RADIO_NOVELTY, d.radioNovelty).coerceIn(0, 100),
+                radioBuffer = getInt(K_RADIO_BUFFER, d.radioBuffer).coerceIn(RADIO_BUFFER_RANGE),
                 eqEnabled = getBoolean(K_EQ, d.eqEnabled),
                 eqGains = parseEqGains(getString(K_EQ_GAINS, null)),
                 eqPreset = enumOr(getString(K_EQ_PRESET, null), d.eqPreset),
@@ -191,6 +209,9 @@ data class CommonSettings(
         private const val K_SPEED = "playback_speed"
         private const val K_CROSSFADE_ALBUMS = "crossfade_albums"
         private const val K_CASSETTE_MODE = "cassette_mode"
+        private const val K_RADIO = "radio"
+        private const val K_RADIO_NOVELTY = "radio_novelty"
+        private const val K_RADIO_BUFFER = "radio_buffer"
         private const val K_EQ = "equalizer"
         private const val K_EQ_GAINS = "equalizer_gains"
         private const val K_EQ_PRESET = "equalizer_preset"

@@ -1,5 +1,9 @@
 package com.ku.pierdoon.ui.phone
 
+import com.ku.pierdoon.ui.library.TWO_PANE_WIDTH
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -47,15 +51,14 @@ import org.jetbrains.compose.resources.stringResource
 fun PhoneScreen(settings: AppSettings, bottomInset: Dp) {
     val remote by RemoteServer.status.collectAsState()
     AppScaffold(title = stringResource(Res.string.nav_phone)) { inner ->
-        LazyColumn(
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = inner.calculateTopPadding(),
-                bottom = listBottomPadding(bottomInset),
-            ),
-            modifier = Modifier.fillMaxHeight().widthIn(max = CONTENT_MAX_WIDTH),
-        ) {
+        val padding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = inner.calculateTopPadding(),
+            bottom = listBottomPadding(bottomInset),
+        )
+        // The switch and how to pair.
+        val setup: LazyListScope.() -> Unit = {
             item(key = "remote") {
                 Group(null) {
                     listOf<@Composable (Shape) -> Unit>(
@@ -98,6 +101,9 @@ fun PhoneScreen(settings: AppSettings, bottomInset: Dp) {
                     }
                 }
             }
+        }
+        // The phones paired so far.
+        val devices: LazyListScope.() -> Unit = {
             item(key = "devices") {
                 Group(stringResource(Res.string.remote_devices)) {
                     if (remote.devices.isEmpty()) {
@@ -118,6 +124,19 @@ fun PhoneScreen(settings: AppSettings, bottomInset: Dp) {
                             { shape: Shape -> DeviceItem(shape, device.name) { RemoteServer.forget(device) } }
                         }
                     }
+                }
+            }
+        }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            if (maxWidth >= TWO_PANE_WIDTH) {
+                Row(Modifier.fillMaxSize()) {
+                    LazyColumn(contentPadding = padding, modifier = Modifier.weight(1f).fillMaxHeight()) { setup() }
+                    LazyColumn(contentPadding = padding, modifier = Modifier.weight(1f).fillMaxHeight()) { devices() }
+                }
+            } else {
+                LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize()) {
+                    setup()
+                    devices()
                 }
             }
         }

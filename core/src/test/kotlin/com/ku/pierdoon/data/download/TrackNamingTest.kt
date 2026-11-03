@@ -29,6 +29,20 @@ class TrackNamingTest {
     }
 
     @Test
+    fun theArtistInTheTitleGoesWhenTheArtistIsKnownToo() {
+        // As a radio track came on the phone: yt-dlp gave "creator" but no "track".
+        assertEquals(
+            TrackName("ДИНАСТИЯ", "VILLIAN, madk1d"),
+            trackName("VILLIAN, madk1d - ДИНАСТИЯ (official music video)", null, "VILLIAN, madk1d", "VILLIAN"),
+        )
+        // A dash that isn't "artist - title" stays in the title.
+        assertEquals(
+            TrackName("Live - Part 2", "Band"),
+            trackName("Live - Part 2", null, "Band", "Band"),
+        )
+    }
+
+    @Test
     fun noDashFallsBackToTheChannel() {
         assertEquals(TrackName("credits song", "ONDA ANDAR"), trackName("credits song | 4K", null, null, "ONDA ANDAR"))
     }

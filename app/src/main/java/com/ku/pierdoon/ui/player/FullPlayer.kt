@@ -174,11 +174,14 @@ fun FullPlayer(
     dragModifier: Modifier = Modifier,
     /** The phone and the paired computer, to switch the player between; null without a computer. */
     devices: PlayerDevices? = null,
+    /** The radio playing on the phone (beta), or null. */
+    radio: PlayerRadio? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     // Nothing style: flat black page, no frosted art, no immersive lyrics.
     val nothing = LocalUiPrefs.current.nothing
-    val cassetteMode = SettingsStore.settings.collectAsStateWithLifecycle().value.cassetteMode
+    // No tape on the radio: an endless queue has no sides (the service leaves the deck out too).
+    val cassetteMode = SettingsStore.settings.collectAsStateWithLifecycle().value.cassetteMode && radio == null
 
     // Matte-glass tints over the frosted art: translucent containers pick up its colour.
     val glassButton = if (nothing) colors.surfaceContainerHigh else colors.surfaceContainerHighest.copy(alpha = 0.45f)
@@ -250,18 +253,23 @@ fun FullPlayer(
                     modifier = Modifier.size(48.dp),
                 )
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = stringResource(
-                            when {
-                                showQueue -> Res.string.queue
-                                showLyrics -> Res.string.lyrics
-                                else -> Res.string.now_playing
-                            }
-                        ),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = colors.onSurface,
-                        textAlign = TextAlign.Center,
-                    )
+                    // One line on top, whatever plays: the radio's name takes "Now playing"'s place.
+                    if (radio != null && !showQueue && !showLyrics) {
+                        RadioTitle(radio)
+                    } else {
+                        Text(
+                            text = stringResource(
+                                when {
+                                    showQueue -> Res.string.queue
+                                    showLyrics -> Res.string.lyrics
+                                    else -> Res.string.now_playing
+                                }
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.onSurface,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                     if (devices != null) {
                         DeviceSwitch(devices, glassButton)
                     } else {
@@ -280,13 +288,10 @@ fun FullPlayer(
                     SpeedButton(glassButton)
                     Spacer(Modifier.width(8.dp))
                     SleepTimerButton(active = sleepTimer != null, onClick = { showSleepSheet = true }, glass = glassButton)
-                    Spacer(Modifier.width(8.dp))
+                } else {
+                    // Keeps the label centred against the collapse button.
+                    Spacer(Modifier.width(48.dp))
                 }
-                FavoriteButton(
-                    isFavorite = isFavorite,
-                    onClick = onToggleFavorite,
-                    containerColor = glassButton,
-                )
             }
         }
 
@@ -357,16 +362,24 @@ fun FullPlayer(
         val controls: @Composable (short: Boolean) -> Unit = { short ->
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(Modifier.height(if (short) 4.dp else 12.dp))
-                Column(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     key(nowPlaying.songId) {
-                        Text(
-                            text = nowPlaying.title,
-                            style = if (short) MaterialTheme.typography.headlineSmallEmphasized
-                            else MaterialTheme.typography.headlineMediumEmphasized,
-                            color = colors.onSurface,
-                            maxLines = 1,
-                            modifier = Modifier.basicMarquee(iterations = 2),
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // A radio's track the library hasn't got: marked where the eye already is.
+                            if (radio?.fresh == true) {
+                                NewBadge()
+                                Spacer(Modifier.width(10.dp))
+                            }
+                            Text(
+                                text = nowPlaying.title,
+                                style = if (short) MaterialTheme.typography.headlineSmallEmphasized
+                                else MaterialTheme.typography.headlineMediumEmphasized,
+                                color = colors.onSurface,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f, fill = false).basicMarquee(iterations = 2),
+                            )
+                        }
                     }
                     ArtistLink(
                         artist = nowPlaying.artist,
@@ -377,6 +390,14 @@ fun FullPlayer(
                         padding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
                         pick = pickArtist,
                     )
+                }
+                Spacer(Modifier.width(12.dp))
+                FavoriteButton(
+                    isFavorite = isFavorite,
+                    onClick = onToggleFavorite,
+                    containerColor = glassButton,
+                    size = if (short) 48.dp else 56.dp,
+                )
                 }
 
                 Spacer(Modifier.height(if (short) 8.dp else 16.dp))
@@ -398,44 +419,20 @@ fun FullPlayer(
                     modifier = Modifier.fillMaxWidth().then(if (short) Modifier.height(68.dp) else Modifier),
                 )
                 Spacer(Modifier.height(if (short) 12.dp else 20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    val toggleSize = if (short) Modifier.size(width = 64.dp, height = 44.dp) else Modifier.size(width = 72.dp, height = 56.dp)
-                    ExpressiveToggleButton(
-                        checked = state.shuffle,
-                        onClick = onToggleShuffle,
-                        icon = PlayerIcons.Shuffle,
-                        contentDescription = stringResource(Res.string.shuffle),
-                        uncheckedColor = glassButton,
-                        modifier = toggleSize,
-                    )
-                    ExpressiveToggleButton(
-                        checked = showLyrics,
-                        onClick = onToggleLyrics,
-                        icon = PlayerIcons.Lyrics,
-                        contentDescription = stringResource(Res.string.lyrics),
-                        uncheckedColor = glassButton,
-                        modifier = toggleSize,
-                    )
-                    ExpressiveToggleButton(
-                        checked = showQueue,
-                        onClick = onToggleQueue,
-                        icon = PlayerIcons.Queue,
-                        contentDescription = stringResource(Res.string.queue),
-                        uncheckedColor = glassButton,
-                        modifier = toggleSize,
-                    )
-                    ExpressiveToggleButton(
-                        checked = state.repeatMode != Player.REPEAT_MODE_OFF,
-                        onClick = onCycleRepeat,
-                        icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
-                        contentDescription = stringResource(Res.string.repeat),
-                        uncheckedColor = glassButton,
-                        modifier = toggleSize,
-                    )
-                }
+                PlayerToggles(
+                    shuffle = state.shuffle,
+                    repeatOn = state.repeatMode != Player.REPEAT_MODE_OFF,
+                    repeatOne = state.repeatMode == Player.REPEAT_MODE_ONE,
+                    showLyrics = showLyrics,
+                    showQueue = showQueue,
+                    onShuffle = onToggleShuffle,
+                    onRepeat = onCycleRepeat,
+                    onLyrics = onToggleLyrics,
+                    onQueue = onToggleQueue,
+                    radio = radio,
+                    glass = glassButton,
+                    height = if (short) 52.dp else 64.dp,
+                )
                 Spacer(Modifier.height(if (short) 0.dp else 8.dp))
             }
         }
@@ -694,40 +691,6 @@ private fun CompactControls(
             )
         }
     }
-}
-
-/** Heart toggle that "pops" (overshoots and settles) when a track is added to favourites. */
-@Composable
-private fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, containerColor: Color) {
-    val pop = remember { Animatable(1f) }
-    val popSpec = remember { spring<Float>(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium) }
-    var first by remember { mutableStateOf(true) }
-    LaunchedEffect(isFavorite) {
-        if (first) { first = false; return@LaunchedEffect }
-        if (isFavorite) {
-            pop.snapTo(1.35f)
-            pop.animateTo(1f, popSpec)
-        }
-    }
-    val tint by animateColorAsState(
-        if (isFavorite) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
-        MaterialTheme.motionScheme.defaultEffectsSpec(),
-        label = "heart",
-    )
-    ExpressiveIconButton(
-        onClick = onClick,
-        icon = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
-        contentDescription = stringResource(if (isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites),
-        containerColor = containerColor,
-        contentColor = tint,
-        haptic = if (isFavorite) HapticFeedbackType.ToggleOff else HapticFeedbackType.Confirm,
-        modifier = Modifier
-            .size(48.dp)
-            .graphicsLayer {
-                scaleX = pop.value
-                scaleY = pop.value
-            },
-    )
 }
 
 /**

@@ -121,6 +121,9 @@ import com.ku.pierdoon.data.ColorSource
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.history.DailyMix
+import com.ku.pierdoon.radio.RadioStart
+import com.ku.pierdoon.radio.RadioTrack
+import com.ku.pierdoon.ui.player.PlayerRadio
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.playback.NowPlaying
@@ -203,6 +206,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     val lyrics by vm.lyrics.collectAsStateWithLifecycle()
     val lyricsOffset by vm.lyricsOffset.collectAsStateWithLifecycle()
     val userData by vm.userData.collectAsStateWithLifecycle()
+    val radio by vm.radio.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
     val updatePrompt by vm.updatePrompt.collectAsStateWithLifecycle()
@@ -533,7 +537,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                             showLyrics = showLyrics,
                             queue = queue,
                             showQueue = showQueue,
-                            isFavorite = np.songId in userData.favorites,
+                            isFavorite = np.songId in userData.favorites || radio?.kept?.containsKey(np.songId) == true,
                             onToggleFavorite = { vm.toggleFavorite(np.songId) },
                             // Lyrics and queue share the space above the controls: one at a time.
                             onToggleLyrics = { showLyrics = !showLyrics; showQueue = false },
@@ -561,6 +565,17 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                             modifier = contentModifier,
                             dragModifier = Modifier.expandingPlayerDrag(sheet, expanded) { expanded = it },
                             devices = devices,
+                            // The phone's radio, not shown over the computer's player.
+                            radio = radio?.takeIf { devices?.onPc != true }?.let { r ->
+                                PlayerRadio(
+                                    seed = r.seed,
+                                    // Kept in the library, it's no longer new.
+                                    fresh = np.songId in r.fresh && np.songId !in r.kept,
+                                    offline = r.offline,
+                                    onDislike = { vm.dislikeRadio(np.songId) },
+                                    onStop = vm::stopRadio,
+                                )
+                            },
                         )
                     }
                 }
@@ -586,6 +601,11 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             },
             onDelete = deleteSongs?.let { delete -> { delete(listOf(target.song)) {} } },
             onSendToComputer = pcPaired?.let { { PcTransfers.sendToComputer(listOf(target.song)) } },
+            onRadio = if (settings.radioEnabled && !RadioTrack.isRadio(target.song.id)) {
+                { vm.startRadio(RadioStart.track(target.song)) }
+            } else {
+                null
+            },
         )
     }
     bulk?.let { target ->
@@ -728,6 +748,11 @@ private fun Screens(
                         onOpen = nav::push,
                         onSongLongPress = { onSongLongPress(it, null) },
                         bottomInset = bottomInset,
+                        onMyWave = if (settings.radioEnabled && songs.isNotEmpty()) {
+                            { vm.startRadio(RadioStart.wave(dailyMix.ifEmpty { songs.shuffled().take(DailyMix.SIZE) })) }
+                        } else {
+                            null
+                        },
                     )
                 }
                 Route.Library -> LibraryScreen(

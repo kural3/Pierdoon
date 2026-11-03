@@ -66,6 +66,10 @@ import com.ku.pierdoon.data.lyrics.LyricsRepository
 import com.ku.pierdoon.data.lyrics.NetworkNotAllowedException
 import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlaybackService
+import com.ku.pierdoon.playback.Radio
+import com.ku.pierdoon.radio.RadioStart
+import com.ku.pierdoon.radio.RadioState
+import com.ku.pierdoon.radio.RadioTrack
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.playback.QueueEntry
 import com.ku.pierdoon.playback.QueueState
@@ -370,7 +374,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun addToPlaylist(id: Long, songIds: List<Long>) = userLibrary.addToPlaylist(id, songIds)
     fun removeFromPlaylist(id: Long, songIds: Set<Long>) = userLibrary.removeFromPlaylist(id, songIds)
 
-    fun toggleFavorite(songId: Long) = userLibrary.toggleFavorite(songId)
+    /** For a radio track not in the library yet, the heart keeps it: downloaded into it, as a favourite. */
+    fun toggleFavorite(songId: Long) {
+        if (RadioTrack.isRadio(songId)) Radio.keep(songId) else userLibrary.toggleFavorite(songId)
+    }
+
+    /** The radio playing now (beta), or null. */
+    val radio: StateFlow<RadioState?> = Radio.state
+
+    fun startRadio(start: RadioStart) {
+        val songs = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
+        Radio.start(songs, start)
+    }
+
+    fun startArtistRadio(name: String) {
+        val songs = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
+        Radio.start(songs, RadioStart.artist(name, songs))
+    }
+
+    fun dislikeRadio(songId: Long) = Radio.dislike(songId)
+
+    fun stopRadio() = Radio.stop()
     fun createPlaylist(name: String, initialSongs: List<Long> = emptyList()) =
         userLibrary.createPlaylist(name, initialSongs)
     fun renamePlaylist(id: Long, name: String) = userLibrary.renamePlaylist(id, name)

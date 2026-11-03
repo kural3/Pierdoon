@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.components.GlassSheet
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -21,7 +22,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -245,7 +245,7 @@ fun BulkActionsSheet(
         target.onDone()
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    GlassSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Text(
                 pluralStringResource(Res.plurals.tracks_selected, target.songs.size, target.songs.size),

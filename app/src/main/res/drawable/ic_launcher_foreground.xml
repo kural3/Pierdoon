@@ -10,14 +10,14 @@
         android:scaleX="1.15"
         android:scaleY="1.15">
         <path
-            android:fillColor="#9D8CCF"
+            android:fillColor="#EEEAE3"
             android:pathData="M52,33H57V66.5H52Z" />
         <path
-            android:fillColor="#9D8CCF"
+            android:fillColor="#EEEAE3"
             android:fillType="evenOdd"
             android:pathData="M52,33H57.5A11,11 0,0 1,57.5,55H52ZM57,38V50H57.5A6,6 0,0 0,57.5,38Z" />
         <path
-            android:fillColor="#9D8CCF"
+            android:fillColor="#EEEAE3"
             android:pathData="M40,66.5a8.5,8.5 0,1 0,17,0a8.5,8.5 0,1 0,-17,0Z" />
     </group>
 </vector>

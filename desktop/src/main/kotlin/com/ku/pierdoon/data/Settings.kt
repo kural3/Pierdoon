@@ -49,6 +49,8 @@ data class AppSettings(
     val discordPresence: Boolean = false,
     /** The picture behind the Delicious mode's lyrics. */
     val deliciousStyle: DeliciousStyle = DeliciousStyle.Aura,
+    /** The browser yt-dlp takes YouTube cookies from, so YouTube doesn't take downloads for a bot. */
+    val cookiesBrowser: CookieBrowser = CookieBrowser.Off,
 ) : SharedSettings by common {
     /** A change to the settings both apps have. */
     fun shared(change: CommonSettings.() -> CommonSettings): AppSettings = copy(common = common.change())
@@ -95,6 +97,7 @@ object SettingsStore {
             remoteControl = p.getBoolean(K_REMOTE, d.remoteControl),
             discordPresence = p.getBoolean(K_DISCORD, d.discordPresence),
             deliciousStyle = enumOr(p.getString(K_DELICIOUS, null), d.deliciousStyle),
+            cookiesBrowser = enumOr(p.getString(K_COOKIES, null), d.cookiesBrowser),
         )
     }
 
@@ -133,6 +136,7 @@ object SettingsStore {
             putBoolean(K_REMOTE, s.remoteControl)
             putBoolean(K_DISCORD, s.discordPresence)
             putString(K_DELICIOUS, s.deliciousStyle.name)
+            putString(K_COOKIES, s.cookiesBrowser.name)
         }
     }
 
@@ -156,4 +160,16 @@ object SettingsStore {
     private const val K_REMOTE = "remote_control"
     private const val K_DISCORD = "discord_presence"
     private const val K_DELICIOUS = "delicious_style"
+    private const val K_COOKIES = "cookies_browser"
+}
+
+/** Browsers yt-dlp can read cookies from on Windows, by its own names for them. */
+enum class CookieBrowser(val ytDlpName: String?, val label: String) {
+    Off(null, ""),
+    Firefox("firefox", "Firefox"),
+    Chrome("chrome", "Chrome"),
+    Edge("edge", "Edge"),
+    Brave("brave", "Brave"),
+    Opera("opera", "Opera"),
+    Vivaldi("vivaldi", "Vivaldi"),
 }

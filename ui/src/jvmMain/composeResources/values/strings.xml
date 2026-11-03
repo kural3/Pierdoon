@@ -60,7 +60,7 @@
     <string name="exclude_folder">Exclude folder</string>
     <string name="exclude_folder_desc">Its tracks and subfolders leave the library; the files stay where they are</string>
     <string name="choose_excluded_folder">Choose a folder not to scan</string>
-    <string name="settings_downloads_summary">Folder, format, yt-dlp</string>
+    <string name="settings_downloads_summary">Folder, format, yt-dlp, log</string>
     <string name="download_folder">Save to</string>
     <string name="download_folder_choose">Choose another folder</string>
     <string name="download_folder_choose_desc">The folder is added to the library</string>
@@ -71,13 +71,15 @@
     <string name="delete_song_body">“%1$s” will be moved to the Recycle Bin</string>
     <string name="delete_songs_body">Tracks: %1$d. The files will be moved to the Recycle Bin</string>
     <string name="drop_link">Drop to download</string>
-    <string name="delicious_open">Delicious mode (beta)</string>
+    <string name="delicious_open">Delicious mode</string>
     <string name="delicious_close">Leave Delicious</string>
-    <string name="delicious_beta">beta</string>
     <string name="delicious_aura">Aura</string>
     <string name="delicious_waves">Waves</string>
     <string name="delicious_dust">Stardust</string>
     <string name="delicious_calm">Calm</string>
     <string name="settings_system">System</string>
     <string name="settings_system_summary">Tray, Discord status</string>
+    <string name="youtube_cookies">Cookies from a browser</string>
+    <string name="youtube_cookies_off">Don't use</string>
+    <string name="youtube_cookies_desc">The browser you are signed in to YouTube with: then it won't take downloads for a bot. Chrome and Edge often won't let their cookies be read; Firefox is the sure one</string>
 </resources>

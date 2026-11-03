@@ -1,6 +1,7 @@
 package com.ku.pierdoon.data.lyrics
 
 import com.ku.pierdoon.data.LruCache
+import com.ku.pierdoon.data.bareTitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -94,7 +95,7 @@ class LyricsRepository(cacheDir: File, private val userAgent: String) {
     }
 
     private fun fetch(q: LyricsQuery): Lyrics {
-        val title = cleanTitle(q.title)
+        val title = bareTitle(q.title)
         val durationSec = q.durationMs / 1000
 
         // 1) Exact signature match — the cheapest and most accurate request.
@@ -214,12 +215,5 @@ class LyricsRepository(cacheDir: File, private val userAgent: String) {
         const val UNSYNCED_PENALTY = 3.0
         const val NOT_FOUND_TTL_MS = 3L * 24 * 60 * 60 * 1000
         const val MAX_SEARCH_RESULTS = 30
-
-        private val noise = Regex(
-            """\s*[(\[](?:feat\.?|ft\.?|prod\.?|remaster(?:ed)?|official|lyrics?|audio|video)[^)\]]*[)\]]""",
-            RegexOption.IGNORE_CASE,
-        )
-
-        fun cleanTitle(title: String) = title.replace(noise, "").trim().ifEmpty { title }
     }
 }

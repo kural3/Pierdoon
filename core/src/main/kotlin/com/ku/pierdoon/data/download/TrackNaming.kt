@@ -1,5 +1,8 @@
 package com.ku.pierdoon.data.download
 
+import com.ku.pierdoon.data.normalizeTag
+import com.ku.pierdoon.data.splitArtists
+
 /** Title and artist a downloaded track gets in its tags. */
 data class TrackName(val title: String, val artist: String)
 
@@ -21,11 +24,14 @@ fun trackName(
         return TrackName(track.trim(), artist?.trim()?.takeIf { it.isNotEmpty() } ?: channel.orEmpty())
     }
     val clean = cleanTitle(title.orEmpty())
-    if (artist.isNullOrBlank()) {
-        val dash = DASHES.find(clean)
-        if (dash != null && dash.range.first > 0 && dash.range.last < clean.lastIndex) {
-            return TrackName(clean.substring(dash.range.last + 1).trim(), clean.substring(0, dash.range.first).trim())
-        }
+    val dash = DASHES.find(clean)?.takeIf { it.range.first > 0 && it.range.last < clean.lastIndex }
+    if (dash != null) {
+        val before = clean.substring(0, dash.range.first).trim()
+        val after = clean.substring(dash.range.last + 1).trim()
+        if (artist.isNullOrBlank()) return TrackName(after, before)
+        // "VILLIAN, madk1d - ДИНАСТИЯ" with the artist known as well: the title is what's after.
+        val known = artistNames(artist)
+        if (artistNames(before).any { it in known }) return TrackName(after, artist.trim())
     }
     return TrackName(clean, artist?.trim()?.takeIf { it.isNotEmpty() } ?: channel.orEmpty())
 }
@@ -64,6 +70,9 @@ private val SOUNDCLOUD_LISTS = setOf("sets", "tracks", "albums", "likes", "repos
 /** A file name every filesystem accepts, short enough to leave room for "(1)" and the extension. */
 fun safeFileName(name: String): String =
     name.replace(Regex("""[\\/:*?"<>|\u0000-\u001f]"""), "_").trim().trimStart('.').take(120).ifBlank { "track" }
+
+private fun artistNames(tag: String) =
+    splitArtists(tag).map(::normalizeTag).filter { it.isNotEmpty() }.toSet()
 
 private val DASHES = Regex("""\s[-–—]\s""")
 private val NOISE = Regex(

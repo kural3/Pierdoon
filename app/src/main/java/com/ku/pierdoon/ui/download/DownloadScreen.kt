@@ -339,41 +339,6 @@ private fun LinkField(
     )
 }
 
-/** What the page is for, until there's something to show. */
-@Composable
-private fun EmptyHint() {
-    val colors = MaterialTheme.colorScheme
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 56.dp),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(96.dp)
-                .clip(MaterialShapes.Cookie9Sided.toShape())
-                .background(colors.secondaryContainer),
-        ) {
-            Icon(PlayerIcons.Download, contentDescription = null, tint = colors.onSecondaryContainer, modifier = Modifier.size(40.dp))
-        }
-        Spacer(Modifier.height(20.dp))
-        Text(
-            stringResource(Res.string.download_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = colors.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 420.dp),
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            stringResource(Res.string.download_rights),
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.outline,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
 /** "Загрузки" over the list, with a way to drop the finished ones. */
 @Composable
 private fun QueueHeader(canClear: Boolean) {
@@ -383,7 +348,7 @@ private fun QueueHeader(canClear: Boolean) {
     ) {
         Text(
             stringResource(Res.string.download_queue),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.titleSmallEmphasized,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),
         )
@@ -603,6 +568,7 @@ private fun statusText(task: DownloadTask): String {
                 when (s.reason) {
                     FailReason.Unsupported -> Res.string.download_fail_unsupported
                     FailReason.Unavailable -> Res.string.download_fail_unavailable
+                    FailReason.Bot -> Res.string.download_fail_bot
                     FailReason.Drm -> Res.string.download_fail_drm
                     FailReason.NoAudio -> Res.string.download_fail_no_audio
                     FailReason.Network -> Res.string.download_fail_network

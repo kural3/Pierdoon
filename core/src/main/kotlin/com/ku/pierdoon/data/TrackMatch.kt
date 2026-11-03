@@ -40,6 +40,14 @@ class TrackMatcher(library: Collection<TrackKey>) {
     }
 }
 
+private val titleNoise = Regex(
+    """\s*[(\[](?:feat\.?|ft\.?|prod\.?|remaster(?:ed)?|official|lyrics?|audio|video)[^)\]]*[)\]]""",
+    RegexOption.IGNORE_CASE,
+)
+
+/** The title less what videos and some files add to it: "(prod. X)", "[Official Video]", "(feat. Y)". */
+fun bareTitle(title: String): String = title.replace(titleNoise, "").trim().ifEmpty { title }
+
 /** Lower case, "ё" as "е", unified quotes and dashes, punctuation at the ends and repeated spaces gone. */
 fun normalizeTag(s: String): String {
     val folded = Normalizer.normalize(s, Normalizer.Form.NFKC).lowercase()

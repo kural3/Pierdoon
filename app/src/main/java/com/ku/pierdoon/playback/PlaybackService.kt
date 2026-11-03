@@ -40,6 +40,8 @@ import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.UserLibrary
+import com.ku.pierdoon.data.uri
+import com.ku.pierdoon.radio.RadioTrack
 import com.ku.pierdoon.widget.PlayerWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +50,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -102,7 +105,8 @@ class PlaybackService : MediaLibraryService() {
         val history = PlayHistory.get(this)
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                mediaItem?.mediaId?.toLongOrNull()?.let(library::recordPlayed)
+                // Radio tracks not kept aren't in the library: nothing to remember them by.
+                mediaItem?.mediaId?.toLongOrNull()?.takeUnless { RadioTrack.isRadio(it) }?.let(library::recordPlayed)
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -116,7 +120,7 @@ class PlaybackService : MediaLibraryService() {
             override fun onEvents(player: Player, events: Player.Events) {
                 if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_IS_PLAYING_CHANGED)) {
                     history.tracker.update(
-                        player.currentMediaItem?.mediaId?.toLongOrNull(),
+                        player.currentMediaItem?.mediaId?.toLongOrNull()?.takeUnless { RadioTrack.isRadio(it) },
                         player.duration.takeIf { it != C.TIME_UNSET } ?: 0L,
                         player.isPlaying,
                         SystemClock.elapsedRealtime(),
@@ -139,13 +143,17 @@ class PlaybackService : MediaLibraryService() {
         val fader = Crossfader(this, player, scope).also { crossfader = it }
         fader.start()
         exoPlayer = player
+        Radio.attach(this, player)
         val cassette = TapeDeck(player, scope).also { tapeDeck = it }
         cassette.start()
         scope.launch {
-            SettingsStore.settings.map { it.cassetteMode }.distinctUntilChanged().collect {
-                cassette.tapeMode = it
-                EqualizerSettings.tape = it
-            }
+            // No tape on the radio: an endless queue has no sides to turn or rewind.
+            combine(SettingsStore.settings.map { it.cassetteMode }, Radio.state.map { it != null }) { tape, radio -> tape && !radio }
+                .distinctUntilChanged()
+                .collect {
+                    cassette.tapeMode = it
+                    EqualizerSettings.tape = it
+                }
         }
         scope.launch {
             SettingsStore.settings
@@ -206,6 +214,12 @@ class PlaybackService : MediaLibraryService() {
             .setSessionActivity(openApp)
             .setMediaButtonPreferences(modeButtons(player))
             .build()
+        // Shuffle and repeat leave the notification while the radio plays, and come back after.
+        scope.launch {
+            Radio.state.map { it != null }.distinctUntilChanged().collect {
+                session?.setMediaButtonPreferences(modeButtons(player))
+            }
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
@@ -227,6 +241,7 @@ class PlaybackService : MediaLibraryService() {
         crossfader = null
         tapeDeck?.release()
         tapeDeck = null
+        exoPlayer?.let(Radio::detach)
         session?.run {
             val player = exoPlayer ?: player
             // A few hundred bytes; written in place so it lands before the process can go.
@@ -292,7 +307,11 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun snapshot(player: Player) = SavedQueue(
-        songIds = List(player.mediaItemCount) { player.getMediaItemAt(it).mediaId.toLongOrNull() ?: -1L },
+        // A radio's download is gone after a restart; one kept in the library is saved as that.
+        songIds = List(player.mediaItemCount) { i ->
+            val id = player.getMediaItemAt(i).mediaId.toLongOrNull() ?: -1L
+            if (RadioTrack.isRadio(id)) Radio.libraryId(id) ?: -1L else id
+        },
         index = player.currentMediaItemIndex,
         positionMs = player.currentPosition,
         shuffle = player.shuffleModeEnabled,
@@ -311,7 +330,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /** Shuffle and repeat for the notification / lock screen, showing the current mode. */
-    private fun modeButtons(player: Player) = listOf(
+    private fun modeButtons(player: Player) = if (Radio.state.value != null) emptyList() else listOf(
         CommandButton.Builder(if (player.shuffleModeEnabled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF)
             .setDisplayName(getString(R.string.shuffle))
             .setSessionCommand(TOGGLE_SHUFFLE)
@@ -351,6 +370,10 @@ class PlaybackService : MediaLibraryService() {
             args: Bundle,
         ): ListenableFuture<SessionResult> {
             val player = session.player
+            // The radio keeps its own order and never ends: a stale button does nothing.
+            if (Radio.state.value != null && customCommand.customAction in setOf(TOGGLE_SHUFFLE.customAction, CYCLE_REPEAT.customAction)) {
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
             when (customCommand.customAction) {
                 TOGGLE_SHUFFLE.customAction -> player.shuffleModeEnabled = !player.shuffleModeEnabled
                 CYCLE_REPEAT.customAction -> player.repeatMode = nextRepeatMode(player.repeatMode)
@@ -366,7 +389,10 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<MutableList<MediaItem>> = Futures.immediateFuture(
             mediaItems.mapTo(ArrayList(mediaItems.size)) { item ->
                 if (item.localConfiguration != null) item
-                else item.mediaId.substringAfterLast('/').let { id -> item.buildUpon().setMediaId(id).setUri(Song.uriFor(id)).build() }
+                else item.mediaId.substringAfterLast('/').let { id ->
+                    val uri = id.toLongOrNull()?.let(Radio::song)?.uri ?: Song.uriFor(id)
+                    item.buildUpon().setMediaId(id).setUri(uri).build()
+                }
             }
         )
 

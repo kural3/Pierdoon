@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.components.ScrollableRow
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -95,10 +96,10 @@ fun StatsScreen(
             item(key = "timeline") { Timeline(stats.timeline) }
             item(key = "artistsTitle") { WideSectionTitle(stringResource(Res.string.stats_top_artists)) }
             item(key = "artists") {
-                LazyRow(
+                ScrollableRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.widthIn(max = CONTENT_MAX_WIDTH).fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().fillMaxWidth(),
                 ) {
                     itemsIndexed(stats.topArtists, key = { _, a -> a.name }) { _, a ->
                         CoverCard(
@@ -120,7 +121,7 @@ fun StatsScreen(
                     isCurrent = t.song.id == currentSongId,
                     onClick = { onPlay(topSongs, index) },
                     onLongClick = { onSongLongPress(t.song) },
-                    modifier = Modifier.widthIn(max = CONTENT_MAX_WIDTH),
+                    modifier = Modifier.fillMaxWidth(),
                     leading = {
                         Text(
                             "${index + 1}",
@@ -168,14 +169,14 @@ private fun PeriodPicker(period: StatsPeriod, onPick: (StatsPeriod) -> Unit) {
         ),
         selected = period.ordinal,
         onSelect = { onPick(StatsPeriod.entries[it]) },
-        modifier = Modifier.widthIn(max = CONTENT_MAX_WIDTH).padding(horizontal = 24.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
     )
 }
 
 @Composable
 private fun Summary(stats: ListeningStats) {
     val colors = MaterialTheme.colorScheme
-    Column(Modifier.widthIn(max = CONTENT_MAX_WIDTH).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
+    Column(Modifier.fillMaxWidth().fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
         Text(
             listenedTime(stats.listenedMs),
             style = MaterialTheme.typography.displayMediumEmphasized,
@@ -222,7 +223,7 @@ private fun Timeline(values: List<Long>) {
     val max = values.maxOrNull()?.coerceAtLeast(1) ?: 1
     Canvas(
         Modifier
-            .widthIn(max = CONTENT_MAX_WIDTH)
+            .fillMaxWidth()
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 12.dp)
             .height(120.dp),
@@ -246,7 +247,7 @@ private fun Timeline(values: List<Long>) {
 
 @Composable
 private fun WideSectionTitle(text: String) {
-    Column(Modifier.widthIn(max = CONTENT_MAX_WIDTH).fillMaxWidth()) { SectionTitle(text) }
+    Column(Modifier.fillMaxWidth().fillMaxWidth()) { SectionTitle(text) }
 }
 
 /** "12 h 5 min", or minutes alone below an hour. */

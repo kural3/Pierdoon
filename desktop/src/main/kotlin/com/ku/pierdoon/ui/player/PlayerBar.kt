@@ -63,6 +63,7 @@ import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.Player
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.ui.resources.*
+import androidx.compose.material3.Icon
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.Backdrop
@@ -104,6 +105,8 @@ fun PlayerBar(
     onOpenArtist: (String) -> Unit,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The radio playing (beta), or null. */
+    radio: PlayerRadio? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(28.dp)
@@ -151,13 +154,25 @@ fun PlayerBar(
                             )
                             Spacer(Modifier.width(14.dp))
                             Column {
-                                Text(
-                                    nowPlaying.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.clickable(onClick = onExpand),
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // On the radio: its mark, lit for a track the library hasn't got.
+                                    if (radio != null) {
+                                        Icon(
+                                            PlayerIcons.Radio,
+                                            contentDescription = stringResource(if (radio.fresh) Res.string.radio_new else Res.string.radio),
+                                            tint = if (radio.fresh) colors.tertiary else colors.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                    }
+                                    Text(
+                                        nowPlaying.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.clickable(onClick = onExpand),
+                                    )
+                                }
                                 ArtistLink(
                                     artist = nowPlaying.artist,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -184,11 +199,12 @@ fun PlayerBar(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // The radio picks its own order and never ends: "not this" and "stop" in place of shuffle and repeat.
                         ExpressiveToggleButton(
-                            checked = state.shuffle,
-                            onClick = onToggleShuffle,
-                            icon = PlayerIcons.Shuffle,
-                            contentDescription = stringResource(Res.string.shuffle),
+                            checked = radio == null && state.shuffle,
+                            onClick = radio?.onDislike ?: onToggleShuffle,
+                            icon = if (radio != null) PlayerIcons.ThumbDown else PlayerIcons.Shuffle,
+                            contentDescription = stringResource(if (radio != null) Res.string.radio_dislike else Res.string.shuffle),
                             iconSize = 18.dp,
                             uncheckedColor = Color.Transparent,
                             modifier = Modifier.size(36.dp),
@@ -218,10 +234,14 @@ fun PlayerBar(
                             modifier = Modifier.size(40.dp),
                         )
                         ExpressiveToggleButton(
-                            checked = state.repeatMode != Player.REPEAT_MODE_OFF,
-                            onClick = onCycleRepeat,
-                            icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) PlayerIcons.RepeatOne else PlayerIcons.Repeat,
-                            contentDescription = stringResource(Res.string.repeat),
+                            checked = radio == null && state.repeatMode != Player.REPEAT_MODE_OFF,
+                            onClick = radio?.onStop ?: onCycleRepeat,
+                            icon = when {
+                                radio != null -> PlayerIcons.Close
+                                state.repeatMode == Player.REPEAT_MODE_ONE -> PlayerIcons.RepeatOne
+                                else -> PlayerIcons.Repeat
+                            },
+                            contentDescription = stringResource(if (radio != null) Res.string.radio_stop else Res.string.repeat),
                             iconSize = 18.dp,
                             uncheckedColor = Color.Transparent,
                             modifier = Modifier.size(36.dp),
