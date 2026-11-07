@@ -231,6 +231,7 @@ object PcRemote {
         val p = _paired.value
         stop()
         prefs.edit { clear() }
+        PcSync.reset()
         _active.value = false
         _paired.value = null
         _connection.value = Connection.NotPaired
@@ -540,6 +541,40 @@ object PcRemote {
         }
     }
 
+    // Syncing favourites, playlists and history -------------------------------------------------
+
+    /** GET /sync: the computer's favourites, playlists, smart playlists and plays since [playsSince]. */
+    internal fun fetchSync(playsSince: Long): JSONObject? {
+        val p = _paired.value ?: return null
+        return runCatching {
+            request("GET", p.host, p.port, "/sync?playsSince=$playsSince", p.token, timeoutMs = SYNC_TIMEOUT_MS).json()
+        }.getOrNull()
+    }
+
+    /** POST /sync: what the computer should change, gzipped; true once it took them. */
+    internal fun postSync(changes: JSONObject): Boolean {
+        val p = _paired.value ?: return false
+        val gz = java.io.ByteArrayOutputStream().also { b ->
+            java.util.zip.GZIPOutputStream(b).use { it.write(changes.toString().toByteArray(Charsets.UTF_8)) }
+        }.toByteArray()
+        val conn = open("POST", p.host, p.port, "/sync", p.token, SYNC_TIMEOUT_MS)
+        return try {
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            conn.setRequestProperty("Content-Encoding", "gzip")
+            conn.setFixedLengthStreamingMode(gz.size)
+            conn.outputStream.use { it.write(gz) }
+            conn.responseCode == 200
+        } catch (_: IOException) {
+            false
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Who the phone is paired with, for telling one computer's sync history from another's. */
+    internal fun pairedId(): String? = _paired.value?.let { sha256Hex(it.token) }
+
     // Lyrics and covers ------------------------------------------------------------------------
 
     /** The computer looks lyrics up on LRCLIB if it hasn't yet, so the first call can take a while. */
@@ -638,8 +673,12 @@ object PcRemote {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     const val DEFAULT_PORT = 47231
-    /** The protocol version this app speaks (docs/remote-api.md); 3 added /verify, 4 /file and /upload. */
-    const val API_VERSION = 4
+    /** The protocol version this app speaks (docs/remote-api.md); 3 added /verify, 4 /file and /upload, 5 /sync. */
+    const val API_VERSION = 5
+    /** Syncing favourites, playlists and history needs this much on the computer. */
+    const val SYNC_API = 5
+    /** A whole history going one way the first time: give it a while. */
+    private const val SYNC_TIMEOUT_MS = 60_000
     /** Moving tracks needs this much on the computer. */
     const val TRANSFER_API = 4
     /** Per read or write: a slow Wi-Fi moves a big file in many of these. */

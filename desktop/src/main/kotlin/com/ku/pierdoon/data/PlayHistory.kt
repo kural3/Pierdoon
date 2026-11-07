@@ -31,4 +31,9 @@ object PlayHistory {
     }
 
     fun clear() = store.clear()
+
+    /** Plays from the phone or a backup; those already here are skipped. */
+    fun merge(plays: List<Play>) {
+        if (plays.isNotEmpty()) store.merge(plays)
+    }
 }

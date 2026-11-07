@@ -19,14 +19,9 @@ import com.ku.pierdoon.ui.components.SpinningLogo
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.about_credits
 import com.ku.pierdoon.ui.resources.about_github
-import com.ku.pierdoon.ui.resources.about_github_desc
-import com.ku.pierdoon.ui.resources.about_hint
 import com.ku.pierdoon.ui.resources.about_issues
-import com.ku.pierdoon.ui.resources.about_issues_desc
 import com.ku.pierdoon.ui.resources.about_license
-import com.ku.pierdoon.ui.resources.about_license_desc
 import com.ku.pierdoon.ui.resources.about_releases
-import com.ku.pierdoon.ui.resources.about_releases_desc
 import com.ku.pierdoon.ui.resources.about_tagline
 import com.ku.pierdoon.ui.resources.app_name
 import com.ku.pierdoon.ui.resources.settings_version
@@ -40,11 +35,6 @@ fun AboutContent(version: String, modifier: Modifier = Modifier) {
     val uri = LocalUriHandler.current
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         SpinningLogo(Modifier.padding(top = 8.dp).size(260.dp))
-        Text(
-            stringResource(Res.string.about_hint),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Spacer(Modifier.height(16.dp))
         Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.displaySmallEmphasized)
         Text(
@@ -63,10 +53,10 @@ fun AboutContent(version: String, modifier: Modifier = Modifier) {
     }
     Group(null) {
         listOf<@Composable (Shape) -> Unit>(
-            { shape -> ActionItem(shape, stringResource(Res.string.about_github), stringResource(Res.string.about_github_desc)) { uri.openUri(REPO) } },
-            { shape -> ActionItem(shape, stringResource(Res.string.about_releases), stringResource(Res.string.about_releases_desc)) { uri.openUri("$REPO/releases") } },
-            { shape -> ActionItem(shape, stringResource(Res.string.about_issues), stringResource(Res.string.about_issues_desc)) { uri.openUri("$REPO/issues") } },
-            { shape -> ActionItem(shape, stringResource(Res.string.about_license), stringResource(Res.string.about_license_desc)) { uri.openUri("$REPO/blob/main/LICENSE") } },
+            { shape -> ActionItem(shape, stringResource(Res.string.about_github), null) { uri.openUri(REPO) } },
+            { shape -> ActionItem(shape, stringResource(Res.string.about_releases), null) { uri.openUri("$REPO/releases") } },
+            { shape -> ActionItem(shape, stringResource(Res.string.about_issues), null) { uri.openUri("$REPO/issues") } },
+            { shape -> ActionItem(shape, stringResource(Res.string.about_license), null) { uri.openUri("$REPO/blob/main/LICENSE") } },
         )
     }
     Text(

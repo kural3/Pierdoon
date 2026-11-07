@@ -20,4 +20,13 @@ data class RadioStart(val title: String, val seeds: List<Song>, val openWith: In
         /** "My wave": from the playlist of the day, which already knows what's played most and loved. */
         fun wave(daily: List<Song>) = RadioStart("", daily.shuffled(), openWith = 1)
     }
+
+    /**
+     * Started while [playing] plays: "my wave" goes on from it rather than cutting it off; a
+     * track's or an artist's radio opens with what was asked for, as it is.
+     */
+    fun over(playing: Song?): RadioStart {
+        if (title.isNotEmpty() || playing == null || RadioTrack.isRadio(playing.id)) return this
+        return copy(seeds = listOf(playing) + seeds.filter { it.id != playing.id })
+    }
 }

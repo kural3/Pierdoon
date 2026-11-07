@@ -83,6 +83,8 @@ fun HomeScreen(
     bottomInset: Dp,
     /** Starts the radio; null with the radio switched off. */
     onMyWave: (() -> Unit)? = null,
+    /** The year whose review the home screen offers (in December and January), or null. */
+    yearReview: Int? = null,
 ) {
     LazyColumn(
         contentPadding = PaddingValues(bottom = listBottomPadding(bottomInset)),
@@ -108,6 +110,15 @@ fun HomeScreen(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(48.dp),
+                )
+            }
+        }
+        if (yearReview != null) {
+            item(key = "yearReview") {
+                YearReviewCard(
+                    year = yearReview,
+                    onClick = { onOpen(Route.YearReview(yearReview)) },
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                 )
             }
         }

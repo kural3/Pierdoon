@@ -84,6 +84,8 @@ fun HomeScreen(
     bottomInset: Dp,
     /** Starts the radio; null with the radio switched off. */
     onMyWave: (() -> Unit)? = null,
+    /** The year whose review the home screen offers (in December and January), or null. */
+    yearReview: Int? = null,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val wide = maxWidth >= TWO_PANE_WIDTH
@@ -126,6 +128,15 @@ fun HomeScreen(
                     .statusBarsPadding()
                     .padding(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 20.dp),
             )
+        }
+        if (yearReview != null) {
+            item(key = "yearReview") {
+                YearReviewCard(
+                    year = yearReview,
+                    onClick = { onOpen(Route.YearReview(yearReview)) },
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                )
+            }
         }
         if (wide) {
             // A wide window: the cards side by side in two rows, each row as tall as its tallest.

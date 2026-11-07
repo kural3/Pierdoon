@@ -52,6 +52,7 @@ import com.ku.pierdoon.data.Album
 import com.ku.pierdoon.data.Artist
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.Playlist
+import com.ku.pierdoon.data.SmartPlaylist
 import com.ku.pierdoon.data.Song
 import androidx.graphics.shapes.RoundedPolygon
 import com.ku.pierdoon.ui.components.Artwork
@@ -149,13 +150,24 @@ fun PlaylistsScreen(
     onCreate: () -> Unit,
     onPlaylistLongPress: (Playlist) -> Unit,
     onImport: () -> Unit,
+    smartPlaylists: List<SmartPlaylist> = emptyList(),
+    smartCount: (SmartPlaylist) -> Int = { 0 },
+    onCreateSmart: () -> Unit = {},
+    onEditSmart: (SmartPlaylist) -> Unit = {},
     bottomInset: Dp,
 ) {
     val haptics = LocalHapticFeedback.current
     AppScaffold(
         title = stringResource(Res.string.nav_playlists),
         actions = {
-            OverflowMenu(listOf(listOf(MenuEntry(stringResource(Res.string.playlist_import), PlayerIcons.Download, onClick = onImport))))
+            OverflowMenu(
+                listOf(
+                    listOf(
+                        MenuEntry(stringResource(Res.string.smart_new), PlayerIcons.Sparkle, onClick = onCreateSmart),
+                        MenuEntry(stringResource(Res.string.playlist_import), PlayerIcons.Download, onClick = onImport),
+                    ),
+                ),
+            )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -184,6 +196,27 @@ fun PlaylistsScreen(
                     onClick = { onOpen(Route.Favorites) },
                 )
             }
+            items(smartPlaylists, key = { "smart:${it.id}" }) { p ->
+                val n = smartCount(p)
+                CollectionRow(
+                    title = p.name,
+                    subtitle = stringResource(Res.string.smart_badge) + " · " + pluralStringResource(Res.plurals.songs_count, n, n),
+                    cover = { SmartPlaylistCover(Modifier.size(56.dp)) },
+                    onClick = { onOpen(Route.SmartPlaylistDetail(p.id)) },
+                    onLongClick = { onEditSmart(p) },
+                )
+            }
+            // Until there is one, a plain row tells what smart playlists are; the menu keeps the entry after.
+            if (smartPlaylists.isEmpty()) {
+                item(key = "smart:new") {
+                    CollectionRow(
+                        title = stringResource(Res.string.smart_new),
+                        subtitle = stringResource(Res.string.smart_new_desc),
+                        cover = { SmartPlaylistCover(Modifier.size(56.dp)) },
+                        onClick = onCreateSmart,
+                    )
+                }
+            }
             items(playlists, key = { it.id }) { p ->
                 CollectionRow(
                     title = p.name,
@@ -193,7 +226,7 @@ fun PlaylistsScreen(
                     onLongClick = { onPlaylistLongPress(p) },
                 )
             }
-            if (playlists.isEmpty()) {
+            if (playlists.isEmpty() && smartPlaylists.isEmpty()) {
                 item(key = "empty") { EmptyMessage(stringResource(Res.string.no_playlists)) }
             }
         }

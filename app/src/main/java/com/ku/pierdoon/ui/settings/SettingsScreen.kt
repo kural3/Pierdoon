@@ -73,7 +73,7 @@ enum class SectionGroup(val title: StringResource) {
 enum class SettingsSection(val group: SectionGroup) {
     Library(SectionGroup.Music), Lyrics(SectionGroup.Music), Downloads(SectionGroup.Music),
     Playback(SectionGroup.Sound), Equalizer(SectionGroup.Sound),
-    Appearance(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App), About(SectionGroup.App),
+    Appearance(SectionGroup.App), Sync(SectionGroup.App), Backup(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App), About(SectionGroup.App),
 }
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
@@ -98,6 +98,9 @@ fun SettingsScreen(
     updateState: UpdateState,
     onCheckUpdates: () -> Unit,
     onShowUpdate: () -> Unit,
+    onFindDuplicates: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
     bottomInset: Dp,
 ) {
     val context = LocalContext.current
@@ -134,7 +137,12 @@ fun SettingsScreen(
                 SettingsSection.Playback -> playback(settings, onUpdate)
                 SettingsSection.Equalizer -> equalizer(settings, onUpdate)
                 SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
-                SettingsSection.Library -> library(settings, onUpdate, trackCount, onRescan, musicFolders)
+                SettingsSection.Library -> {
+                    library(settings, onUpdate, trackCount, onRescan, musicFolders)
+                    duplicatesItem(onFindDuplicates)
+                }
+                SettingsSection.Sync -> item(key = "sync") { PcSyncGroup(null, onOpenComputer) }
+                SettingsSection.Backup -> backupItems(onExportBackup, onImportBackup)
                 SettingsSection.Downloads -> downloads(settings, onUpdate)
                 SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
                 SettingsSection.Beta -> beta(settings, onUpdate)
@@ -146,6 +154,8 @@ fun SettingsScreen(
 
 private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Appearance -> Res.string.settings_appearance
+    SettingsSection.Sync -> Res.string.settings_sync
+    SettingsSection.Backup -> Res.string.settings_backup
     SettingsSection.Playback -> Res.string.settings_playback
     SettingsSection.Equalizer -> Res.string.settings_equalizer
     SettingsSection.Lyrics -> Res.string.settings_lyrics
@@ -158,6 +168,8 @@ private fun SettingsSection.title(): StringResource = when (this) {
 
 private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Appearance -> PlayerIcons.Palette
+    SettingsSection.Sync -> PlayerIcons.Sync
+    SettingsSection.Backup -> PlayerIcons.Restore
     SettingsSection.Playback -> PlayerIcons.Play
     SettingsSection.Equalizer -> PlayerIcons.Equalizer
     SettingsSection.Lyrics -> PlayerIcons.Lyrics
@@ -225,6 +237,8 @@ private fun LazyListScope.sectionList(
 @Composable
 private fun sectionSummary(s: SettingsSection, settings: AppSettings, trackCount: Int, updateStatus: String): String = when (s) {
     SettingsSection.Appearance -> stringResource(Res.string.settings_appearance_summary)
+    SettingsSection.Sync -> syncSummary()
+    SettingsSection.Backup -> stringResource(Res.string.settings_backup_summary)
     SettingsSection.Playback -> playbackSummary(settings)
     SettingsSection.Equalizer -> equalizerSummary(settings)
     SettingsSection.Lyrics -> stringResource(Res.string.settings_lyrics_summary)
@@ -744,4 +758,12 @@ private fun LazyListScope.updates(
             )
         }
     }
+}
+
+/** The Sync section on the list: which computer and when, or that there is none. */
+@Composable
+private fun syncSummary(): String {
+    val paired by PcRemote.paired.collectAsStateWithLifecycle()
+    val pc = paired ?: return stringResource(Res.string.pc_summary_none)
+    return pc.name + " · " + (syncAgo(short = true) ?: stringResource(Res.string.sync_never))
 }

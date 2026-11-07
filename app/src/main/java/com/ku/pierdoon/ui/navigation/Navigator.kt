@@ -22,6 +22,9 @@ sealed interface Route {
     data object Favorites : Route { override val key = "favorites" }
     data object DailyMix : Route { override val key = "dailymix" }
     data object Stats : Route { override val key = "stats" }
+    data class YearReview(val year: Int) : Route { override val key = "year:$year" }
+    data object Duplicates : Route { override val key = "duplicates" }
+    data class SmartPlaylistDetail(val playlistId: Long) : Route { override val key = "smart:$playlistId" }
     data class EditSong(val songId: Long) : Route { override val key = "edit:$songId" }
     data object Downloads : Route { override val key = "downloads" }
     data object Search : Route { override val key = "search" }
@@ -39,6 +42,9 @@ sealed interface Route {
             key == Favorites.key -> Favorites
             key == DailyMix.key -> DailyMix
             key == Stats.key -> Stats
+            key.startsWith("year:") -> YearReview(key.removePrefix("year:").toInt())
+            key.startsWith("smart:") -> SmartPlaylistDetail(key.removePrefix("smart:").toLong())
+            key == Duplicates.key -> Duplicates
             key == Downloads.key -> Downloads
             key == Search.key -> Search
             key == Computer.key -> Computer

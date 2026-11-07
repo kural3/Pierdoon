@@ -1,6 +1,14 @@
 package com.ku.pierdoon
 
 import com.ku.pierdoon.data.USER_AGENT
+import com.ku.pierdoon.data.Backup
+import com.ku.pierdoon.data.LibrarySnapshot
+import com.ku.pierdoon.data.LibrarySync
+import com.ku.pierdoon.data.PlayHistory
+import com.ku.pierdoon.data.SmartPlaylist
+import com.ku.pierdoon.data.history.Play
+import com.ku.pierdoon.remote.PcRemote
+import com.ku.pierdoon.remote.PcSync
 import com.ku.pierdoon.data.M3uMatch
 import com.ku.pierdoon.data.M3uMatcher
 import com.ku.pierdoon.data.MusicFolder
@@ -444,6 +452,67 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (c.moveToFirst()) c.getString(0)?.substringBeforeLast('.')?.ifBlank { null } else null
         }
     }.getOrNull()
+
+    fun putSmartPlaylist(playlist: SmartPlaylist) = userLibrary.putSmartPlaylist(playlist)
+    fun deleteSmartPlaylist(id: Long) = userLibrary.deleteSmartPlaylist(id)
+
+    // Backups and syncing with the computer ---------------------------------------------------------
+
+    private fun librarySongs(): List<Song>? = (_library.value as? LibraryState.Ready)?.songs
+
+    private suspend fun allPlays(): List<Play> =
+        PlayHistory.get(getApplication()).plays.first { it != null }.orEmpty()
+
+    /** Writes a backup of the settings, playlists, favourites and history to a file the user picked. */
+    suspend fun exportBackup(target: Uri): Boolean = withContext(Dispatchers.IO) {
+        val backup = Backup(
+            createdAtMs = System.currentTimeMillis(),
+            platform = "android",
+            appVersion = BuildConfig.VERSION_NAME,
+            settings = SettingsStore.settings.value.common,
+            library = LibrarySnapshot.of(librarySongs().orEmpty(), userData.value, allPlays()),
+        )
+        runCatching {
+            getApplication<Application>().contentResolver.openOutputStream(target, "wt")?.use { it.write(backup.encode()) } != null
+        }.getOrDefault(false)
+    }
+
+    /** The backup in a file the user picked, or null if it isn't one. */
+    suspend fun readBackup(source: Uri): Backup? = withContext(Dispatchers.IO) {
+        runCatching { getApplication<Application>().contentResolver.openInputStream(source)?.use { it.readBytes() } }.getOrNull()
+            ?.let { Backup.decode(it, SettingsStore.settings.value.common) }
+    }
+
+    /**
+     * Takes [backup]'s settings and adds what's missing of its playlists, favourites and history.
+     * @return how many of the tracks it names were found here, and how many it names.
+     */
+    suspend fun restoreBackup(backup: Backup): Pair<Int, Int> {
+        val songs = librarySongs().orEmpty()
+        val plays = allPlays()
+        val outcome = withContext(Dispatchers.Default) {
+            LibrarySync.merge(LibrarySnapshot.of(songs, userData.value, plays, allTracks = true), backup.library, base = null)
+        }
+        userLibrary.apply(outcome.local)
+        PlayHistory.get(getApplication()).merge(outcome.local.plays)
+        backup.settings?.let { s -> SettingsStore.update { it.copy(common = s) } }
+        return outcome.matched to backup.library.tracks.size
+    }
+
+    /** Favourites, playlists and history, both ways with the paired computer. */
+    fun syncWithComputer() {
+        viewModelScope.launch { PcSync.sync(getApplication()) }
+    }
+
+    init {
+        PcSync.library = ::librarySongs
+        // Each time the phone connects to the computer, a sync if it's been a while.
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(PcRemote.connection, _library) { c, l ->
+                c == PcRemote.Connection.Connected && l is LibraryState.Ready
+            }.distinctUntilChanged().collect { ready -> if (ready) PcSync.onConnected(getApplication()) }
+        }
+    }
 
     fun addToPlaylist(id: Long, songId: Long) = userLibrary.addToPlaylist(id, songId)
     fun removeFromPlaylist(id: Long, songId: Long) = userLibrary.removeFromPlaylist(id, songId)

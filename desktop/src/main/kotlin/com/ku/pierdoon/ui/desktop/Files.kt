@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.desktop
 
+import com.ku.pierdoon.data.Backup
 import com.ku.pierdoon.data.CustomFonts
 import com.ku.pierdoon.data.M3U_EXTENSION
 import java.awt.FileDialog
@@ -61,6 +62,26 @@ object Files {
         val name = dialog.file ?: return null
         val picked = File(dialog.directory, name)
         return if (picked.extension.lowercase() in PLAYLIST_EXT) picked else File(dialog.directory, "$name.$M3U_EXTENSION")
+    }
+
+    /** Picks a backup file with the native Open dialog; null if cancelled. */
+    fun pickBackup(title: String): File? {
+        val dialog = FileDialog(owner, title, FileDialog.LOAD)
+        dialog.file = "*.${Backup.EXTENSION}"
+        dialog.setFilenameFilter { _, name -> name.endsWith(".${Backup.EXTENSION}", ignoreCase = true) }
+        dialog.isVisible = true
+        val name = dialog.file ?: return null
+        return File(dialog.directory, name).takeIf { it.isFile }
+    }
+
+    /** Asks where to save a backup; null if cancelled. */
+    fun saveBackup(title: String, suggestedName: String): File? {
+        val dialog = FileDialog(owner, title, FileDialog.SAVE)
+        dialog.file = "$suggestedName.${Backup.EXTENSION}"
+        dialog.isVisible = true
+        val name = dialog.file ?: return null
+        val picked = File(dialog.directory, name)
+        return if (picked.extension.equals(Backup.EXTENSION, ignoreCase = true)) picked else File(dialog.directory, "$name.${Backup.EXTENSION}")
     }
 
     /** Picks a folder; null if cancelled. */

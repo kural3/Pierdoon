@@ -1,6 +1,6 @@
 # Phone connection API
 
-Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 4 (`api: 4`). Version 2 added downloads; version 3 added `/verify`; version 4 added `/file` and `/upload` for copying tracks. A phone compares `api` from `/info` with its own and asks the user to update whichever side is behind. The server is in `desktop/src/main/kotlin/com/ku/pierdoon/remote/`, the phone side in `app/src/main/java/com/ku/pierdoon/remote/PcRemote.kt`.
+Pier.doon for Windows can be driven from the Pier.doon Android app over the local network. This is the protocol, version 5 (`api: 5`). Version 2 added downloads; version 3 added `/verify`; version 4 added `/file` and `/upload` for copying tracks; version 5 added `/sync`. A phone compares `api` from `/info` with its own and asks the user to update whichever side is behind. The server is in `desktop/src/main/kotlin/com/ku/pierdoon/remote/`, the phone side in `app/src/main/java/com/ku/pierdoon/remote/PcRemote.kt`.
 
 The server is off by default. The user turns it on in the Phone tab of the side menu → Phone control. While it runs, that tab shows a six-digit pairing code and the computer's addresses.
 
@@ -177,6 +177,39 @@ The latest 20 downloads on the computer, newest first.
 ### `GET /downloads/search?q=…&source=youtube`
 
 Finds tracks to download by name: `source` is `youtube` (default) or `soundcloud`. Takes a few seconds. `{"hits": [{"url", "title", "artist", "durationSec", "thumbnail"}]}`, or `502` when the site can't be reached.
+
+### `GET /sync?playsSince=…` (since API 5)
+
+The computer's side of a library sync: what the phone needs to merge it with its own. `playsSince` (epoch ms, default 0) limits the plays to those from then on.
+
+```json
+{
+  "tracks": [[songId, "Title", "Artist", durationMs], …],
+  "favorites": [songId, …],
+  "playlists": [{"id": 1, "name": "…", "songs": [songId, …]}],
+  "smart": [ /* smart playlists as kept in library.json */ ],
+  "plays": [[songId, atMs, listenedMs], …]
+}
+```
+
+`tracks` lists every track the other fields name. Song ids differ between devices, so the phone matches tracks by title, artist and length. `503 {"error": "loading"}` means the computer hasn't finished loading its library: try again in a few seconds.
+
+The phone drives the sync. It keeps the state both sides agreed on last time (the base), does a three-way merge of the base, its library and this snapshot, applies its own share and sends the computer's.
+
+### `POST /sync` (since API 5)
+
+The changes for the computer to make, in its own song ids:
+
+```json
+{
+  "favoritesAdd": [songId, …], "favoritesRemove": [songId, …],
+  "playlistsPut": [{"id": 1, "name": "…", "songs": [songId, …]}], "playlistsDelete": [id, …],
+  "smartPut": [ … ], "smartDelete": [id, …],
+  "plays": [[songId, atMs, listenedMs], …]
+}
+```
+
+Every field is optional. A put replaces the playlist with that id, or adds it. `200 {"ok": true}`, `400` for a body that isn't this, `503` while loading, as above. The body may be up to 64 MB.
 
 ### `POST /command`
 

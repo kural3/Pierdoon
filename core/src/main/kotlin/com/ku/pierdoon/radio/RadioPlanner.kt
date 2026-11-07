@@ -60,13 +60,17 @@ class RadioPlanner(
 
     val hasLibrary: Boolean get() = songs.isNotEmpty()
 
+    /** Seeds still to play first: they need nothing from the internet. */
+    val opens: Boolean get() = opening.isNotEmpty()
+
     /** New tracks waiting. Below a few the session asks for another mix. */
     val waiting: Int get() = pool.size
 
     /** Takes in a mix; returns how many of its tracks are new to the radio. */
     fun add(mix: List<RadioTrack>): Int {
         var added = 0
-        for (track in mix) {
+        // The head of the mix only, whatever came in: further on it drifts off the track.
+        for (track in mix.take(YouTubeMix.SIZE)) {
             if (!seen.add(track.videoId)) continue
             meet(track.artist)
             val length = track.durationSec

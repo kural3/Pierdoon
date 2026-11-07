@@ -44,6 +44,7 @@ import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.history.ListeningStats
 import com.ku.pierdoon.data.history.Play
 import com.ku.pierdoon.data.history.StatsPeriod
+import com.ku.pierdoon.data.history.YearReview
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.ui.components.ConnectedChoice
@@ -63,6 +64,7 @@ fun StatsScreen(
     onSongLongPress: (Song) -> Unit,
     onOpen: (Route) -> Unit,
     onClear: () -> Unit,
+    onYearReview: (Int) -> Unit,
     bottomInset: Dp,
 ) {
     var period by rememberSaveable { mutableStateOf(StatsPeriod.Week) }
@@ -71,13 +73,19 @@ fun StatsScreen(
         plays?.let { ListeningStats.from(it, songs.associateBy { s -> s.id }, period, System.currentTimeMillis()) }
     }
     val topSongs = remember(stats) { stats?.topTracks?.map { it.song }.orEmpty() }
+    val years = remember(plays) { plays?.let { YearReview.years(it) }.orEmpty() }
 
     AppScaffold(
         title = stringResource(Res.string.stats),
         onBack = onBack,
         actions = {
             if (!plays.isNullOrEmpty()) {
-                OverflowMenu(listOf(listOf(MenuEntry(stringResource(Res.string.stats_clear), PlayerIcons.Delete, destructive = true) { confirmClear = true })))
+                OverflowMenu(
+                    listOf(
+                        years.drop(1).map { y -> MenuEntry(stringResource(Res.string.year_review_title, y), PlayerIcons.Sparkle) { onYearReview(y) } },
+                        listOf(MenuEntry(stringResource(Res.string.stats_clear), PlayerIcons.Delete, destructive = true) { confirmClear = true }),
+                    ).filter { it.isNotEmpty() },
+                )
             }
         },
     ) { inner ->
@@ -86,6 +94,11 @@ fun StatsScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxSize(),
         ) {
+            years.firstOrNull()?.let { y ->
+                item(key = "yearReview") {
+                    YearReviewCard(y, onClick = { onYearReview(y) }, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp))
+                }
+            }
             item(key = "period") { PeriodPicker(period) { period = it } }
             if (stats == null) return@LazyColumn
             if (stats.plays == 0) {

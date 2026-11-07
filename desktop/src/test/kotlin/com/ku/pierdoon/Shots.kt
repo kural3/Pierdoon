@@ -1,10 +1,17 @@
 package com.ku.pierdoon
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import com.ku.pierdoon.ui.player.MiniPlayerContent
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerButton
@@ -41,6 +48,7 @@ import kotlin.system.exitProcess
  *     wait 1500          let it run
  *     tab Settings       select a tab
  *     page Appearance    open a settings page
+ *     open year:2026     open a page by its route key (duplicates, smart:<id>, year:<year>…)
  *     font Custom <file> the font by name; Custom brings in that font file
  *     lang en            interface language: en, ru or system
  *     click 300 400      press and release there
@@ -56,6 +64,7 @@ import kotlin.system.exitProcess
  *     next               the next button, as a media key would press it
  *     toggle             play / pause
  *     motion Flip        show the tape doing that (Still, Flip, Rewind, Forward, Back) without the player
+ *     mini on            draw the mini player's window body (400×104, top left) instead of the app; off goes back
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
@@ -75,12 +84,21 @@ fun main(args: Array<String>) {
             val vm = MainViewModel()
             com.ku.pierdoon.remote.RemoteServer.bind(vm)
             val nav = Navigator(listOf(Route.Home))
+            val miniShot = mutableStateOf(false)
             val scene = ImageComposeScene(width, height, Density(1f), coroutineContext = Dispatchers.Main) {
                 val settings by SettingsStore.settings.collectAsState()
                 // As in Main.kt: the language is applied before the strings are read, and a change reads them anew.
                 val language = settings.language
                 remember(language) { InterfaceLanguage.apply(language) }
-                PierdoonTheme(settings) { key(language) { PierdoonApp(vm, nav) } }
+                PierdoonTheme(settings) {
+                    key(language) {
+                        if (miniShot.value) {
+                            Box(Modifier.size(DpSize(400.dp, 104.dp))) { MiniPlayerContent(vm) {} }
+                        } else {
+                            PierdoonApp(vm, nav)
+                        }
+                    }
+                }
             }
             var time = 0L
             // Wall time of each rendered frame, for the `perf` step.
@@ -105,6 +123,7 @@ fun main(args: Array<String>) {
                     "wait" -> run(p[1].toLong())
                     "tab" -> nav.selectTab(Route.tabs.first { it::class.simpleName == p[1] })
                     "page" -> nav.push(Route.SettingsPage(SettingsSection.valueOf(p[1])))
+                    "open" -> nav.push(Route.decode(p[1]))
                     "font" -> if (p[1] == "Custom") {
                         val file = File(p.drop(2).joinToString(" "))
                         val imported = CustomFonts.import(file.inputStream(), file.name, SettingsStore.fontsDir)!!
@@ -153,6 +172,7 @@ fun main(args: Array<String>) {
                     "shuffle" -> vm.shuffleAll()
                     "next" -> PlaybackController.player.seekToNext()
                     "toggle" -> vm.togglePlay()
+                    "mini" -> miniShot.value = p[1] == "on"
                     "motion" -> TapeMotion.current.value = TapeMotion.valueOf(p[1])
                     "state" -> PlaybackController.player.let { pl ->
                         val l = pl.levels()

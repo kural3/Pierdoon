@@ -5,6 +5,7 @@ import android.content.Context
 import android.Manifest
 import android.view.KeyEvent
 import com.ku.pierdoon.remote.PcRemote
+import com.ku.pierdoon.remote.PcSync
 import com.ku.pierdoon.remote.PcTransfers
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         SettingsStore.init(this)
         PcRemote.init(this)
+        PcSync.init(this)
         PcTransfers.init(this)
         CoverStore.init(this)
         Updater.init(this)

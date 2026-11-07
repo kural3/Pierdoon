@@ -1,5 +1,19 @@
 package com.ku.pierdoon.ui
 
+import org.jetbrains.compose.resources.getString
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.produceState
+import com.ku.pierdoon.ui.settings.RestoreBackupDialog
+import com.ku.pierdoon.ui.library.YearReviewScreen
+import com.ku.pierdoon.ui.library.SmartPlaylistEditor
+import com.ku.pierdoon.ui.library.SmartPlaylistCover
+import com.ku.pierdoon.ui.library.DuplicatesScreen
+import com.ku.pierdoon.data.history.YearReview
+import com.ku.pierdoon.data.SmartPlaylist
+import com.ku.pierdoon.data.Duplicates
+import com.ku.pierdoon.data.DuplicateGroup
+import com.ku.pierdoon.data.Backup
 import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
@@ -121,6 +135,8 @@ import com.ku.pierdoon.data.ColorSource
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.history.DailyMix
+import com.ku.pierdoon.data.history.ListeningStats
+import com.ku.pierdoon.data.history.StatsPeriod
 import com.ku.pierdoon.radio.RadioStart
 import com.ku.pierdoon.radio.RadioTrack
 import com.ku.pierdoon.ui.player.PlayerRadio
@@ -184,6 +200,9 @@ private val audioPermission =
 
 private fun Context.hasAudioPermission() =
     ContextCompat.checkSelfPermission(this, audioPermission) == PackageManager.PERMISSION_GRANTED
+
+/** The smart playlist editor: a new one, or [playlist] to change. */
+private class SmartEditorTarget(val playlist: SmartPlaylist?)
 
 private sealed interface PlaylistDialog {
     data class Create(val songIds: List<Long>) : PlaylistDialog
@@ -736,6 +755,28 @@ private fun Screens(
         if (!playsLoaded) emptyList() else DailyMix.build(songs, plays.orEmpty(), userData.favorites, System.currentTimeMillis())
     }
 
+    val yearReview = remember(plays, today) { plays?.let { YearReview.seasonYear(it, System.currentTimeMillis()) } }
+    val smartTracks: (SmartPlaylist) -> List<Song> = { p ->
+        p.evaluate(songs, plays.orEmpty(), userData.favorites, System.currentTimeMillis())
+    }
+    // The smart playlist being made (id not in the list yet) or changed; null with the editor closed.
+    var smartEditor by remember { mutableStateOf<SmartEditorTarget?>(null) }
+    var restoring by remember { mutableStateOf<Backup?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val backupSaved = stringResource(Res.string.backup_saved)
+    val backupFailed = stringResource(Res.string.backup_save_failed)
+    val backupUnreadable = stringResource(Res.string.backup_read_failed)
+    val saveBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { target ->
+        if (target != null) scope.launch {
+            Toast.makeText(context, if (vm.exportBackup(target)) backupSaved else backupFailed, Toast.LENGTH_SHORT).show()
+        }
+    }
+    val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { source ->
+        if (source != null) scope.launch {
+            vm.readBackup(source)?.let { restoring = it } ?: Toast.makeText(context, backupUnreadable, Toast.LENGTH_LONG).show()
+        }
+    }
     // One page = its saved UI state + its content.
     val pageBody: @Composable (Route) -> Unit = { route ->
         stateHolder.SaveableStateProvider(route.key) {
@@ -749,8 +790,10 @@ private fun Screens(
                         favoritesCount = userData.favorites.size,
                         dailyMix = dailyMix,
                         weekListenedMs = plays?.let { p ->
-                            val since = System.currentTimeMillis() - WEEK_MS
-                            p.sumOf { if (it.atMs >= since) it.listenedMs else 0L }
+                            // The same week as the statistics page: seven calendar days, tracks still in the library.
+                            val since = ListeningStats.periodStart(StatsPeriod.Week, System.currentTimeMillis())
+                            val ids = songs.mapTo(HashSet()) { it.id }
+                            p.sumOf { if (it.atMs >= since && it.songId in ids) it.listenedMs else 0L }
                         },
                         resolveCover = resolveCover,
                         onPlay = onPlay,
@@ -763,6 +806,7 @@ private fun Screens(
                         } else {
                             null
                         },
+                        yearReview = yearReview,
                     )
                 }
                 Route.Library -> LibraryScreen(
@@ -820,6 +864,9 @@ private fun Screens(
                         updateState = vm.update.collectAsStateWithLifecycle().value,
                         onCheckUpdates = vm::checkForUpdates,
                         onShowUpdate = vm::showUpdate,
+                        onFindDuplicates = { nav.push(Route.Duplicates) },
+                        onExportBackup = { saveBackup.launch(Backup.suggestedName(System.currentTimeMillis()) + "." + Backup.EXTENSION) },
+                        onImportBackup = { openBackup.launch(arrayOf("*/*")) },
                         bottomInset = bottomInset,
                     )
                 }
@@ -831,6 +878,10 @@ private fun Screens(
                     onCreate = onCreatePlaylist,
                     onPlaylistLongPress = onPlaylistLongPress,
                     onImport = onImportPlaylist,
+                    smartPlaylists = userData.smartPlaylists,
+                    smartCount = { smartTracks(it).size },
+                    onCreateSmart = { smartEditor = SmartEditorTarget(null) },
+                    onEditSmart = { smartEditor = SmartEditorTarget(it) },
                     bottomInset = bottomInset,
                 )
                 is Route.AlbumDetail -> {
@@ -937,8 +988,74 @@ private fun Screens(
                     onSongLongPress = { onSongLongPress(it, null) },
                     onOpen = nav::push,
                     onClear = PlayHistory.get(LocalContext.current)::clear,
+                    onYearReview = { nav.push(Route.YearReview(it)) },
                     bottomInset = bottomInset,
                 )
+                is Route.YearReview -> YearReviewScreen(
+                    year = route.year,
+                    plays = plays,
+                    songs = songs,
+                    onBack = { nav.pop() },
+                    onPlay = onPlay,
+                    onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
+                    bottomInset = bottomInset,
+                )
+                Route.Duplicates -> {
+                    val groups by produceState<List<DuplicateGroup>?>(null, songs, userData, plays) {
+                        value = withContext(Dispatchers.Default) {
+                            val playCounts = plays.orEmpty().groupingBy { it.songId }.eachCount()
+                            val inPlaylists = userData.playlists.flatMap { it.songIds }.groupingBy { it }.eachCount()
+                            Duplicates.find(songs, userData.favorites, inPlaylists, playCounts)
+                        }
+                    }
+                    DuplicatesScreen(
+                        groups = groups,
+                        currentSongId = currentSongId,
+                        // No file path on Android: the album and when the copy arrived tell them apart.
+                        describe = { s ->
+                            listOfNotNull(
+                                s.album.takeIf { !s.albumFromFolder && it.isNotBlank() },
+                                s.dateAdded.takeIf { it > 0 }?.let {
+                                    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(it * 1000))
+                                },
+                            ).joinToString("\n")
+                        },
+                        onBack = { nav.pop() },
+                        onPlay = onPlay,
+                        onDelete = { picked, done -> onDeleteSongs?.invoke(picked, done) },
+                        bottomInset = bottomInset,
+                    )
+                }
+                is Route.SmartPlaylistDetail -> {
+                    val playlist = userData.smartPlaylists.firstOrNull { it.id == route.playlistId }
+                    val tracks = remember(playlist, songs, plays, userData.favorites, today) { playlist?.let(smartTracks).orEmpty() }
+                    CollectionScreen(
+                        title = playlist?.name.orEmpty(),
+                        subtitle = stringResource(Res.string.smart_badge),
+                        songs = tracks,
+                        currentSongId = currentSongId,
+                        cover = { m -> SmartPlaylistCover(m) },
+                        onBack = { nav.pop() },
+                        onPlay = onPlay,
+                        onShuffle = onShuffle,
+                        onSongLongPress = { onSongLongPress(it, null) },
+                        onBulk = { picked, done -> onBulk(picked, null, done) },
+                        onDelete = onDeleteSongs,
+                        bottomInset = bottomInset,
+                        emptyText = stringResource(Res.string.empty_playlist),
+                        menu = if (playlist != null) {
+                            listOf(
+                                MenuEntry(stringResource(Res.string.smart_edit_rules), PlayerIcons.Edit) { smartEditor = SmartEditorTarget(playlist) },
+                                MenuEntry(stringResource(Res.string.delete), PlayerIcons.Delete) {
+                                    vm.deleteSmartPlaylist(playlist.id)
+                                    nav.pop()
+                                },
+                            )
+                        } else {
+                            emptyList()
+                        },
+                    )
+                }
                 Route.Favorites -> {
                     val tracks = remember(userData.favorites, songs) { vm.resolve(userData.favorites) }
                     CollectionScreen(
@@ -982,6 +1099,39 @@ private fun Screens(
     ) { route ->
         // Opaque page background: pages overlap while sliding over each other.
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) { pageBody(route) }
+    }
+
+    smartEditor?.let { target ->
+        SmartPlaylistEditor(
+            initial = target.playlist,
+            count = { smartTracks(it).size },
+            onDismiss = { smartEditor = null },
+            onSave = { p ->
+                vm.putSmartPlaylist(p)
+                smartEditor = null
+                if (target.playlist == null) nav.push(Route.SmartPlaylistDetail(p.id))
+            },
+            onDelete = target.playlist?.let { p ->
+                {
+                    vm.deleteSmartPlaylist(p.id)
+                    smartEditor = null
+                    if (nav.current == Route.SmartPlaylistDetail(p.id)) nav.pop()
+                }
+            },
+        )
+    }
+    restoring?.let { backup ->
+        RestoreBackupDialog(
+            backup = backup,
+            onDismiss = { restoring = null },
+            onConfirm = {
+                restoring = null
+                scope.launch {
+                    val (found, total) = vm.restoreBackup(backup)
+                    Toast.makeText(context, getString(Res.string.backup_restored, found, total), Toast.LENGTH_LONG).show()
+                }
+            },
+        )
     }
 }
 
@@ -1135,7 +1285,6 @@ private fun DockedNavBar(nav: Navigator, backdrop: com.ku.pierdoon.ui.components
     }
 }
 
-private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
 private val FLOATING_NAV_HEIGHT = 72.dp
 private const val SELECTED_WEIGHT = 3f
 

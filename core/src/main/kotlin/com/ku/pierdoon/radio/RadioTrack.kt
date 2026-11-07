@@ -34,8 +34,17 @@ data class RadioTrack(val videoId: String, val title: String, val artist: String
 
 /** YouTube's own radio: for any video, a mix of what its listeners also play. */
 object YouTubeMix {
-    /** A track's mix: the video itself first, then about fifty that go with it. */
+    /** A track's mix: the video itself first, then those that go with it. */
     fun url(videoId: String): String = "https://www.youtube.com/watch?v=$videoId&list=RD$videoId"
+
+    /**
+     * How much of a mix is taken: yt-dlp now pages through hundreds of entries (689 for one track,
+     * 36 s to list), and past the first few dozen they have little to do with the track.
+     */
+    const val SIZE = 25
+
+    /** yt-dlp's options for listing a mix: just its head. */
+    val listOptions: List<String> get() = listOf("--flat-playlist", "-J", "--playlist-end", SIZE.toString())
 
     /** What yt-dlp's `--flat-playlist -J` says about a mix or a search, as tracks. */
     fun parse(json: String): List<RadioTrack> {

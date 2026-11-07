@@ -59,6 +59,9 @@ import com.ku.pierdoon.ui.resources.pierdoon
 import com.ku.pierdoon.ui.resources.tray_quit
 import com.ku.pierdoon.ui.resources.tray_show
 import com.ku.pierdoon.ui.PierdoonApp
+import com.ku.pierdoon.ui.player.MiniPlayerMode
+import com.ku.pierdoon.ui.player.MiniPlayerWindow
+import com.ku.pierdoon.ui.resources.mini_player
 import com.ku.pierdoon.ui.desktop.BackDispatcher
 import com.ku.pierdoon.ui.desktop.Files
 import com.ku.pierdoon.ui.navigation.Navigator
@@ -107,7 +110,8 @@ fun main(args: Array<String>) {
             val language = settings.language
             remember(language) { InterfaceLanguage.apply(language) }
             var visible by remember { mutableStateOf(true) }
-            SingleInstance.onActivate = { visible = true; SingleInstance.bringToFront() }
+            val mini by MiniPlayerMode.open.collectAsState()
+            SingleInstance.onActivate = { MiniPlayerMode.open.value = false; visible = true; SingleInstance.bringToFront() }
             val state = rememberWindowState(
                 size = DpSize(windowPrefs.getFloat("w", 1280f).dp, windowPrefs.getFloat("h", 820f).dp),
                 position = windowPrefs.getFloat("x", Float.NaN).takeUnless { it.isNaN() }
@@ -141,22 +145,31 @@ fun main(args: Array<String>) {
             Tray(
                 icon = icon,
                 tooltip = stringResource(Res.string.app_name),
-                onAction = { visible = true; SingleInstance.bringToFront() },
+                onAction = { MiniPlayerMode.open.value = false; visible = true; SingleInstance.bringToFront() },
                 menu = {
                     key(language) {
-                        Item(stringResource(Res.string.tray_show), onClick = { visible = true; SingleInstance.bringToFront() })
+                        Item(stringResource(Res.string.tray_show), onClick = { MiniPlayerMode.open.value = false; visible = true; SingleInstance.bringToFront() })
+                        Item(stringResource(Res.string.mini_player), onClick = { MiniPlayerMode.open.value = true })
                         Separator()
                         Item(stringResource(Res.string.tray_quit), onClick = { quit(vm) })
                     }
                 },
             )
 
+            if (mini) {
+                MiniPlayerWindow(vm, settings, windowPrefs, icon) {
+                    MiniPlayerMode.open.value = false
+                    visible = true
+                    SingleInstance.bringToFront()
+                }
+            }
+
             Window(
                 onCloseRequest = {
                     saveWindow(windowPrefs, state)
                     if (settings.closeToTray) visible = false else quit(vm)
                 },
-                visible = visible,
+                visible = visible && !mini,
                 state = state,
                 title = stringResource(Res.string.app_name),
                 icon = icon,

@@ -110,7 +110,7 @@ data class ListeningStats(
         private const val TOP = 20
 
         /** Plays of tracks no longer in the library are left out: there'd be nothing to show for them. */
-        fun from(plays: List<Play>, byId: Map<Long, Song>, period: StatsPeriod, nowMs: Long): ListeningStats {
+        fun from(plays: List<Play>, byId: Map<Long, Song>, period: StatsPeriod, nowMs: Long, top: Int = TOP): ListeningStats {
             val since = periodStart(period, nowMs)
             val inPeriod = plays.filter { it.atMs >= since && it.songId in byId }
 
@@ -118,7 +118,7 @@ data class ListeningStats(
             for (p in inPeriod) perTrack.getOrPut(p.songId) { LongArray(2) }.let { it[0]++; it[1] += p.listenedMs }
             val topTracks = perTrack.entries
                 .sortedWith(compareByDescending<Map.Entry<Long, LongArray>> { it.value[0] }.thenByDescending { it.value[1] })
-                .take(TOP)
+                .take(top)
                 .map { (id, v) -> TrackCount(byId.getValue(id), v[0].toInt(), v[1]) }
 
             // A track of "A, B" counts fully for each; names that differ in case are one.
@@ -137,7 +137,7 @@ data class ListeningStats(
             }
             val topArtists = perArtist.values
                 .sortedWith(compareByDescending<Acc> { it.plays }.thenByDescending { it.ms })
-                .take(TOP)
+                .take(top)
                 .map { ArtistCount(it.name, it.plays, it.ms, it.cover) }
 
             return ListeningStats(

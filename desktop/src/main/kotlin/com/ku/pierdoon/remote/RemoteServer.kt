@@ -5,6 +5,8 @@ import com.ku.pierdoon.BuildConfig
 import com.ku.pierdoon.LibraryState
 import com.ku.pierdoon.MainViewModel
 import com.ku.pierdoon.data.CoverStore
+import com.ku.pierdoon.data.LibraryChanges
+import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.MusicRepository
 import com.ku.pierdoon.data.Song
@@ -40,6 +42,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -85,8 +89,8 @@ data class RemoteDevice(val id: String, val name: String, val pairedAt: Long)
  */
 object RemoteServer {
     const val PORT = 47231
-    /** 2: downloads; 3: /verify; 4: /file and /upload. */
-    const val API_VERSION = 4
+    /** 2: downloads; 3: /verify; 4: /file and /upload; 5: /sync. */
+    const val API_VERSION = 5
     private const val DOWNLOADS_THROTTLE_MS = 400L
     private const val MAX_DOWNLOADS_SENT = 20
 
@@ -230,6 +234,8 @@ object RemoteServer {
             path.startsWith("/file/") && method == "GET" -> file(ex, path.removePrefix("/file/"))
             path == "/upload" && method == "POST" -> upload(ex)
             path == "/command" && method == "POST" -> command(ex)
+            path == "/sync" && method == "GET" -> syncGet(ex)
+            path == "/sync" && method == "POST" -> syncPost(ex)
             path == "/unpair" && method == "POST" -> {
                 tokenOf(ex)?.let { token -> prefs.edit { remove(DEVICE + hash(token)) } }
                 _status.update { it.copy(devices = loadDevices()) }
@@ -436,6 +442,33 @@ object RemoteServer {
         send(ex, 200, JSONObject().put("ok", true).put("name", target.name))
     }
 
+    /**
+     * /sync?playsSince=…: favourites, playlists, smart playlists and plays (from playsSince on,
+     * epoch ms) with the tags of every track they name, for the phone to merge with its own.
+     */
+    private fun syncGet(ex: HttpExchange) {
+        val model = vm ?: return send(ex, 503, JSONObject())
+        // Still loading: "not yet", so the phone tries again instead of merging with nothing.
+        if (!onUi { model.syncReady() }) return send(ex, 503, JSONObject().put("error", "loading"))
+        val since = query(ex)["playsSince"]?.toLongOrNull() ?: 0L
+        PlayHistory.load()
+        // The play log is read on its own thread; a moment's wait the first time.
+        runBlocking { withTimeoutOrNull(5_000) { PlayHistory.plays.first { it != null } } }
+        send(ex, 200, onUi { model.syncSnapshot(since) }.toJson())
+    }
+
+    /** /sync (POST): the changes the phone worked out, in this computer's song ids. */
+    private fun syncPost(ex: HttpExchange) {
+        val model = vm ?: return send(ex, 503, JSONObject())
+        if (!onUi { model.syncReady() }) return send(ex, 503, JSONObject().put("error", "loading"))
+        val body = runCatching { readJson(ex, MAX_SYNC_BYTES) }.getOrNull()
+            ?: return send(ex, 400, JSONObject().put("error", "body"))
+        val changes = runCatching { LibraryChanges.fromJson(body) }.getOrNull()
+            ?: return send(ex, 400, JSONObject().put("error", "changes"))
+        onUi { model.applySync(changes) }
+        send(ex, 200, JSONObject().put("ok", true))
+    }
+
     private fun tagsJson(t: TagOverride) = JSONObject().apply {
         t.title?.let { put("title", it) }
         t.artist?.let { put("artist", it) }
@@ -608,6 +641,17 @@ object RemoteServer {
         return runCatching { JSONObject(text) }.getOrDefault(JSONObject())
     }
 
+    /** A big JSON body, gzipped when Content-Encoding says so; throws when it isn't one or is over [limit]. */
+    private fun readJson(ex: HttpExchange, limit: Int): JSONObject {
+        val gzip = ex.requestHeaders.getFirst("Content-Encoding")?.contains("gzip") == true
+        val bytes = ex.requestBody.use { raw ->
+            val input = if (gzip) java.util.zip.GZIPInputStream(raw) else raw
+            input.readNBytes(limit + 1)
+        }
+        if (bytes.size > limit) throw IOException("too large")
+        return JSONObject(bytes.toString(Charsets.UTF_8))
+    }
+
     private fun query(ex: HttpExchange): Map<String, String> =
         ex.requestURI.rawQuery.orEmpty().split('&').filter { '=' in it }.associate {
             val (k, v) = it.split('=', limit = 2)
@@ -648,6 +692,8 @@ object RemoteServer {
     private const val MAX_NONCE_CHARS = 128
     private const val GZIP_MIN_BYTES = 4096
     private const val MAX_BODY_BYTES = 256 * 1024
+    /** A sync from the phone: a year of plays is a few megabytes before gzip. */
+    private const val MAX_SYNC_BYTES = 64 * 1024 * 1024
     private const val COVER_CACHE_BYTES = 16 * 1024 * 1024
     private const val COPY_BUFFER = 64 * 1024
     private const val MAX_UPLOAD_BYTES = 2L * 1024 * 1024 * 1024

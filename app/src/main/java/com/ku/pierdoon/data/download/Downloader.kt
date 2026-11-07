@@ -432,6 +432,7 @@ object Downloader {
             val request = YoutubeDLRequest(YouTubeMix.url(videoId)).apply {
                 addOption("--flat-playlist")
                 addOption("-J")
+                addOption("--playlist-end", YouTubeMix.SIZE)
                 addCommands(listOf("--"))
             }
             YouTubeMix.parse(execute(request, "pierdoon-radio-mix").out)

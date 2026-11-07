@@ -87,8 +87,9 @@ object Radio {
     fun libraryId(id: Long): Long? = keptIds[id]
 
     /** Starts a radio from [start], over whatever was playing. */
-    fun start(library: List<Song>, start: RadioStart) {
+    fun start(library: List<Song>, request: RadioStart) {
         stop()
+        val start = request.over(player.currentMediaItem?.song?.takeIf { player.isPlaying })
         val settings = SettingsStore.settings.value
         val memory = RadioMemory.get(AppDirs.files)
         val planner = RadioPlanner(library, start.seeds, start.openWith, memory, settings.radioNovelty)
@@ -104,9 +105,23 @@ object Radio {
             val p = player
             p.shuffleModeEnabled = false
             p.repeatMode = Player.REPEAT_MODE_OFF
-            p.setMediaItems(listOf(item(first)), 0, 0)
-            p.prepare()
-            p.play()
+            val current = p.currentMediaItem
+            if (current != null && current.song.id == first.id) {
+                // It's playing already: it goes on from where it is, the radio after it.
+                ours += current.queueKey
+                editing++
+                try {
+                    for (i in p.mediaItemCount - 1 downTo 0) if (i != p.currentMediaItemIndex) p.removeMediaItem(i)
+                } finally {
+                    editing--
+                }
+                p.play()
+                fill()
+            } else {
+                p.setMediaItems(listOf(item(first)), 0, 0)
+                p.prepare()
+                p.play()
+            }
         }
     }
 

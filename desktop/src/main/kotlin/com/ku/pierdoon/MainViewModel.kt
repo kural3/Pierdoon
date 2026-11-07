@@ -2,6 +2,12 @@ package com.ku.pierdoon
 
 import androidx.compose.runtime.Immutable
 import com.ku.pierdoon.data.USER_AGENT
+import com.ku.pierdoon.data.Backup
+import com.ku.pierdoon.data.LibraryChanges
+import com.ku.pierdoon.data.LibrarySnapshot
+import com.ku.pierdoon.data.LibrarySync
+import com.ku.pierdoon.data.PlayHistory
+import com.ku.pierdoon.data.SmartPlaylist
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.M3uMatch
 import com.ku.pierdoon.data.M3uMatcher
@@ -442,6 +448,74 @@ class MainViewModel {
     suspend fun exportPlaylist(playlist: Playlist, target: File): Boolean = withContext(Dispatchers.IO) {
         val text = writeM3u(playlist.name, resolve(playlist.songIds)) { it.path }
         runCatching { target.writeText(text) }.isSuccess
+    }
+
+    fun putSmartPlaylist(playlist: SmartPlaylist) = userLibrary.putSmartPlaylist(playlist)
+    fun deleteSmartPlaylist(id: Long) = userLibrary.deleteSmartPlaylist(id)
+
+    private fun librarySongs(): List<Song> = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
+
+    // Sync with the phone and backups -------------------------------------------------------------
+
+    /**
+     * The library is scanned and the playlists read. Until then a sync would see no tracks and no
+     * playlists here, and take that for everything having been removed.
+     */
+    fun syncReady(): Boolean = _library.value is LibraryState.Ready && userData.value.loaded
+
+    /** What the phone merges with its own: plays from [playsSince] on, everything else whole. */
+    fun syncSnapshot(playsSince: Long): LibrarySnapshot {
+        val plays = PlayHistory.plays.value.orEmpty()
+        return LibrarySnapshot.of(librarySongs(), userData.value, plays, allTracks = true).let { s ->
+            s.copy(plays = s.plays.filter { it.atMs >= playsSince })
+        }
+    }
+
+    /** Changes the phone worked out, in this library's ids. */
+    fun applySync(changes: LibraryChanges) {
+        val known = songsById.keys
+        userLibrary.apply(
+            changes.copy(
+                favoritesAdd = changes.favoritesAdd.filterTo(HashSet()) { it in known },
+                playlistsPut = changes.playlistsPut.map { p -> p.copy(songIds = p.songIds.filter { it in known }) },
+            )
+        )
+        PlayHistory.merge(changes.plays.filter { it.songId in known })
+    }
+
+    /** Writes a backup of the settings, playlists, favourites and history to [target]. */
+    suspend fun exportBackup(target: File): Boolean = withContext(Dispatchers.IO) {
+        PlayHistory.load()
+        val plays = PlayHistory.plays.first { it != null }.orEmpty()
+        val backup = Backup(
+            createdAtMs = System.currentTimeMillis(),
+            platform = "windows",
+            appVersion = BuildConfig.VERSION_NAME,
+            settings = SettingsStore.settings.value.common,
+            library = LibrarySnapshot.of(librarySongs(), userData.value, plays),
+        )
+        runCatching { target.writeBytes(backup.encode()) }.isSuccess
+    }
+
+    /** The backup in [source], or null if it isn't one. */
+    suspend fun readBackup(source: File): Backup? = withContext(Dispatchers.IO) {
+        runCatching { source.readBytes() }.getOrNull()?.let { Backup.decode(it, SettingsStore.settings.value.common) }
+    }
+
+    /**
+     * Takes [backup]'s settings and adds what's missing of its playlists, favourites and history.
+     * @return how many of the tracks it names were found here, and how many it names.
+     */
+    suspend fun restoreBackup(backup: Backup): Pair<Int, Int> {
+        PlayHistory.load()
+        val plays = PlayHistory.plays.first { it != null }.orEmpty()
+        val outcome = withContext(Dispatchers.Default) {
+            LibrarySync.merge(LibrarySnapshot.of(librarySongs(), userData.value, plays, allTracks = true), backup.library, base = null)
+        }
+        userLibrary.apply(outcome.local)
+        PlayHistory.merge(outcome.local.plays)
+        backup.settings?.let { s -> SettingsStore.update { it.copy(common = s) } }
+        return outcome.matched to backup.library.tracks.size
     }
 
     fun addToPlaylist(id: Long, songId: Long) = userLibrary.addToPlaylist(id, songId)

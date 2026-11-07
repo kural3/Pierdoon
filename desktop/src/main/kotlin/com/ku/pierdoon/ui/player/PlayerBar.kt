@@ -260,22 +260,44 @@ fun PlayerBar(
             },
             end = {
                 // Extras --------------------------------------------------------------------------
+                // In a narrow window the volume slider goes first (the wheel over the speaker
+                // still sets it), then the mini player button (it is in the tray menu too), then
+                // the queue; the full-player button always stays.
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val showSlider = maxWidth >= EXTRAS_FULL
+                val showMini = maxWidth >= EXTRAS_FULL - VOLUME_SLIDER
+                // At the narrowest the queue goes too (the full player has it); an open queue keeps
+                // its button so it can be closed.
+                val showQueueButton = showQueue || maxWidth >= EXTRAS_FULL - VOLUME_SLIDER - 44.dp
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     LyricsPill(showLyrics, onToggleLyrics, onOpenDelicious)
-                    ExpressiveToggleButton(
-                        checked = showQueue,
-                        onClick = onToggleQueue,
-                        icon = PlayerIcons.Queue,
-                        contentDescription = stringResource(Res.string.queue),
-                        iconSize = 20.dp,
-                        uncheckedColor = Color.Transparent,
-                        modifier = Modifier.size(40.dp),
-                    )
-                    VolumeControl(volume, muted, onVolume, onToggleMute)
+                    if (showQueueButton) {
+                        ExpressiveToggleButton(
+                            checked = showQueue,
+                            onClick = onToggleQueue,
+                            icon = PlayerIcons.Queue,
+                            contentDescription = stringResource(Res.string.queue),
+                            iconSize = 20.dp,
+                            uncheckedColor = Color.Transparent,
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
+                    VolumeControl(volume, muted, onVolume, onToggleMute, sliderWidth = if (showSlider) VOLUME_SLIDER else 0.dp)
+                    if (showMini) {
+                        ExpressiveIconButton(
+                            onClick = { MiniPlayerMode.open.value = true },
+                            icon = PlayerIcons.CloseFullscreen,
+                            contentDescription = stringResource(Res.string.mini_player),
+                            containerColor = Color.Transparent,
+                            contentColor = colors.onSurfaceVariant,
+                            iconSize = 20.dp,
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
                     ExpressiveIconButton(
                         onClick = onExpand,
                         icon = PlayerIcons.OpenInFull,
@@ -285,6 +307,7 @@ fun PlayerBar(
                         iconSize = 20.dp,
                         modifier = Modifier.size(40.dp),
                     )
+                }
                 }
             },
         )
@@ -321,6 +344,10 @@ private fun BarLayout(
 
 private const val CENTER_SHARE = 0.4f
 private val CENTER_MIN = 320.dp
+
+/** The volume slider in the bar, and everything on the bar's right side with it shown. */
+private val VOLUME_SLIDER = 96.dp
+private val EXTRAS_FULL = 80.dp + 40.dp + 40.dp + VOLUME_SLIDER + 40.dp + 40.dp + 4.dp * 4
 
 /** Lyrics and the Delicious mode side by side in one pill: the panel on the left, the mode on the right. */
 @Composable
@@ -377,7 +404,7 @@ fun VolumeControl(volume: Float, muted: Boolean, onVolume: (Float) -> Unit, onTo
             iconSize = 20.dp,
             modifier = Modifier.size(40.dp),
         )
-        SlimSlider(value = shown, onValueChange = onVolume, modifier = Modifier.width(sliderWidth))
+        if (sliderWidth > 0.dp) SlimSlider(value = shown, onValueChange = onVolume, modifier = Modifier.width(sliderWidth))
     }
 }
 

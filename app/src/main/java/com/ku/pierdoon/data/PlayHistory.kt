@@ -31,6 +31,11 @@ class PlayHistory private constructor(context: Context) {
 
     fun clear() = store.clear()
 
+    /** Plays from the computer or a backup; those already here are skipped. */
+    fun merge(plays: List<Play>) {
+        if (plays.isNotEmpty()) store.merge(plays)
+    }
+
     companion object {
         @Volatile private var instance: PlayHistory? = null
 

@@ -1,5 +1,11 @@
 package com.ku.pierdoon.ui.remote
 
+import android.text.format.DateUtils
+import com.ku.pierdoon.ui.settings.SwitchItem
+import com.ku.pierdoon.ui.settings.ActionItem
+import com.ku.pierdoon.remote.SyncStatus
+import com.ku.pierdoon.remote.PcSync
+import com.ku.pierdoon.ui.settings.PcSyncGroup
 import org.jetbrains.compose.resources.StringResource
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
@@ -582,6 +588,11 @@ private fun RemoteScreen(
                             }
                         })
                     }
+                }
+            }
+            item(key = "sync") {
+                Box(Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 12.dp)) {
+                    PcSyncGroup(stringResource(Res.string.sync_title))
                 }
             }
             item(key = "send") {

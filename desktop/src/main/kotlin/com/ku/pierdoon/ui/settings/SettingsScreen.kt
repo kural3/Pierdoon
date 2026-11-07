@@ -84,7 +84,7 @@ enum class SectionGroup(val title: StringResource) {
 enum class SettingsSection(val group: SectionGroup) {
     Library(SectionGroup.Music), Lyrics(SectionGroup.Music), Downloads(SectionGroup.Music),
     Playback(SectionGroup.Sound), Equalizer(SectionGroup.Sound),
-    Appearance(SectionGroup.App), System(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App), About(SectionGroup.App),
+    Appearance(SectionGroup.App), System(SectionGroup.App), Backup(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App), About(SectionGroup.App),
 }
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
@@ -112,6 +112,9 @@ fun SettingsScreen(
     updateState: UpdateState,
     onCheckUpdates: () -> Unit,
     onShowUpdate: () -> Unit,
+    onFindDuplicates: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
     bottomInset: Dp,
 ) {
     val version = BuildConfig.VERSION_NAME
@@ -134,7 +137,11 @@ fun SettingsScreen(
             SettingsSection.Playback -> playback(settings, onUpdate)
             SettingsSection.Equalizer -> equalizer(settings, onUpdate)
             SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
-            SettingsSection.Library -> library(settings, trackCount, onRescan, onAddFolder, onRemoveFolder, onExcludeFolder, onUnexcludeFolder)
+            SettingsSection.Library -> {
+                library(settings, trackCount, onRescan, onAddFolder, onRemoveFolder, onExcludeFolder, onUnexcludeFolder)
+                duplicatesItem(onFindDuplicates)
+            }
+            SettingsSection.Backup -> backupItems(onExportBackup, onImportBackup)
             SettingsSection.Downloads -> downloads(settings, onUpdate, onDownloadFolder)
             SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
             SettingsSection.Beta -> beta(settings, onUpdate)
@@ -194,6 +201,7 @@ private val SECTION_LIST_WIDTH = 400.dp
 private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Appearance -> Res.string.settings_appearance
     SettingsSection.System -> Res.string.settings_system
+    SettingsSection.Backup -> Res.string.settings_backup
     SettingsSection.Playback -> Res.string.settings_playback
     SettingsSection.Equalizer -> Res.string.settings_equalizer
     SettingsSection.Lyrics -> Res.string.settings_lyrics
@@ -207,6 +215,7 @@ private fun SettingsSection.title(): StringResource = when (this) {
 private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Appearance -> PlayerIcons.Palette
     SettingsSection.System -> PlayerIcons.Desktop
+    SettingsSection.Backup -> PlayerIcons.Restore
     SettingsSection.Playback -> PlayerIcons.Play
     SettingsSection.Equalizer -> PlayerIcons.Equalizer
     SettingsSection.Lyrics -> PlayerIcons.Lyrics
@@ -245,6 +254,7 @@ private fun LazyListScope.sectionList(
                         summary = when (s) {
                             SettingsSection.Appearance -> stringResource(Res.string.settings_appearance_summary)
                             SettingsSection.System -> stringResource(Res.string.settings_system_summary)
+                            SettingsSection.Backup -> stringResource(Res.string.settings_backup_summary)
                             SettingsSection.Playback -> playbackSummary(settings)
                             SettingsSection.Equalizer -> equalizerSummary(settings)
                             SettingsSection.Lyrics -> stringResource(Res.string.settings_lyrics_summary)

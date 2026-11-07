@@ -31,6 +31,7 @@ data class UserData(
     val favorites: Set<Long> = emptySet(),
     /** Most recent first. */
     val recent: List<Long> = emptyList(),
+    val smartPlaylists: List<SmartPlaylist> = emptyList(),
 )
 
 /**
@@ -128,6 +129,39 @@ class UserLibrary private constructor(private val file: File) {
         )
     }
 
+    fun putSmartPlaylist(playlist: SmartPlaylist) = mutate { d ->
+        val p = playlist.copy(name = playlist.name.trim())
+        d.copy(
+            smartPlaylists = if (d.smartPlaylists.any { it.id == p.id }) d.smartPlaylists.map { if (it.id == p.id) p else it }
+            else d.smartPlaylists + p
+        )
+    }
+
+    fun deleteSmartPlaylist(id: Long) = mutate { d -> d.copy(smartPlaylists = d.smartPlaylists.filterNot { it.id == id }) }
+
+    /**
+     * Changes brought by a sync with the other device or a restored backup, in one write:
+     * favourites added and removed, playlists put in whole (by id; a new one goes at the end) or
+     * dropped, smart playlists the same.
+     */
+    fun apply(changes: LibraryChanges) = mutate { d ->
+        var playlists = d.playlists.filterNot { it.id in changes.playlistsDelete }
+        for (p in changes.playlistsPut) {
+            playlists = if (playlists.any { it.id == p.id }) {
+                playlists.map { if (it.id == p.id) it.copy(name = p.name, songIds = p.songIds.distinct()) else it }
+            } else {
+                playlists + Playlist(p.id, p.name, p.songIds.distinct())
+            }
+        }
+        var smart = d.smartPlaylists.filterNot { it.id in changes.smartDelete }
+        for (p in changes.smartPut) smart = if (smart.any { it.id == p.id }) smart.map { if (it.id == p.id) p else it } else smart + p
+        d.copy(
+            favorites = d.favorites - changes.favoritesRemove + changes.favoritesAdd,
+            playlists = playlists,
+            smartPlaylists = smart,
+        )
+    }
+
     fun recordPlayed(songId: Long) = mutate(delayMs = HISTORY_WRITE_DELAY_MS) { d ->
         if (d.recent.firstOrNull() == songId) d
         else d.copy(recent = (listOf(songId) + (d.recent - songId)).take(MAX_RECENT))
@@ -175,6 +209,9 @@ class UserLibrary private constructor(private val file: File) {
                 playlists = playlists,
                 favorites = o.optJSONArray("favorites")?.toLongList().orEmpty().toSet(),
                 recent = o.optJSONArray("recent")?.toLongList().orEmpty(),
+                smartPlaylists = o.optJSONArray("smart")?.let { arr ->
+                    List(arr.length()) { arr.getJSONObject(it) }.mapNotNull(SmartPlaylist::fromJson)
+                }.orEmpty(),
             )
         }.getOrElse { UserData(loaded = true) }
     }
@@ -192,6 +229,7 @@ class UserLibrary private constructor(private val file: File) {
             })
             .put("favorites", JSONArray(d.favorites.toList()))
             .put("recent", JSONArray(d.recent))
+            .put("smart", JSONArray(d.smartPlaylists.map { it.toJson() }))
         writeAtomically(file, o.toString())
     }
 

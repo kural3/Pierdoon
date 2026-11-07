@@ -175,6 +175,14 @@ object PlayerIcons {
                 "L13,11h7V4l-2.35,2.35z"
         )
     }
+    val Sync by lazy {
+        icon(
+            "Sync",
+            "M12,4L12,1L8,5l4,4L12,6c3.31,0 6,2.69 6,6 0,1.01 -0.25,1.97 -0.7,2.8l1.46,1.46C19.54,15.03 20,13.57 20,12" +
+                "c0,-4.42 -3.58,-8 -8,-8zM12,18c-3.31,0 -6,-2.69 -6,-6 0,-1.01 0.25,-1.97 0.7,-2.8L5.24,7.74C4.46,8.97 4,10.43 4,12" +
+                "c0,4.42 3.58,8 8,8v3l4,-4 -4,-4v3z"
+        )
+    }
     val ChevronRight by lazy { icon("ChevronRight", "M10,6L8.59,7.41 13.17,12l-4.58,4.59L10,18l6,-6z") }
     /** The app's mark: the note-shaped P from its icon (desktop/icons/Icon.java), in 24 units. */
     val Logo by lazy {

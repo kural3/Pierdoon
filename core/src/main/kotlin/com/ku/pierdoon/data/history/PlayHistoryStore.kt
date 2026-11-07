@@ -34,6 +34,21 @@ class PlayHistoryStore(private val file: File, private val onChange: (List<Play>
         onChange(plays)
     }
 
+    /**
+     * Plays from elsewhere (the other device, a backup): those not already here (the same track
+     * starting at the same moment) are added in time order, and the log is written anew.
+     */
+    fun merge(incoming: List<Play>) = io.execute {
+        val have = plays.mapTo(HashSet()) { it.songId to it.atMs }
+        val fresh = incoming.filter { have.add(it.songId to it.atMs) }
+        if (fresh.isEmpty()) return@execute
+        val all = (plays + fresh).sortedBy { it.atMs }.takeLast(PlayLogFormat.MAX_PLAYS)
+        file.parentFile?.mkdirs()
+        rewrite(all)
+        plays = all
+        onChange(plays)
+    }
+
     /** Waits a moment for what's queued to reach the disk; for quitting. */
     fun awaitWrites() {
         runCatching { io.submit {}.get(1, TimeUnit.SECONDS) }

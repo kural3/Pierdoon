@@ -84,6 +84,8 @@ class RadioSession(
 
     /** The next track to queue, or null when there's nothing left to play. */
     suspend fun next(): Song? = lock.withLock {
+        // The track it starts with plays at once; the first mix comes in while it plays.
+        if (planner.opens) return (planner.next() as? RadioPlanner.Pick.Known)?.song
         repeat(MAX_TRIES) {
             if (stopped) return null
             if (failures >= MAX_FAILURES && now() >= retryAt) failures = MAX_FAILURES - 1

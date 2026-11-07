@@ -32,6 +32,10 @@ What changed in each version is in its release notes.
 - Plays your music: tracks, albums, artists, playlists, favorites, search, sorting, selecting many tracks at once to queue, add to a playlist or delete. A track tagged "A, B" or "A feat. B" counts for each artist
 - A playlist of the day on the home screen: favourites, more of the artists you play most and some you haven't heard yet, new every day
 - Listening stats for the week, month, year or all time: time listened, top artists and tracks, a bar per day or month
+- A year in review in December and January: time listened, top tracks and artists, the busiest month and day, new artists found, the longest streak; older years in Stats
+- Smart playlists that fill themselves by rules: artist, album, title, favourites, plays, how recently added or played, length
+- Finds duplicate tracks (same title, artist and length) to clear out the extra copies
+- Backs up favourites, playlists, play history and settings to one `.pierdoon` file, and restores from it
 - Synced lyrics from [LRCLIB](https://lrclib.net), and plain ones from [Genius](https://genius.com) when LRCLIB has none, with a per-track sync offset. When none are found, or the wrong ones, search both by hand and pick, or write your own: a text editor with `[mm:ss]` stamps, and a sync view that stamps each line as the song plays
 - Playback speed from 0.8× to 1.25×, pitch going along (slowed, nightcore)
 - Radio (beta): an endless stream of your own music mixed with new tracks like it, downloaded ahead as it plays. "Not this" skips a track and remembers it; how much is new is up to you
@@ -48,6 +52,7 @@ What changed in each version is in its release notes.
 - Expanding player, album art / wallpaper or Windows accent / custom color themes (any hue and strength, from graphite to neon), a Nothing-style look (monochrome, red accent, dotted progress) and a choice of fonts, your own TTF or OTF file among them
 - The phone works as a remote for the computer over Wi-Fi: the computer's playback in the phone's own player, its queue, lyrics and library, and downloads sent to it
 - Copies tracks between the phone and the computer over Wi-Fi, byte for byte: "Send to computer" on the phone's tracks and playlists, "Save to phone" on the computer's. Tracks that look like ones already there (same title, artist and length) are pointed out first
+- Syncs favourites, playlists, smart playlists and play history between the phone and the computer: on connecting (at most hourly) or from Settings → Sync on the phone
 
 **Android**
 - Media3 playback with notification and lock screen controls
@@ -62,6 +67,7 @@ What changed in each version is in its release notes.
 **Windows**
 - Plays music from folders on your computer (Music by default; add more, or leave subfolders out, in Settings → Library). Deleting sends files to the Recycle Bin
 - Any format FFmpeg reads (MP3, M4A/AAC, FLAC, Opus, Ogg, WAV, WMA, APE, WavPack…), gapless between tracks, output device choice, skip silence
+- A mini player: a small window over the others with the cover and the controls, from the player bar or the tray
 - Media keys and the Windows media overlay, tray icon (closing the window keeps the music playing), one instance at a time
 - Discord status ("Listening to Pier.doon"), switched on in Settings → System
 - Delicious mode: the lyrics line by line, lit as they are sung, over the cover itself, blurred and slowly turning with the music, in four styles, with a dock for the playback controls

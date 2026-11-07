@@ -200,4 +200,40 @@ class RadioTest {
         assertTrue(picks.all { it != null && it.id in 1L..5L })
         assertTrue(session.state.value.offline)
     }
+
+    @Test
+    fun theSeedPlaysBeforeAnythingIsAskedOnline() = runBlocking {
+        val seed = song(1, "Seed", "Artist")
+        val source = object : RadioSource {
+            var asked = 0
+            override suspend fun find(query: String): RadioTrack? { asked++; return null }
+            override suspend fun mix(videoId: String): List<RadioTrack> { asked++; return emptyList() }
+            override suspend fun fetch(track: RadioTrack): Song? = null
+            override fun discard(track: RadioTrack) {}
+            override suspend fun keep(track: RadioTrack): Long? = null
+        }
+        val planner = RadioPlanner(listOf(seed, song(2, "Other", "Artist")), listOf(seed), 1, null, novelty = 100)
+        val session = RadioSession(source, planner, null, "Seed")
+        assertEquals(1L, session.next()!!.id)
+        assertEquals(0, source.asked)
+    }
+
+    @Test
+    fun onlyTheHeadOfALongMixIsTaken() {
+        val mix = (1..700).map { track("m$it", "M$it", "Artist $it") }
+        val planner = RadioPlanner(emptyList(), emptyList(), 0, null, novelty = 100)
+        assertEquals(YouTubeMix.SIZE, planner.add(mix))
+    }
+
+    @Test
+    fun myWaveGoesOnFromWhatPlays() {
+        val playing = song(7, "Now", "Artist")
+        val daily = (1L..5L).map { song(it, "D$it", "Artist") }
+        val wave = RadioStart.wave(daily).over(playing)
+        assertEquals(playing, wave.seeds.first())
+        assertEquals(6, wave.seeds.size)
+        // A track's radio opens with that track, whatever plays.
+        val one = RadioStart.track(daily[0]).over(playing)
+        assertEquals(daily[0], one.seeds.first())
+    }
 }

@@ -353,7 +353,7 @@ fun SwitchItem(
 }
 
 @Composable
-fun ActionItem(shape: Shape, title: String, subtitle: String, onClick: () -> Unit) {
+fun ActionItem(shape: Shape, title: String, subtitle: String?, onClick: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     ItemContainer(shape) {
         Column(
@@ -363,10 +363,10 @@ fun ActionItem(shape: Shape, title: String, subtitle: String, onClick: () -> Uni
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     onClick()
                 }
-                .padding(horizontal = 20.dp, vertical = 14.dp)
+                .padding(horizontal = 20.dp, vertical = if (subtitle == null) 18.dp else 14.dp)
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

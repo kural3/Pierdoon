@@ -449,7 +449,7 @@ object Downloader {
 
     suspend fun radioMix(videoId: String): List<RadioTrack> = withContext(Dispatchers.IO) {
         ensureEngine(update = true)
-        YouTubeMix.parse(execute(listOf("--flat-playlist", "-J", "--", YouTubeMix.url(videoId))))
+        YouTubeMix.parse(execute(YouTubeMix.listOptions + listOf("--", YouTubeMix.url(videoId))))
     }
 
     /** Downloads [track] into the radio's cache with a cover, as a song to queue; null if it couldn't. */
