@@ -124,8 +124,6 @@ import kotlin.math.roundToInt
 /** What fills the space above the controls. */
 internal enum class PlayerPanel { Art, Lyrics, Queue }
 
-private val ArtworkMorph by lazy { Morph(MaterialShapes.Square, MaterialShapes.Cookie12Sided) }
-
 @Composable
 fun FullPlayer(
     nowPlaying: NowPlaying,
@@ -519,7 +517,7 @@ internal fun CompactControls(
 
 /**
  * Album art that relaxes into a rounded square while playing and curls into a scalloped
- * cookie (and shrinks a little) when paused. One-shot springs, no idle animation.
+ * flower, a different one each time (and shrinks a little), when paused. One-shot springs, no idle animation.
  *
  * Tap toggles playback. Double-tap the left or right third to skip 10 s back or forward,
  * YouTube Music style: further taps on that side while the hint is up add 10 s each.
@@ -542,6 +540,10 @@ internal fun PlayerArtwork(
     val press = animatePressAsState(source, 0.94f)
     val slowSpatial = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     val morph = animateFloatAsState(if (isPlaying) 0f else 1f, slowSpatial, label = "artMorph")
+    // Each pause curls the cover into a different flower; picked while it is still square, so the swap never shows.
+    var flower by remember { mutableStateOf(com.ku.pierdoon.ui.library.CoverFlowers.random()) }
+    LaunchedEffect(isPlaying) { if (!isPlaying && morph.value < 0.05f) flower = com.ku.pierdoon.ui.library.CoverFlowers.random() }
+    val artMorph = remember(flower) { Morph(MaterialShapes.Square, flower) }
     val tapeMotion by TapeMotion.current.collectAsState()
     // The player is paused through a rewind or a turn, but the tape is still moving.
     val restScale = animateFloatAsState(if (isPlaying || tapeMotion != TapeMotion.Still) 1f else 0.86f, slowSpatial, label = "artScale")
@@ -652,7 +654,7 @@ internal fun PlayerArtwork(
                 modifier = Modifier
                     .fillMaxSize()
                     .scaleBy(scale)
-                    .morphClip(ArtworkMorph, morph)
+                    .morphClip(artMorph, morph)
                     .then(gestures),
             )
         }

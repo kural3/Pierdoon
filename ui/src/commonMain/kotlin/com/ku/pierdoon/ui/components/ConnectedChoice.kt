@@ -2,6 +2,8 @@ package com.ku.pierdoon.ui.components
 
 import androidx.compose.material3.ToggleButtonColors
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ButtonGroupDefaults
@@ -62,6 +64,7 @@ fun ConnectedChoice(
     modifier: Modifier = Modifier,
     /** Unchecked segment colour; pick one that contrasts with whatever sits behind the group. */
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    enabled: Boolean = true,
 ) {
     val colors = toggleColors(containerColor)
     val haptics = LocalHapticFeedback.current
@@ -78,14 +81,18 @@ fun ConnectedChoice(
                         onSelect(index)
                     }
                 },
+                enabled = enabled,
                 colors = colors,
+                // Four segments on a phone are narrow; tighter sides keep "Playlists" whole.
+                contentPadding = PaddingValues(horizontal = if (options.size > 3) 6.dp else 16.dp, vertical = 8.dp),
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                     options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 },
                 modifier = Modifier
-                    .weight(1f)
+                    // Four segments share little room: longer labels get more of it.
+                    .weight(if (options.size > 3) label.length + 4f else 1f)
                     .semantics { role = Role.RadioButton },
             ) {
                 Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)

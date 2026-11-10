@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -29,6 +30,8 @@ dependencies {
     implementation("org.bytedeco:ffmpeg:8.1.2-1.5.14:$javacppPlatform")
     // Media keys and the system media overlay go through Win32 / WinRT calls.
     implementation("net.java.dev.jna:jna-platform:5.19.1")
+    // The window draws its own title bar on JetBrains Runtime, which Windows still resizes and snaps.
+    implementation("org.jetbrains.runtime:jbr-api:1.9.0")
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -40,9 +43,16 @@ kotlin {
     }
 }
 
+// JetBrains Runtime runs and ships the app: its window decorations let the title bar be our own.
+// Its folder is jbr.dir in local.properties; without it the plain JDK runs with Windows' own bar.
+val jbrDir: String? = rootProject.file("local.properties").takeIf { it.exists() }
+    ?.let { f -> Properties().apply { f.inputStream().use(::load) }.getProperty("jbr.dir") }
+    ?.takeIf { file(it).exists() }
+
 compose.desktop {
     application {
         mainClass = "com.ku.pierdoon.MainKt"
+        jbrDir?.let { javaHome = it }
         jvmArgs += listOf("-Dfile.encoding=UTF-8", "-Xss4m", "--enable-native-access=ALL-UNNAMED")
         // A music player's live heap is a few dozen MB. The defaults (G1, heap sized from the
         // PC's RAM) kept 300+ MB committed: G1's own bookkeeping alone is ~60 MB. The serial

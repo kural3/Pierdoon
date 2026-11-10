@@ -19,3 +19,7 @@ local.properties
 *.keystore
 keystore.properties
 .kotlin
+
+# JVM crash logs (contain local paths)
+hs_err_pid*.log
+replay_pid*.log

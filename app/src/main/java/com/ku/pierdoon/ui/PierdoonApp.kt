@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import androidx.compose.runtime.produceState
 import com.ku.pierdoon.ui.settings.RestoreBackupDialog
+import com.ku.pierdoon.ui.library.HeroTrack
 import com.ku.pierdoon.ui.library.YearReviewScreen
 import com.ku.pierdoon.ui.library.SmartPlaylistEditor
 import com.ku.pierdoon.ui.library.SmartPlaylistCover
@@ -132,6 +133,7 @@ import com.ku.pierdoon.R
 import com.ku.pierdoon.data.M3U_EXTENSION
 import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.ColorSource
+import com.ku.pierdoon.data.ProgressStyle
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.PlayHistory
 import com.ku.pierdoon.data.history.DailyMix
@@ -171,6 +173,7 @@ import com.ku.pierdoon.ui.download.DownloadScreen
 import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.ui.update.UpdateDialog
 import com.ku.pierdoon.ui.library.PlaylistNameDialog
+import com.ku.pierdoon.ui.library.LibraryPlaylists
 import com.ku.pierdoon.ui.library.PlaylistsScreen
 import com.ku.pierdoon.ui.library.SongActionTarget
 import com.ku.pierdoon.ui.library.SongActionsSheet
@@ -300,7 +303,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
     // Once the full player fully covers the screen, stop drawing everything underneath it.
     val covered by remember { derivedStateOf { sheet.progress.value >= 1f && !sheet.isMoving } }
     // The open player's wave animates endlessly: leave those frames at the system default rate.
-    HighFrameRate.suppressed = covered && player.isPlaying && settings.wavyProgress
+    HighFrameRate.suppressed = covered && player.isPlaying && settings.progressStyle == ProgressStyle.Wavy && !settings.nothingStyle
 
 
     // A link shared into the app (or the downloads notification) opens the downloads page.
@@ -420,6 +423,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                 !granted -> PermissionScreen(onGrant = { permissionLauncher.launch(audioPermission) })
                 library is LibraryState.Loading -> FillBox { LoadingIndicator(Modifier.size(64.dp)) }
                 else -> Screens(
+                    onOpenPlayer = { expanded = true },
                     nav = nav,
                     vm = vm,
                     songs = (library as LibraryState.Ready).songs,
@@ -484,7 +488,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                         }
                     }
                 }
-                GlassNavigationBar(nav = nav, backdrop = backdrop, floating = settings.floatingNav)
+                FloatingNavBar(nav, backdrop)
             }
         }
 
@@ -719,6 +723,8 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
 @Composable
 private fun Screens(
     nav: Navigator,
+    /** Opens the full player (the home screen's top card). */
+    onOpenPlayer: () -> Unit,
     vm: MainViewModel,
     songs: List<Song>,
     currentSongId: Long?,
@@ -736,6 +742,7 @@ private fun Screens(
     onPlaylistCover: (Playlist) -> Unit,
 ) {
     val collections by vm.collections.collectAsStateWithLifecycle()
+    val player by vm.player.collectAsStateWithLifecycle()
     val settings by SettingsStore.settings.collectAsStateWithLifecycle()
     val stateHolder = rememberSaveableStateHolder()
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
@@ -807,6 +814,12 @@ private fun Screens(
                             null
                         },
                         yearReview = yearReview,
+                        hero = player.nowPlaying?.let { HeroTrack(it.songId, it.albumId, it.title, it.artist, playing = true) }
+                            ?: recent.firstOrNull()?.let { HeroTrack(it.id, it.albumId, it.title, it.artist, playing = false) },
+                        isPlaying = player.isPlaying,
+                        onOpenPlayer = onOpenPlayer,
+                        onTogglePlay = vm::togglePlay,
+                        radioOn = vm.radio.collectAsStateWithLifecycle().value != null,
                     )
                 }
                 Route.Library -> LibraryScreen(
@@ -822,6 +835,24 @@ private fun Screens(
                     onSort = { sort, desc -> SettingsStore.update { it.shared { copy(songSort = sort, songSortDescending = desc) } } },
                     onBulk = { picked, done -> onBulk(picked, null, done) },
                     onDelete = onDeleteSongs,
+                    albumGrid = settings.albumGrid,
+                    onAlbumGrid = { g -> SettingsStore.update { it.copy(albumGrid = g) } },
+                    bottomInset = bottomInset,
+                )
+                Route.Playlists -> PlaylistsScreen(
+                    lists = LibraryPlaylists(
+                        playlists = userData.playlists,
+                        favoritesCount = userData.favorites.size,
+                        resolveCover = resolveCover,
+                        onCreate = onCreatePlaylist,
+                        onLongPress = onPlaylistLongPress,
+                        onImport = onImportPlaylist,
+                        smart = userData.smartPlaylists,
+                        smartCount = { smartTracks(it).size },
+                        onCreateSmart = { smartEditor = SmartEditorTarget(null) },
+                        onEditSmart = { smartEditor = SmartEditorTarget(it) },
+                    ),
+                    onOpen = nav::push,
                     bottomInset = bottomInset,
                 )
                 Route.Search -> SearchScreen(
@@ -870,20 +901,6 @@ private fun Screens(
                         bottomInset = bottomInset,
                     )
                 }
-                Route.Playlists -> PlaylistsScreen(
-                    playlists = userData.playlists,
-                    favoritesCount = userData.favorites.size,
-                    resolveCover = resolveCover,
-                    onOpen = nav::push,
-                    onCreate = onCreatePlaylist,
-                    onPlaylistLongPress = onPlaylistLongPress,
-                    onImport = onImportPlaylist,
-                    smartPlaylists = userData.smartPlaylists,
-                    smartCount = { smartTracks(it).size },
-                    onCreateSmart = { smartEditor = SmartEditorTarget(null) },
-                    onEditSmart = { smartEditor = SmartEditorTarget(it) },
-                    bottomInset = bottomInset,
-                )
                 is Route.AlbumDetail -> {
                     val album = collections.albums.firstOrNull { it.id == route.albumId }
                     CollectionScreen(
@@ -1136,27 +1153,6 @@ private fun Screens(
 }
 
 /** Docked (edge-to-edge) or floating (pill) tab bar; switching cross-fades between them. */
-@Composable
-private fun GlassNavigationBar(
-    nav: Navigator,
-    backdrop: com.ku.pierdoon.ui.components.Backdrop,
-    floating: Boolean,
-) {
-    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    AnimatedContent(
-        targetState = floating,
-        transitionSpec = {
-            (fadeIn(effects) + slideInVertically(spatial) { it / 2 })
-                .togetherWith(fadeOut(effects) + slideOutVertically(spatial) { it / 2 })
-                .using(SizeTransform(clip = false))
-        },
-        label = "navMode",
-    ) { isFloating ->
-        if (isFloating) FloatingNavBar(nav, backdrop) else DockedNavBar(nav, backdrop)
-    }
-}
-
 /**
  * M3 Expressive floating bar: a large glass pill. Only the selected tab shows its label,
  * inside an indicator that grows to fit it, so labels always have room.
@@ -1247,40 +1243,6 @@ private fun FloatingNavItem(tab: Route.Tab, selected: Boolean, onClick: () -> Un
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun DockedNavBar(nav: Navigator, backdrop: com.ku.pierdoon.ui.components.Backdrop) {
-    val haptics = LocalHapticFeedback.current
-    val colors = MaterialTheme.colorScheme
-    ShortNavigationBar(
-        containerColor = Color.Transparent,
-        modifier = Modifier.glass(
-            backdrop = backdrop,
-            shape = RectangleShape,
-            tint = colors.surfaceContainer.copy(alpha = 0.72f),
-            fallback = colors.surfaceContainer,
-        ),
-    ) {
-        Route.tabs.forEach { tab ->
-            ShortNavigationBarItem(
-                selected = nav.tab == tab,
-                onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    nav.selectTab(tab)
-                },
-                icon = { Icon(tab.icon(), contentDescription = null) },
-                label = {
-                    Text(
-                        stringResource(tab.label()),
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-            )
         }
     }
 }

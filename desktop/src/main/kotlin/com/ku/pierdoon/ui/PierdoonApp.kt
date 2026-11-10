@@ -5,6 +5,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInHorizontally
 import com.ku.pierdoon.ui.components.hairline
 import com.ku.pierdoon.ui.components.LocalBackdrop
+import com.ku.pierdoon.ui.desktop.WindowButtons
+import com.ku.pierdoon.ui.desktop.WindowChrome
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -122,6 +124,7 @@ import com.ku.pierdoon.ui.desktop.ToastHost
 import com.ku.pierdoon.ui.desktop.trackPointer
 import com.ku.pierdoon.ui.download.DownloadScreen
 import com.ku.pierdoon.ui.edit.EditSongScreen
+import com.ku.pierdoon.ui.library.HeroTrack
 import com.ku.pierdoon.ui.library.BulkActionsSheet
 import com.ku.pierdoon.ui.library.BulkTarget
 import com.ku.pierdoon.ui.library.CollectionScreen
@@ -137,7 +140,7 @@ import com.ku.pierdoon.ui.library.PlaylistActionsSheet
 import com.ku.pierdoon.ui.library.PlaylistCover
 import com.ku.pierdoon.ui.library.PlaylistCoverSheet
 import com.ku.pierdoon.ui.library.PlaylistNameDialog
-import com.ku.pierdoon.ui.library.PlaylistsScreen
+import com.ku.pierdoon.ui.library.LibraryPlaylists
 import com.ku.pierdoon.ui.library.SearchScreen
 import com.ku.pierdoon.ui.library.SongActionTarget
 import com.ku.pierdoon.ui.library.SongActionsSheet
@@ -230,6 +233,9 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val settings by SettingsStore.settings.collectAsState()
     val nowPlaying = rememberLastNonNull(player.nowPlaying)
     val backdrop = rememberBackdrop()
+    // How wide the floating rail is, so the screen beside it starts past it.
+    var railWidth by remember { mutableStateOf(NAV_MIN_WIDTH.dp) }
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val exportTitle = stringResource(Res.string.playlist_export)
     val exportedText = stringResource(Res.string.playlist_exported)
@@ -307,19 +313,19 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                     .backdropSource(backdrop)
             ) {
                 Row(Modifier.fillMaxSize()) {
-                    NavRail(
-                        nav = nav,
-                        width = settings.navWidth,
-                        onResize = { w -> SettingsStore.update { it.copy(navWidth = w) } },
-                        bottomInset = bottomInset,
-                    )
-                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                    // The rail floats above, on glass over this strip; it can't sit inside what it blurs.
+                    Spacer(Modifier.width(railWidth))
+                    // Pages start below the window's top strip, as they did below Windows' own bar, so
+                    // nothing scrolls up under the window buttons or sticks to the edge.
+                    val chromeTop = if (WindowChrome.controls.value != null) WindowChrome.HEIGHT else 0.dp
+                    Box(Modifier.weight(1f).fillMaxHeight().padding(top = chromeTop)) {
                         when {
                             noFolders && (library as? LibraryState.Ready)?.songs.isNullOrEmpty() -> PermissionScreen(
                                 onGrant = { Files.pickFolder(chooseFolder)?.let(vm::addMusicFolder) },
                             )
                             library is LibraryState.Loading -> FillBox { LoadingIndicator(Modifier.size(64.dp)) }
                             else -> Screens(
+                                onOpenPlayer = { expanded = true },
                                 nav = nav,
                                 vm = vm,
                                 songs = (library as LibraryState.Ready).songs,
@@ -355,6 +361,16 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                     }
                 }
             }
+            NavRail(
+                nav = nav,
+                width = settings.navWidth,
+                onResize = { w -> SettingsStore.update { it.copy(navWidth = w) } },
+                bottomInset = bottomInset,
+                backdrop = backdrop,
+                modifier = Modifier
+                    .onSizeChanged { railWidth = with(density) { it.width.toDp() } }
+                    .graphicsLayer { alpha = if (covered) 0f else 1f },
+            )
             // Over the screen rather than beside it, on frosted glass: opening it moves nothing.
             AnimatedVisibility(
                 visible = sidePanel != null && nowPlaying != null && ready,
@@ -388,6 +404,15 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                             modifier = modifier,
                         )
                     },
+                )
+            }
+
+            // The window's own minimize, maximize and close, over everything in the top right corner.
+            WindowChrome.controls.value?.let { controls ->
+                WindowButtons(
+                    controls = controls,
+                    backdrop = backdrop,
+                    modifier = Modifier.align(Alignment.TopEnd).graphicsLayer { alpha = if (covered) 0f else 1f },
                 )
             }
 
@@ -655,7 +680,7 @@ private fun SidePanelContent(
         Modifier
             .width(SIDE_PANEL_WIDTH)
             .fillMaxHeight()
-            .padding(top = 12.dp, end = 12.dp, bottom = bottomInset + 12.dp)
+            .padding(top = (if (WindowChrome.controls.value != null) WindowChrome.HEIGHT + 4.dp else 12.dp), end = 12.dp, bottom = bottomInset + 12.dp)
             .shadow(16.dp, shape)
             .glass(
                 backdrop = backdrop,
@@ -690,6 +715,8 @@ private fun SidePanelContent(
 @Composable
 private fun Screens(
     nav: Navigator,
+    /** Opens the full player (the home screen's top card). */
+    onOpenPlayer: () -> Unit,
     vm: MainViewModel,
     songs: List<Song>,
     currentSongId: Long?,
@@ -707,6 +734,7 @@ private fun Screens(
     onPlaylistCover: (Playlist) -> Unit,
 ) {
     val collections by vm.collections.collectAsState()
+    val player by vm.player.collectAsState()
     val settings by SettingsStore.settings.collectAsState()
     val stateHolder = rememberSaveableStateHolder()
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
@@ -769,6 +797,12 @@ private fun Screens(
                             null
                         },
                         yearReview = yearReview,
+                        hero = player.nowPlaying?.let { HeroTrack(it.songId, it.albumId, it.title, it.artist, playing = true) }
+                            ?: recent.firstOrNull()?.let { HeroTrack(it.id, it.albumId, it.title, it.artist, playing = false) },
+                        isPlaying = player.isPlaying,
+                        onOpenPlayer = onOpenPlayer,
+                        onTogglePlay = vm::togglePlay,
+                        radioOn = vm.radio.collectAsState().value != null,
                     )
                 }
                 Route.Library -> LibraryScreen(
@@ -782,15 +816,29 @@ private fun Screens(
                     sort = settings.songSort,
                     sortDescending = settings.songSortDescending,
                     onSort = { sort, desc -> SettingsStore.update { it.shared { copy(songSort = sort, songSortDescending = desc) } } },
+                    trackView = settings.trackView,
+                    onTrackView = { v -> SettingsStore.update { it.copy(trackView = v) } },
                     onBulk = { picked, done -> onBulk(picked, null, done) },
                     onDelete = onDeleteSongs,
+                    lists = LibraryPlaylists(
+                        playlists = userData.playlists,
+                        favoritesCount = userData.favorites.size,
+                        resolveCover = resolveCover,
+                        onCreate = onCreatePlaylist,
+                        onLongPress = onPlaylistLongPress,
+                        onImport = onImportPlaylist,
+                        smart = userData.smartPlaylists,
+                        smartCount = { smartTracks(it).size },
+                        onCreateSmart = { smartEditor = SmartEditorTarget(null) },
+                        onEditSmart = { smartEditor = SmartEditorTarget(it) },
+                    ),
                     bottomInset = bottomInset,
                 )
                 Route.Search -> SearchScreen(
                     songs = songs,
                     collections = collections,
                     currentSongId = currentSongId,
-                    onBack = null,
+                    onBack = { nav.pop() },
                     onPlay = onPlay,
                     onSongLongPress = { onSongLongPress(it, null) },
                     onOpen = nav::push,
@@ -836,20 +884,6 @@ private fun Screens(
                         bottomInset = bottomInset,
                     )
                 }
-                Route.Playlists -> PlaylistsScreen(
-                    playlists = userData.playlists,
-                    favoritesCount = userData.favorites.size,
-                    resolveCover = resolveCover,
-                    onOpen = nav::push,
-                    onCreate = onCreatePlaylist,
-                    onPlaylistLongPress = onPlaylistLongPress,
-                    onImport = onImportPlaylist,
-                    smartPlaylists = userData.smartPlaylists,
-                    smartCount = { smartTracks(it).size },
-                    onCreateSmart = { smartEditor = SmartEditorTarget(null) },
-                    onEditSmart = { smartEditor = SmartEditorTarget(it) },
-                    bottomInset = bottomInset,
-                )
                 is Route.AlbumDetail -> {
                     val album = collections.albums.firstOrNull { it.id == route.albumId }
                     CollectionScreen(
@@ -1101,7 +1135,14 @@ private fun Route.isSettings() = this == Route.Settings || this is Route.Setting
  * ([NAV_MAX_WIDTH]); a double click on the edge jumps between the two.
  */
 @Composable
-private fun NavRail(nav: Navigator, width: Float, onResize: (Float) -> Unit, bottomInset: Dp) {
+private fun NavRail(
+    nav: Navigator,
+    width: Float,
+    onResize: (Float) -> Unit,
+    bottomInset: Dp,
+    backdrop: Backdrop,
+    modifier: Modifier = Modifier,
+) {
     val colors = MaterialTheme.colorScheme
     val density = LocalDensity.current
     val currentWidth by rememberUpdatedState(width)
@@ -1121,13 +1162,25 @@ private fun NavRail(nav: Navigator, width: Float, onResize: (Float) -> Unit, bot
         label = "railEdge",
     )
 
-    Box(Modifier.fillMaxHeight().width(shown)) {
+    val capsule = RoundedCornerShape(36.dp)
+    Box(modifier.fillMaxHeight().width(shown)) {
+        // A frosted capsule, like the phone's floating bar stood on end.
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = bottomInset + 12.dp),
+                .padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = bottomInset + 12.dp)
+                .shadow(8.dp, capsule)
+                .glass(
+                    backdrop = backdrop,
+                    shape = capsule,
+                    tint = colors.surfaceContainerHigh.copy(alpha = 0.72f),
+                    fallback = colors.surfaceContainerHigh,
+                    blurRadius = 40.dp,
+                )
+                .hairline(capsule)
+                .padding(8.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1154,7 +1207,6 @@ private fun NavRail(nav: Navigator, width: Float, onResize: (Float) -> Unit, bot
                 RailItem(tab = tab, selected = nav.tab == tab, compact = compact) {
                     nav.selectTab(tab)
                 }
-                if (tab == Route.Search) Spacer(Modifier.height(8.dp))
                 if (tab == Route.Phone) Spacer(Modifier.weight(1f))
             }
         }
@@ -1242,9 +1294,7 @@ private val NAV_LABEL_WIDTH = 160.dp
 
 private fun Route.Tab.icon() = when (this) {
     Route.Home -> PlayerIcons.Home
-    Route.Search -> PlayerIcons.Search
     Route.Library -> PlayerIcons.Library
-    Route.Playlists -> PlayerIcons.Playlist
     Route.Downloads -> PlayerIcons.Download
     Route.Phone -> PlayerIcons.Smartphone
     Route.Settings -> PlayerIcons.Settings
@@ -1252,9 +1302,7 @@ private fun Route.Tab.icon() = when (this) {
 
 private fun Route.Tab.label() = when (this) {
     Route.Home -> Res.string.nav_home
-    Route.Search -> Res.string.search_short
     Route.Library -> Res.string.nav_library
-    Route.Playlists -> Res.string.nav_playlists
     Route.Downloads -> Res.string.nav_downloads
     Route.Phone -> Res.string.nav_phone
     Route.Settings -> Res.string.nav_settings

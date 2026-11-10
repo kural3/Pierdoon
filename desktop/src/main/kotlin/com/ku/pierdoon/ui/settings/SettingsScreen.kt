@@ -46,6 +46,7 @@ import com.ku.pierdoon.data.AppFont
 import com.ku.pierdoon.data.AppLanguage
 import com.ku.pierdoon.data.AppSettings
 import com.ku.pierdoon.data.ColorSource
+import com.ku.pierdoon.data.ProgressStyle
 import com.ku.pierdoon.data.CustomFonts
 import com.ku.pierdoon.data.NAV_MAX_WIDTH
 import com.ku.pierdoon.data.NAV_MIN_WIDTH
@@ -281,9 +282,9 @@ private fun LazyListScope.sectionList(
 
 private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
     item(key = "theme") {
-        Group(stringResource(Res.string.settings_theme)) {
-            buildList<@Composable (Shape) -> Unit> {
-                add { shape ->
+        FadingGroup(stringResource(Res.string.settings_theme)) {
+            buildList<GroupRow> {
+                add(GroupRow { shape ->
                     ChoiceRowItem(
                         shape = shape,
                         options = listOf(
@@ -294,9 +295,9 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         selected = settings.theme.ordinal,
                         onSelect = { i -> onUpdate { it.shared { copy(theme = ThemeMode.entries[i]) } } },
                     )
-                }
+                })
                 // The Nothing style brings its own palette.
-                if (!settings.nothingStyle) add { shape ->
+                add(GroupRow(visible = !settings.nothingStyle) { shape ->
                     SwitchItem(
                         shape = shape,
                         title = stringResource(Res.string.settings_black),
@@ -304,40 +305,45 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         checked = settings.pureBlack,
                         onChange = { v -> onUpdate { it.shared { copy(pureBlack = v) } } },
                     )
+                })
+            }
+        }
+    }
+    item(key = "colors") {
+        Group(stringResource(Res.string.settings_colors)) {
+            buildList<@Composable (Shape) -> Unit> {
+                // A special theme brings its own colours; the picker stays, locked, until it's off.
+                add { shape ->
+                    ColorsItem(
+                        shape = shape,
+                        // "Wallpaper" here is Windows' accent colour.
+                        sources = ColorSource.entries,
+                        source = settings.colorSource,
+                        seed = settings.seedColor,
+                        onSource = { s -> onUpdate { it.shared { copy(colorSource = s) } } },
+                        onSeed = { seed -> onUpdate { it.shared { copy(seedColor = seed) } } },
+                        wallpaperDescription = stringResource(Res.string.settings_colors_wallpaper_desc),
+                        enabled = !settings.nothingStyle,
+                    )
+                }
+                add { shape ->
+                    DropdownItem(
+                        shape = shape,
+                        title = stringResource(Res.string.settings_special),
+                        options = listOf(false, true),
+                        selected = settings.nothingStyle,
+                        label = { on -> stringResource(if (on) Res.string.special_nothing else Res.string.special_none) },
+                        onSelect = { on -> onUpdate { it.shared { copy(nothingStyle = on) } } },
+                    )
                 }
             }
         }
     }
-    if (!settings.nothingStyle) item(key = "colors") {
-        Group(stringResource(Res.string.settings_colors)) {
-            listOf<@Composable (Shape) -> Unit>({ shape ->
-                ColorsItem(
-                    shape = shape,
-                    // "Wallpaper" here is Windows' accent colour.
-                    sources = ColorSource.entries,
-                    source = settings.colorSource,
-                    seed = settings.seedColor,
-                    onSource = { s -> onUpdate { it.shared { copy(colorSource = s) } } },
-                    onSeed = { seed -> onUpdate { it.shared { copy(seedColor = seed) } } },
-                    wallpaperDescription = stringResource(Res.string.settings_colors_wallpaper_desc),
-                )
-            })
-        }
-    }
     item(key = "style") {
-        Group(stringResource(Res.string.settings_style)) {
-            buildList<@Composable (Shape) -> Unit> {
-                add { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_nothing),
-                        subtitle = stringResource(Res.string.settings_nothing_desc),
-                        checked = settings.nothingStyle,
-                        onChange = { v -> onUpdate { it.shared { copy(nothingStyle = v) } } },
-                    )
-                }
+        FadingGroup(stringResource(Res.string.settings_style)) {
+            buildList<GroupRow> {
                 // The Nothing style has no glass and its own dotted progress bar.
-                if (!settings.nothingStyle) add { shape ->
+                add(GroupRow(visible = !settings.nothingStyle) { shape ->
                     SwitchItem(
                         shape = shape,
                         title = stringResource(Res.string.settings_glass),
@@ -345,17 +351,22 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         checked = settings.glass,
                         onChange = { v -> onUpdate { it.shared { copy(glass = v) } } },
                     )
-                }
-                if (!settings.nothingStyle) add { shape ->
-                    SwitchItem(
+                })
+                add(GroupRow(visible = !settings.nothingStyle) { shape ->
+                    ChoiceRowItem(
                         shape = shape,
-                        title = stringResource(Res.string.settings_wavy),
-                        subtitle = stringResource(Res.string.settings_wavy_desc),
-                        checked = settings.wavyProgress,
-                        onChange = { v -> onUpdate { it.shared { copy(wavyProgress = v) } } },
+                        title = stringResource(Res.string.settings_progress_style),
+                        options = listOf(
+                            stringResource(Res.string.progress_wavy),
+                            stringResource(Res.string.progress_line),
+                            stringResource(Res.string.progress_dots),
+                            stringResource(Res.string.progress_thick),
+                        ),
+                        selected = settings.progressStyle.ordinal,
+                        onSelect = { i -> onUpdate { it.shared { copy(progressStyle = ProgressStyle.entries[i]) } } },
                     )
-                }
-                add { shape ->
+                })
+                add(GroupRow { shape ->
                     SwitchItem(
                         shape = shape,
                         title = stringResource(Res.string.settings_floating_nav),
@@ -363,7 +374,7 @@ private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
                         checked = settings.navWidth <= NAV_MIN_WIDTH,
                         onChange = { v -> onUpdate { it.copy(navWidth = if (v) NAV_MIN_WIDTH else NAV_MAX_WIDTH) } },
                     )
-                }
+                })
             }
         }
     }

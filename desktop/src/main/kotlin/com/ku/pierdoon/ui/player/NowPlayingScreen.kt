@@ -83,7 +83,6 @@ import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.components.BlurredArtwork
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.ExpressiveToggleButton
-import com.ku.pierdoon.ui.components.PlayPauseButton
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.theme.LocalUiPrefs
 import org.jetbrains.compose.resources.stringResource
@@ -133,6 +132,9 @@ fun NowPlayingScreen(
     /** The radio playing (beta), or null. */
     radio: PlayerRadio? = null,
 ) {
+    // The wide player always has its lyrics beside the art; the narrow one, like the phone's, shows
+    // the cover and its lyrics button swaps the two.
+    var narrowLyrics by remember { mutableStateOf(false) }
     BoxWithConstraints(modifier.fillMaxSize()) {
         if (maxWidth < WIDE) {
             FullPlayer(
@@ -140,12 +142,14 @@ fun NowPlayingScreen(
                 state = state,
                 position = position,
                 lyrics = lyrics,
-                showLyrics = showLyrics,
+                showLyrics = showLyrics && narrowLyrics,
                 queue = queue,
                 showQueue = showQueue,
                 isFavorite = isFavorite,
                 onToggleFavorite = onToggleFavorite,
-                onToggleLyrics = onToggleLyrics,
+                onToggleLyrics = {
+                    if (showQueue) { onToggleLyrics(); narrowLyrics = true } else narrowLyrics = !narrowLyrics
+                },
                 onToggleQueue = onToggleQueue,
                 onPlayQueueEntry = onPlayQueueEntry,
                 onRemoveQueueEntry = onRemoveQueueEntry,
@@ -320,7 +324,7 @@ private fun WideNowPlaying(
                 // the controls folded away it takes most of that room too.
                 val area = screenHeight - SCREEN_PADDING * 2
                 val width = screenWidth - 56.dp
-                val normal = (area - TOP_BAR_HEIGHT - 250.dp).coerceIn(220.dp, 480.dp).coerceAtMost(width * 0.42f)
+                val normal = (area - TOP_BAR_HEIGHT - 258.dp).coerceIn(240.dp, 560.dp).coerceAtMost(width * 0.46f)
                 val roomy = (area - 120.dp).coerceIn(220.dp, 600.dp).coerceAtMost(width * 0.45f)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(56.dp, Alignment.CenterHorizontally),
@@ -394,31 +398,14 @@ private fun WideNowPlaying(
                                             uncheckedColor = Color.Transparent,
                                             modifier = Modifier.size(44.dp),
                                         )
-                                        ExpressiveIconButton(
-                                            onClick = onPrevious,
-                                            icon = PlayerIcons.Previous,
-                                            contentDescription = stringResource(Res.string.previous),
-                                            containerColor = glassButton,
-                                            contentColor = colors.onSurface,
-                                            iconSize = 26.dp,
-                                            modifier = Modifier.size(56.dp),
-                                        )
-                                        PlayPauseButton(
+                                        // The phone's connected group: the pressed button widens and pushes the others.
+                                        PlayerControls(
                                             isPlaying = state.isPlaying,
-                                            onClick = onTogglePlay,
-                                            playLabel = stringResource(Res.string.play),
-                                            pauseLabel = stringResource(Res.string.pause),
-                                            iconSize = 32.dp,
-                                            modifier = Modifier.size(width = 88.dp, height = 64.dp),
-                                        )
-                                        ExpressiveIconButton(
-                                            onClick = onNext,
-                                            icon = PlayerIcons.Next,
-                                            contentDescription = stringResource(Res.string.next),
-                                            containerColor = glassButton,
-                                            contentColor = colors.onSurface,
-                                            iconSize = 26.dp,
-                                            modifier = Modifier.size(56.dp),
+                                            onPrevious = onPrevious,
+                                            onTogglePlay = onTogglePlay,
+                                            onNext = onNext,
+                                            sideColor = glassButton,
+                                            modifier = Modifier.weight(1f).height(72.dp),
                                         )
                                         ExpressiveToggleButton(
                                             checked = radio == null && state.repeatMode != Player.REPEAT_MODE_OFF,
@@ -575,7 +562,7 @@ private fun PanelTab(selected: Boolean, icon: ImageVector, label: String, onClic
 }
 
 private val WIDE = 880.dp
-private val CONTROLS_WIDTH = 340.dp
+private val CONTROLS_WIDTH = 380.dp
 /** As on the phone: idle time with lyrics showing before the controls fold away. */
 private const val IMMERSIVE_DELAY_MS = 5_000L
 private val SCREEN_PADDING = 20.dp

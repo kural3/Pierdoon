@@ -48,6 +48,9 @@ import kotlin.system.exitProcess
  *     wait 1500          let it run
  *     tab Settings       select a tab
  *     page Appearance    open a settings page
+ *     nothing on|off     the Nothing style
+ *     progress Thick     the seek bar style: Wavy, Line, Dots or Thick
+ *     chrome on          draw the window's own title bar buttons
  *     open year:2026     open a page by its route key (duplicates, smart:<id>, year:<year>…)
  *     font Custom <file> the font by name; Custom brings in that font file
  *     lang en            interface language: en, ru or system
@@ -59,6 +62,7 @@ import kotlin.system.exitProcess
  *     shot home          save home.png
  *     shotnow mid        save mid.png at once, mid-animation
  *     state              print whether it plays and how loud (the Delicious mode's levels)
+ *     press 300 400      press and hold there (release 300 400 lets go)
  *     cassette on        cassette mode on or off
  *     shuffle            play the whole library shuffled
  *     next               the next button, as a media key would press it
@@ -140,6 +144,12 @@ fun main(args: Array<String>) {
                         run(60)
                         scene.sendPointerEvent(PointerEventType.Release, o, button = PointerButton.Primary)
                     }
+                    "press" -> {
+                        val o = at(p[1], p[2])
+                        scene.sendPointerEvent(PointerEventType.Move, o)
+                        scene.sendPointerEvent(PointerEventType.Press, o, buttons = pressed, button = PointerButton.Primary)
+                    }
+                    "release" -> scene.sendPointerEvent(PointerEventType.Release, at(p[1], p[2]), button = PointerButton.Primary)
                     "rclick" -> {
                         val o = at(p[1], p[2])
                         val right = PointerButtons(isSecondaryPressed = true)
@@ -169,6 +179,11 @@ fun main(args: Array<String>) {
                         println("shot ${p[1]}")
                     }
                     "cassette" -> SettingsStore.update { it.shared { copy(cassetteMode = p[1] == "on") } }
+                    "nothing" -> SettingsStore.update { it.shared { copy(nothingStyle = p[1] == "on") } }
+                    "chrome" -> com.ku.pierdoon.ui.desktop.WindowChrome.controls.value =
+                        if (p[1] == "on") com.ku.pierdoon.ui.desktop.WindowControls(androidx.compose.ui.window.WindowState(), onClose = {}) else null
+                    "tracks" -> SettingsStore.update { it.copy(trackView = com.ku.pierdoon.data.TrackView.valueOf(p[1])) }
+                    "progress" -> SettingsStore.update { it.shared { copy(progressStyle = com.ku.pierdoon.data.ProgressStyle.valueOf(p[1])) } }
                     "shuffle" -> vm.shuffleAll()
                     "next" -> PlaybackController.player.seekToNext()
                     "toggle" -> vm.togglePlay()

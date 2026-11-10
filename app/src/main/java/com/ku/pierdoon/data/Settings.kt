@@ -19,14 +19,18 @@ private val PHONE_DEFAULTS = CommonSettings(
     haptics = true,
 )
 
+/** How big the covers are in the library's album grid: the narrowest a cell may get, in dp. */
+enum class AlbumGrid(val minCellDp: Int) { Large(150), Medium(108), Small(80) }
+
 /** The settings both apps have ([common]) and the phone's own. */
 @Immutable
 data class AppSettings(
     val common: CommonSettings = PHONE_DEFAULTS,
     /** Rounded tab bar hovering above content instead of docked to the bottom edge. */
-    val floatingNav: Boolean = false,
     /** Folders left out of the library, as [MusicFolder.path]s: only that folder, not the ones inside it. */
     val excludedFolders: Set<String> = emptySet(),
+    /** The library's album grid; large covers unless picked otherwise. */
+    val albumGrid: AlbumGrid = AlbumGrid.Large,
 ) : SharedSettings by common {
     /** A change to the settings both apps have. */
     fun shared(change: CommonSettings.() -> CommonSettings): AppSettings = copy(common = common.change())
@@ -61,8 +65,8 @@ object SettingsStore {
             else d.common
         _settings.value = AppSettings(
             common = CommonSettings.read(Reader(p), defaults),
-            floatingNav = p.getBoolean(K_FLOATING_NAV, d.floatingNav),
             excludedFolders = p.getStringSet(K_EXCLUDED, null)?.toSet() ?: d.excludedFolders,
+            albumGrid = AlbumGrid.entries.firstOrNull { it.name == p.getString(K_ALBUM_GRID, null) } ?: d.albumGrid,
         )
     }
 
@@ -72,8 +76,8 @@ object SettingsStore {
         _settings.value = s
         prefs?.edit {
             s.common.write(Writer(this))
-            putBoolean(K_FLOATING_NAV, s.floatingNav)
             putStringSet(K_EXCLUDED, s.excludedFolders)
+            putString(K_ALBUM_GRID, s.albumGrid.name)
         }
     }
 
@@ -92,6 +96,6 @@ object SettingsStore {
     }
 
     private const val K_DYNAMIC = "dynamic_color"
-    private const val K_FLOATING_NAV = "floating_nav"
     private const val K_EXCLUDED = "excluded_folders"
+    private const val K_ALBUM_GRID = "album_grid"
 }

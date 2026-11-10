@@ -13,7 +13,6 @@ sealed interface Route {
     sealed interface Tab : Route
     data object Home : Tab { override val key = "home" }
     data object Library : Tab { override val key = "library" }
-    data object Playlists : Tab { override val key = "playlists" }
     data object Settings : Tab { override val key = "settings" }
 
     data class AlbumDetail(val albumId: Long) : Route { override val key = "album:$albumId" }
@@ -27,12 +26,12 @@ sealed interface Route {
     data class SmartPlaylistDetail(val playlistId: Long) : Route { override val key = "smart:$playlistId" }
     data class EditSong(val songId: Long) : Route { override val key = "edit:$songId" }
     data object Downloads : Tab { override val key = "downloads" }
-    data object Search : Tab { override val key = "search" }
+    data object Search : Route { override val key = "search" }
     data object Phone : Tab { override val key = "phone" }
     data class SettingsPage(val section: SettingsSection) : Route { override val key = "settings:${section.name}" }
 
     companion object {
-        val tabs = listOf(Home, Search, Library, Playlists, Downloads, Phone, Settings)
+        val tabs = listOf(Home, Library, Downloads, Phone, Settings)
 
         fun decode(key: String): Route = when {
             key.startsWith("album:") -> AlbumDetail(key.removePrefix("album:").toLong())

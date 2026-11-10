@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import com.ku.pierdoon.data.ProgressStyle
 import com.ku.pierdoon.PositionSnapshot
 import com.ku.pierdoon.ui.components.rememberSmoothProgress
 import com.ku.pierdoon.ui.formatDuration
@@ -109,7 +110,8 @@ fun WavySeekBar(
     // already-animating value, or it can get stuck mid-way. Read through a state so a change
     // invalidates its draw cache.
     val nothing = LocalUiPrefs.current.nothing
-    val wavyEnabled = LocalUiPrefs.current.wavyProgress && !nothing
+    val barStyle = if (nothing) ProgressStyle.Dots else LocalUiPrefs.current.progressStyle
+    val wavyEnabled = barStyle == ProgressStyle.Wavy
     // Scrubbing keeps the wave; only a real pause flattens it, not the stall right after a seek.
     var playingSteady by remember { mutableStateOf(isPlaying) }
     LaunchedEffect(isPlaying) {
@@ -179,10 +181,17 @@ fun WavySeekBar(
                     }
                 },
         ) {
-            if (nothing) {
+            if (barStyle == ProgressStyle.Dots) {
                 DotProgress(
                     progress = { shown.value.coerceIn(0f, 1f) },
                     dragging = dragging,
+                    modifier = Modifier.fillMaxWidth().height(20.dp),
+                )
+            } else if (barStyle == ProgressStyle.Thick) {
+                ThickProgress(
+                    progress = { shown.value.coerceIn(0f, 1f) },
+                    dragging = dragging,
+                    thickness = 12.dp,
                     modifier = Modifier.fillMaxWidth().height(20.dp),
                 )
             } else {
@@ -238,3 +247,25 @@ private fun DotProgress(progress: () -> Float, dragging: Boolean, modifier: Modi
 
 private val DOT_PITCH = 9.dp
 private val DOT_RADIUS = 2.dp
+
+/**
+ * A thick pill: the played part filled, the rest a quiet track. Grows under the finger. Draws
+ * nothing that moves on its own, so playback costs no extra frames.
+ */
+@Composable
+private fun ThickProgress(progress: () -> Float, dragging: Boolean, thickness: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val height by animateDpAsState(
+        targetValue = if (dragging) thickness + 4.dp else thickness,
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+        label = "thickHeight",
+    )
+    Canvas(modifier) {
+        val h = height.toPx()
+        val top = (size.height - h) / 2
+        val corner = androidx.compose.ui.geometry.CornerRadius(h / 2)
+        drawRoundRect(colors.secondaryContainer, topLeft = Offset(0f, top), size = androidx.compose.ui.geometry.Size(size.width, h), cornerRadius = corner)
+        val filled = (progress() * size.width).coerceIn(h, size.width)
+        drawRoundRect(colors.primary, topLeft = Offset(0f, top), size = androidx.compose.ui.geometry.Size(filled, h), cornerRadius = corner)
+    }
+}

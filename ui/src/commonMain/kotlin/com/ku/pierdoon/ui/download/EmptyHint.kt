@@ -1,5 +1,8 @@
 package com.ku.pierdoon.ui.download
 
+import com.ku.pierdoon.ui.components.livelyCard
+import com.ku.pierdoon.ui.components.rememberSpin
+import com.ku.pierdoon.ui.components.spunBackground
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,19 +36,21 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun EmptyHint() {
     val colors = MaterialTheme.colorScheme
+    val spin = rememberSpin()
     Box(Modifier.fillMaxWidth().padding(top = 16.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
+                .livelyCard(spin)
                 .clip(RoundedCornerShape(32.dp))
                 .background(colors.secondaryContainer)
-                .cornerDecor(MaterialShapes.Cookie9Sided.toShape(), colors.onSecondaryContainer.copy(alpha = 0.07f), size = 180.dp)
+                .cornerDecor(MaterialShapes.Cookie9Sided.toShape(), colors.onSecondaryContainer.copy(alpha = 0.07f), size = 180.dp, spin = spin)
                 .padding(20.dp),
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(72.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(colors.secondary),
+                modifier = Modifier.size(72.dp).spunBackground(MaterialShapes.Cookie9Sided.toShape(), colors.secondary, spin),
             ) {
                 Icon(PlayerIcons.Download, contentDescription = null, tint = colors.onSecondary, modifier = Modifier.size(32.dp))
             }

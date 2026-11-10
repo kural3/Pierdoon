@@ -145,12 +145,14 @@ fun Modifier.cornerDecor(
     color: Color,
     size: Dp = 132.dp,
     rotation: Float = 18f,
+    /** Lively motion: turns the shape further while the card is hovered or held. */
+    spin: Spin? = null,
 ): Modifier = drawWithCache {
     val px = size.toPx()
     val outline = shape.createOutline(Size(px, px), layoutDirection, this)
     onDrawBehind {
         translate(left = this.size.width - px * 0.62f, top = -px * 0.34f) {
-            rotate(rotation, pivot = Offset(px / 2, px / 2)) {
+            rotate(rotation + (spin?.degrees ?: 0f), pivot = Offset(px / 2, px / 2)) {
                 drawOutline(outline, color)
             }
         }

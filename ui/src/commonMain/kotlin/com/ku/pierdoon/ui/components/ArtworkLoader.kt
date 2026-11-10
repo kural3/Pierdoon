@@ -30,7 +30,7 @@ fun Artwork(
     modifier: Modifier = Modifier,
     large: Boolean = false,
     placeholderIconSize: Dp = 24.dp,
-) = LocalArtworkLoader.current.Artwork(songId, albumId, modifier, large, placeholderIconSize)
+) = LocalArtworkLoader.current.Artwork(songId, albumId, Modifier.lively(coverTilt(large)).then(modifier), large, placeholderIconSize)
 
 /** A picture file of the app's own (a playlist cover); [version] changes when it does. */
 @Composable
@@ -40,4 +40,7 @@ fun FileArtwork(
     modifier: Modifier = Modifier,
     large: Boolean = false,
     placeholderIconSize: Dp = 24.dp,
-) = LocalArtworkLoader.current.FileArtwork(file, version, modifier, large, placeholderIconSize)
+) = LocalArtworkLoader.current.FileArtwork(file, version, Modifier.lively(coverTilt(large)).then(modifier), large, placeholderIconSize)
+
+/** Big covers lean a bit further; small ones in lists only a little. */
+private fun coverTilt(large: Boolean): Float = if (large) 12f else 8f

@@ -61,6 +61,8 @@ import com.ku.pierdoon.ui.resources.tray_show
 import com.ku.pierdoon.ui.PierdoonApp
 import com.ku.pierdoon.ui.player.MiniPlayerMode
 import com.ku.pierdoon.ui.player.MiniPlayerWindow
+import com.ku.pierdoon.ui.desktop.WindowChrome
+import com.ku.pierdoon.ui.desktop.titleBarHitTest
 import com.ku.pierdoon.ui.resources.mini_player
 import com.ku.pierdoon.ui.desktop.BackDispatcher
 import com.ku.pierdoon.ui.desktop.Files
@@ -164,11 +166,12 @@ fun main(args: Array<String>) {
                 }
             }
 
+            val close = {
+                saveWindow(windowPrefs, state)
+                if (settings.closeToTray) visible = false else quit(vm)
+            }
             Window(
-                onCloseRequest = {
-                    saveWindow(windowPrefs, state)
-                    if (settings.closeToTray) visible = false else quit(vm)
-                },
+                onCloseRequest = close,
                 visible = visible && !mini,
                 state = state,
                 title = stringResource(Res.string.app_name),
@@ -178,6 +181,8 @@ fun main(args: Array<String>) {
             ) {
                 LaunchedEffect(Unit) {
                     window.minimumSize = java.awt.Dimension(720, 560)
+                    // Our own buttons on the window's top strip; Windows keeps the frame.
+                    WindowChrome.install(window, state, close)
                     Files.owner = window
                     SingleInstance.window = window
                     PlaybackController.attachWindow(window)
@@ -194,6 +199,7 @@ fun main(args: Array<String>) {
                     Box(
                         Modifier
                             .fillMaxSize()
+                            .titleBarHitTest()
                             .onPointerEvent(PointerEventType.Press) { ev ->
                                 if (ev.button == PointerButton.Back) BackDispatcher.dispatch()
                             }
@@ -232,7 +238,14 @@ private class LinkDropTarget : DragAndDropTarget {
 
 /** Shortcuts that work everywhere, text fields included. */
 private fun globalShortcut(e: androidx.compose.ui.input.key.KeyEvent, vm: MainViewModel, nav: Navigator): Boolean = when {
-    e.isCtrlPressed && e.key == Key.F -> { nav.selectTab(Route.Search); true }
+    // Search opens over the library, the way its field there does.
+    e.isCtrlPressed && e.key == Key.F -> {
+        if (nav.current != Route.Search) {
+            nav.selectTab(Route.Library)
+            nav.push(Route.Search)
+        }
+        true
+    }
     e.isCtrlPressed && e.key == Key.DirectionRight -> { vm.next(); true }
     e.isCtrlPressed && e.key == Key.DirectionLeft -> { vm.previous(); true }
     e.isCtrlPressed && e.key == Key.DirectionUp -> { vm.setVolume(SettingsStore.settings.value.volume + 0.05f); true }

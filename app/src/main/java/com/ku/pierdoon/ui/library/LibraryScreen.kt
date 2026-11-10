@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
+import com.ku.pierdoon.data.AlbumGrid
 import com.ku.pierdoon.data.MusicCollections
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.SongSort
@@ -71,6 +72,9 @@ fun LibraryScreen(
     onBulk: (List<Song>, () -> Unit) -> Unit,
     /** Null where the system can't ask for consent to delete (below Android 11). */
     onDelete: ((List<Song>, () -> Unit) -> Unit)?,
+    /** How big the album covers are, and how to change it. */
+    albumGrid: AlbumGrid,
+    onAlbumGrid: (AlbumGrid) -> Unit,
     bottomInset: Dp,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -105,6 +109,11 @@ fun LibraryScreen(
     ).map { (s, res) -> s to stringResource(res) }
     val selectLabel = stringResource(Res.string.select)
     val descendingLabel = stringResource(Res.string.sort_descending)
+    val gridLabels = listOf(
+        AlbumGrid.Large to Res.string.grid_large,
+        AlbumGrid.Medium to Res.string.grid_medium,
+        AlbumGrid.Small to Res.string.grid_small,
+    ).map { (g, res) -> g to stringResource(res) }
 
     AppScaffold(
         title = stringResource(Res.string.nav_library),
@@ -179,6 +188,13 @@ fun LibraryScreen(
                                 size = 56.dp,
                             )
                         }
+                        if (section == 1 && collections.albums.isNotEmpty()) {
+                            OverflowMenu(
+                                listOf(gridLabels.map { (g, label) -> MenuEntry(label, selected = g == albumGrid) { onAlbumGrid(g) } }),
+                                containerColor = toolColor,
+                                size = 56.dp,
+                            )
+                        }
                     }
                 }
             }
@@ -228,7 +244,7 @@ fun LibraryScreen(
             sectionState.SaveableStateProvider(s) {
                 when (s) {
                     0 -> SongsList(sorted, currentSongId, onPlay, onSongLongPress, top, bottomInset, songsListState, selection)
-                    1 -> AlbumsGrid(collections.albums, onOpen, top, bottomInset)
+                    1 -> AlbumsGrid(collections.albums, onOpen, top, bottomInset, minCell = albumGrid.minCellDp.dp)
                     else -> ArtistsList(collections.artists, onOpen, top, bottomInset)
                 }
             }

@@ -1,5 +1,7 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.components.livelyCard
+import com.ku.pierdoon.ui.components.rememberSpin
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -379,13 +381,15 @@ private fun monthName(month: Int): String {
 fun YearReviewCard(year: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(28.dp)
+    val spin = rememberSpin()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            .livelyCard(spin)
             .clip(shape)
             .background(colors.primary)
-            .cornerDecor(MaterialShapes.Sunny.toShape(), colors.onPrimary.copy(alpha = 0.1f), size = 150.dp)
+            .cornerDecor(MaterialShapes.Sunny.toShape(), colors.onPrimary.copy(alpha = 0.1f), size = 150.dp, spin = spin)
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 18.dp),
     ) {

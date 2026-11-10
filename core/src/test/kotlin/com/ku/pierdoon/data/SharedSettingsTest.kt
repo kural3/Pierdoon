@@ -31,7 +31,7 @@ class SharedSettingsTest {
             haptics = false,
             smoothAnimations = false,
             glass = false,
-            wavyProgress = false,
+            progressStyle = ProgressStyle.Thick,
             nothingStyle = true,
             font = AppFont.Custom,
             customFontFile = "font-1.ttf",
@@ -69,7 +69,7 @@ class SharedSettingsTest {
         assertEquals(
             setOf(
                 "theme", "color_source", "seed_color", "pure_black", "haptics", "smooth_animations", "glass",
-                "wavy_progress", "nothing_style", "font", "custom_font_file", "custom_font_name", "lyrics_wifi_only", "lyrics_sync_controls", "skip_silence",
+                "progress_style", "nothing_style", "font", "custom_font_file", "custom_font_name", "lyrics_wifi_only", "lyrics_sync_controls", "skip_silence",
                 "crossfade_seconds", "playback_speed", "crossfade_albums", "cassette_mode", "radio", "radio_novelty", "radio_buffer", "equalizer",
                 "equalizer_gains", "equalizer_preset", "edit_target", "check_updates", "download_format",
                 "song_sort", "song_sort_desc",
@@ -89,5 +89,13 @@ class SharedSettingsTest {
         assertEquals(ColorSource.Wallpaper, read.colorSource)
         assertEquals(false, read.haptics)
         assertEquals(MAX_CROSSFADE_SECONDS, read.crossfadeSeconds)
+    }
+
+    @Test
+    fun theOldWaveSwitchBecomesAProgressStyle() {
+        val off = MapFile().apply { values["wavy_progress"] = "false" }
+        assertEquals(ProgressStyle.Line, CommonSettings.read(off, CommonSettings()).progressStyle)
+        val on = MapFile().apply { values["wavy_progress"] = "true" }
+        assertEquals(ProgressStyle.Wavy, CommonSettings.read(on, CommonSettings()).progressStyle)
     }
 }

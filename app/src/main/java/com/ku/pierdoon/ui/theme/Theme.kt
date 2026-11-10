@@ -88,7 +88,7 @@ fun PierdoonTheme(
         CompositionLocalProvider(
             LocalUiPrefs provides UiPrefs(
                 glass = settings.glass && !settings.nothingStyle,
-                wavyProgress = settings.wavyProgress,
+                progressStyle = settings.progressStyle,
                 lyricsSyncControls = settings.lyricsSyncControls,
                 nothing = settings.nothingStyle,
             ),

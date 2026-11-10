@@ -214,6 +214,12 @@ fun AppScaffold(
                 },
                 actions = { actions() },
                 scrollBehavior = scrollBehavior,
+                // No grey band once scrolled: the bar stays the page's own colour, and the list just
+                // slips under it.
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
             belowTitle?.invoke()
             }

@@ -98,9 +98,9 @@ fun SongsList(
 }
 
 @Composable
-fun AlbumsGrid(albums: List<Album>, onOpen: (Route) -> Unit, topPadding: Dp, bottomInset: Dp) {
+fun AlbumsGrid(albums: List<Album>, onOpen: (Route) -> Unit, topPadding: Dp, bottomInset: Dp, minCell: Dp = 150.dp) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 150.dp),
+        columns = GridCells.Adaptive(minSize = minCell),
         contentPadding = PaddingValues(
             start = 12.dp,
             end = 12.dp,
@@ -141,96 +141,86 @@ fun ArtistsList(artists: List<Artist>, onOpen: (Route) -> Unit, topPadding: Dp, 
     }
 }
 
+/** The library's playlists section: favourites, smart playlists and the user's own. */
 @Composable
-fun PlaylistsScreen(
-    playlists: List<Playlist>,
-    favoritesCount: Int,
-    resolveCover: (Playlist) -> Song?,
-    onOpen: (Route) -> Unit,
-    onCreate: () -> Unit,
-    onPlaylistLongPress: (Playlist) -> Unit,
-    onImport: () -> Unit,
-    smartPlaylists: List<SmartPlaylist> = emptyList(),
-    smartCount: (SmartPlaylist) -> Int = { 0 },
-    onCreateSmart: () -> Unit = {},
-    onEditSmart: (SmartPlaylist) -> Unit = {},
-    bottomInset: Dp,
-) {
-    val haptics = LocalHapticFeedback.current
-    AppScaffold(
-        title = stringResource(Res.string.nav_playlists),
-        actions = {
-            OverflowMenu(
-                listOf(
-                    listOf(
-                        MenuEntry(stringResource(Res.string.smart_new), PlayerIcons.Sparkle, onClick = onCreateSmart),
-                        MenuEntry(stringResource(Res.string.playlist_import), PlayerIcons.Download, onClick = onImport),
-                    ),
-                ),
+fun PlaylistsList(lists: LibraryPlaylists, onOpen: (Route) -> Unit, topPadding: Dp, bottomInset: Dp) {
+    LazyColumn(
+        contentPadding = PaddingValues(top = topPadding, bottom = listBottomPadding(bottomInset, extra = 88.dp)),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(key = "favorites") {
+            CollectionRow(
+                title = stringResource(Res.string.favorites),
+                subtitle = pluralStringResource(Res.plurals.songs_count, lists.favoritesCount, lists.favoritesCount),
+                cover = { FavoritesCover(Modifier.size(56.dp)) },
+                onClick = { onOpen(Route.Favorites) },
             )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                text = { Text(stringResource(Res.string.new_playlist)) },
-                icon = { Icon(PlayerIcons.Add, contentDescription = null) },
-                onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    onCreate()
-                },
-                modifier = Modifier.padding(bottom = bottomInset),
+        }
+        items(lists.smart, key = { "smart:${it.id}" }) { p ->
+            val n = lists.smartCount(p)
+            CollectionRow(
+                title = p.name,
+                subtitle = stringResource(Res.string.smart_badge) + " · " + pluralStringResource(Res.plurals.songs_count, n, n),
+                cover = { SmartPlaylistCover(Modifier.size(56.dp)) },
+                onClick = { onOpen(Route.SmartPlaylistDetail(p.id)) },
+                onLongClick = { lists.onEditSmart(p) },
             )
-        },
-    ) { inner ->
-        LazyColumn(
-            contentPadding = PaddingValues(
-                top = inner.calculateTopPadding(),
-                bottom = listBottomPadding(bottomInset, extra = 88.dp),
-            ),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            item(key = "favorites") {
+        }
+        // Until there is one, a plain row tells what smart playlists are; the menu keeps the entry after.
+        if (lists.smart.isEmpty()) {
+            item(key = "smart:new") {
                 CollectionRow(
-                    title = stringResource(Res.string.favorites),
-                    subtitle = pluralStringResource(Res.plurals.songs_count, favoritesCount, favoritesCount),
-                    cover = { FavoritesCover(Modifier.size(56.dp)) },
-                    onClick = { onOpen(Route.Favorites) },
-                )
-            }
-            items(smartPlaylists, key = { "smart:${it.id}" }) { p ->
-                val n = smartCount(p)
-                CollectionRow(
-                    title = p.name,
-                    subtitle = stringResource(Res.string.smart_badge) + " · " + pluralStringResource(Res.plurals.songs_count, n, n),
+                    title = stringResource(Res.string.smart_new),
+                    subtitle = stringResource(Res.string.smart_new_desc),
                     cover = { SmartPlaylistCover(Modifier.size(56.dp)) },
-                    onClick = { onOpen(Route.SmartPlaylistDetail(p.id)) },
-                    onLongClick = { onEditSmart(p) },
+                    onClick = lists.onCreateSmart,
                 )
-            }
-            // Until there is one, a plain row tells what smart playlists are; the menu keeps the entry after.
-            if (smartPlaylists.isEmpty()) {
-                item(key = "smart:new") {
-                    CollectionRow(
-                        title = stringResource(Res.string.smart_new),
-                        subtitle = stringResource(Res.string.smart_new_desc),
-                        cover = { SmartPlaylistCover(Modifier.size(56.dp)) },
-                        onClick = onCreateSmart,
-                    )
-                }
-            }
-            items(playlists, key = { it.id }) { p ->
-                CollectionRow(
-                    title = p.name,
-                    subtitle = pluralStringResource(Res.plurals.songs_count, p.songIds.size, p.songIds.size),
-                    cover = { PlaylistCover(p, resolveCover(p), Modifier.size(56.dp)) },
-                    onClick = { onOpen(Route.PlaylistDetail(p.id)) },
-                    onLongClick = { onPlaylistLongPress(p) },
-                )
-            }
-            if (playlists.isEmpty() && smartPlaylists.isEmpty()) {
-                item(key = "empty") { EmptyMessage(stringResource(Res.string.no_playlists)) }
             }
         }
+        items(lists.playlists, key = { it.id }) { p ->
+            CollectionRow(
+                title = p.name,
+                subtitle = pluralStringResource(Res.plurals.songs_count, p.songIds.size, p.songIds.size),
+                cover = { PlaylistCover(p, lists.resolveCover(p), Modifier.size(56.dp)) },
+                onClick = { onOpen(Route.PlaylistDetail(p.id)) },
+                onLongClick = { lists.onLongPress(p) },
+            )
+        }
+        if (lists.playlists.isEmpty() && lists.smart.isEmpty()) {
+            item(key = "empty") { EmptyMessage(stringResource(Res.string.no_playlists)) }
+        }
     }
+}
+
+/** The library section that holds playlists. */
+const val PLAYLISTS = 3
+
+/** ⋮ of the playlists section: a new smart playlist, or one from a file. */
+@Composable
+fun PlaylistsMenu(lists: LibraryPlaylists, containerColor: Color, size: Dp = 56.dp) {
+    OverflowMenu(
+        listOf(
+            listOf(
+                MenuEntry(stringResource(Res.string.smart_new), PlayerIcons.Sparkle, onClick = lists.onCreateSmart),
+                MenuEntry(stringResource(Res.string.playlist_import), PlayerIcons.Download, onClick = lists.onImport),
+            ),
+        ),
+        containerColor = containerColor,
+        size = size,
+    )
+}
+
+@Composable
+fun NewPlaylistButton(onCreate: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    ExtendedFloatingActionButton(
+        text = { Text(stringResource(Res.string.new_playlist)) },
+        icon = { Icon(PlayerIcons.Add, contentDescription = null) },
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            onCreate()
+        },
+    )
 }
 
 @Composable
@@ -335,5 +325,19 @@ private fun IconCover(
 ) {
     Box(modifier.clip(shape).background(container), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = content, modifier = Modifier.fillMaxSize(0.42f))
+    }
+}
+
+/** The playlists tab: [PlaylistsList] under its title, with a new playlist and the import at hand. */
+@Composable
+fun PlaylistsScreen(lists: LibraryPlaylists, onOpen: (Route) -> Unit, bottomInset: Dp) {
+    AppScaffold(
+        title = stringResource(Res.string.nav_playlists),
+        actions = { PlaylistsMenu(lists, Color.Transparent, size = 48.dp) },
+        floatingActionButton = {
+            Box(Modifier.padding(bottom = bottomInset)) { NewPlaylistButton(lists.onCreate) }
+        },
+    ) { inner ->
+        PlaylistsList(lists, onOpen, inner.calculateTopPadding(), bottomInset)
     }
 }

@@ -36,37 +36,6 @@ import org.jetbrains.compose.resources.stringResource
 
 // The list rows, scaffold and headers both apps share are in ui (SongRows.kt).
 
-/** Pill that looks like a search field and opens the search page. */
-@Composable
-fun SearchCapsule(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val haptics = LocalHapticFeedback.current
-    val source = remember { MutableInteractionSource() }
-    val scale = animatePressAsState(source, 0.96f)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .height(56.dp)
-            .scaleBy(scale)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable(source, ripple()) {
-                haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
-                onClick()
-            }
-            .padding(horizontal = 20.dp),
-    ) {
-        Icon(PlayerIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(14.dp))
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
 /** Big cover, title and Play / Shuffle pills for album, artist and playlist screens. */
 @Composable
 fun CollectionHeader(

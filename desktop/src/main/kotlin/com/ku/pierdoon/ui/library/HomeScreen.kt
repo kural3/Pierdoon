@@ -59,10 +59,14 @@ import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.splitArtists
 import com.ku.pierdoon.ui.components.Artwork
+import com.ku.pierdoon.ui.components.BlurredArtwork
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.components.animatePressAsState
 import com.ku.pierdoon.ui.components.cornerDecor
+import com.ku.pierdoon.ui.components.livelyCard
+import com.ku.pierdoon.ui.components.rememberSpin
+import com.ku.pierdoon.ui.components.spunBackground
 import com.ku.pierdoon.ui.components.scaleBy
 import com.ku.pierdoon.ui.navigation.Route
 import java.util.Calendar
@@ -86,35 +90,48 @@ fun HomeScreen(
     onMyWave: (() -> Unit)? = null,
     /** The year whose review the home screen offers (in December and January), or null. */
     yearReview: Int? = null,
+    /** The track for the card at the top: the one playing, or else the last one played; null hides it. */
+    hero: HeroTrack? = null,
+    isPlaying: Boolean = false,
+    onOpenPlayer: () -> Unit = {},
+    onTogglePlay: () -> Unit = {},
+    /** The radio is on (playing or paused): its pill shows it. */
+    radioOn: Boolean = false,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val wide = maxWidth >= TWO_PANE_WIDTH
-    val shuffleCard: @Composable (Modifier) -> Unit = { m ->
-        QuickCard(
-            title = stringResource(Res.string.shuffle_all),
-            icon = PlayerIcons.Shuffle,
-            shape = MaterialShapes.Cookie9Sided.toShape(),
-            container = MaterialTheme.colorScheme.primaryContainer,
-            content = MaterialTheme.colorScheme.onPrimaryContainer,
-            onClick = onShuffleAll,
-            modifier = m,
-        )
-    }
-    val favoritesCard: @Composable (Modifier) -> Unit = { m ->
-        QuickCard(
-            title = stringResource(Res.string.favorites),
-            subtitle = pluralStringResource(Res.plurals.songs_count, favoritesCount, favoritesCount),
-            icon = PlayerIcons.Favorite,
-            shape = MaterialShapes.Sunny.toShape(),
-            container = MaterialTheme.colorScheme.tertiaryContainer,
-            content = MaterialTheme.colorScheme.onTertiaryContainer,
-            onClick = { onOpen(Route.Favorites) },
-            modifier = m,
-        )
-    }
+    val pills = homePills(
+        shuffleLabel = stringResource(Res.string.shuffle_all),
+        onShuffle = onShuffleAll,
+        favoritesLabel = stringResource(Res.string.favorites),
+        favoritesDetail = pluralStringResource(Res.plurals.songs_count, favoritesCount, favoritesCount),
+        onFavorites = { onOpen(Route.Favorites) },
+        radioLabel = stringResource(Res.string.radio),
+        onRadio = onMyWave,
+        statsLabel = stringResource(Res.string.stats),
+        statsDetail = weekListenedMs?.let { listenedTime(it) },
+        onStats = weekListenedMs?.let { { onOpen(Route.Stats) } },
+        radioOn = radioOn,
+        onOpenPlayer = onOpenPlayer,
+    )
     val mixCard: @Composable (Modifier) -> Unit = { m ->
         DailyMixCard(songs = dailyMix, onOpen = { onOpen(Route.DailyMix) }, onPlay = { onPlay(dailyMix, 0) }, modifier = m)
     }
+    val heroCard: @Composable (HeroTrack, Modifier) -> Unit = { track, m ->
+        // A track that isn't loaded any more starts again from the recent list.
+        val play = { if (track.playing) onTogglePlay() else onPlay(recent, 0) }
+        ContinueCard(
+            track = track,
+            isPlaying = isPlaying,
+            onOpen = { if (track.playing) onOpenPlayer() else play() },
+            onPlayPause = play,
+            background = { b -> BlurredArtwork(track.songId, track.albumId, b) },
+            coverSize = if (wide) 140.dp else 112.dp,
+            modifier = m,
+        )
+    }
+    // On a wide window the playlist of the day sits beside the hero.
+    val mixBesideHero = wide && hero != null && dailyMix.isNotEmpty()
     LazyColumn(
         contentPadding = PaddingValues(bottom = listBottomPadding(bottomInset)),
         modifier = Modifier.fillMaxSize(),
@@ -138,54 +155,24 @@ fun HomeScreen(
                 )
             }
         }
-        if (wide) {
-            // A wide window: the cards side by side in two rows, each row as tall as its tallest.
-            item(key = "quick") {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp).height(IntrinsicSize.Min),
-                ) {
-                    shuffleCard(Modifier.weight(1f).fillMaxHeight())
-                    favoritesCard(Modifier.weight(1f).fillMaxHeight())
-                    if (dailyMix.isNotEmpty()) mixCard(Modifier.weight(2f).fillMaxHeight())
-                }
-            }
-            if (onMyWave != null || weekListenedMs != null) {
-                item(key = "wave") {
+        if (hero != null) {
+            item(key = "hero") {
+                if (mixBesideHero) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).height(IntrinsicSize.Min),
+                        modifier = Modifier.padding(horizontal = 16.dp).height(IntrinsicSize.Min),
                     ) {
-                        if (onMyWave != null) WaveCard(onMyWave, Modifier.weight(1f).fillMaxHeight())
-                        if (weekListenedMs != null) {
-                            StatsCard(weekListenedMs, onClick = { onOpen(Route.Stats) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                        }
+                        heroCard(hero, Modifier.weight(1.4f).fillMaxHeight())
+                        mixCard(Modifier.weight(1f).fillMaxHeight())
                     }
+                } else {
+                    heroCard(hero, Modifier.padding(horizontal = 16.dp))
                 }
             }
-        } else {
-        item(key = "quick") {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(horizontal = 16.dp),
-            ) {
-                shuffleCard(Modifier.weight(1f))
-                favoritesCard(Modifier.weight(1f))
-            }
         }
-        if (dailyMix.isNotEmpty()) {
-            item(key = "mix") { mixCard(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) }
-        }
-        if (onMyWave != null) {
-            item(key = "wave") {
-                WaveCard(onMyWave, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp))
-            }
-        }
-        if (weekListenedMs != null) {
-            item(key = "stats") {
-                StatsCard(weekListenedMs, onClick = { onOpen(Route.Stats) }, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp))
-            }
-        }
+        item(key = "pills") { QuickPills(pills, Modifier.padding(top = if (hero != null) 16.dp else 0.dp), fill = wide) }
+        if (dailyMix.isNotEmpty() && !mixBesideHero) {
+            item(key = "mix") { mixCard(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) }
         }
 
         if (recent.isNotEmpty()) {
@@ -254,59 +241,6 @@ private fun greetingRes(): StringResource = when (Calendar.getInstance().get(Cal
     in 12..17 -> Res.string.greeting_day
     in 18..22 -> Res.string.greeting_evening
     else -> Res.string.greeting_night
-}
-
-@Composable
-private fun QuickCard(
-    title: String,
-    icon: ImageVector,
-    shape: Shape,
-    container: Color,
-    content: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null,
-) {
-    val haptics = LocalHapticFeedback.current
-    val source = remember { MutableInteractionSource() }
-    val scale = animatePressAsState(source, 0.93f)
-    Column(
-        modifier = modifier
-            .scaleBy(scale)
-            .clip(RoundedCornerShape(28.dp))
-            .background(container)
-            .hairline(RoundedCornerShape(28.dp))
-            .cornerDecor(shape, content.copy(alpha = 0.08f))
-            .clickable(interactionSource = source, indication = ripple()) {
-                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                onClick()
-            }
-            .padding(16.dp),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(48.dp)
-                .clip(shape)
-                .background(content.copy(alpha = 0.14f)),
-        ) {
-            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(24.dp))
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMediumEmphasized,
-            color = content,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            subtitle.orEmpty(),
-            style = MaterialTheme.typography.bodySmall,
-            color = content.copy(alpha = 0.75f),
-            maxLines = 1,
-        )
-    }
 }
 
 /**
@@ -432,16 +366,18 @@ private fun DailyMixCard(songs: List<Song>, onOpen: () -> Unit, onPlay: () -> Un
     val haptics = LocalHapticFeedback.current
     val source = remember { MutableInteractionSource() }
     val scale = animatePressAsState(source, 0.97f)
+    val spin = rememberSpin()
     val artists = remember(songs) { songs.flatMap { splitArtists(it.artist) }.distinct().take(4).joinToString(", ") }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            .livelyCard(spin)
             .scaleBy(scale)
             .clip(RoundedCornerShape(28.dp))
             .background(colors.secondaryContainer)
             .hairline(RoundedCornerShape(28.dp))
-            .cornerDecor(MaterialShapes.Clover8Leaf.toShape(), colors.onSecondaryContainer.copy(alpha = 0.07f), size = 150.dp)
+            .cornerDecor(MaterialShapes.Clover8Leaf.toShape(), colors.onSecondaryContainer.copy(alpha = 0.07f), size = 150.dp, spin = spin)
             .clickable(interactionSource = source, indication = ripple()) {
                 haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                 onOpen()
@@ -500,49 +436,5 @@ fun MixCollage(songs: List<Song>, modifier: Modifier = Modifier) {
                 }
             }
         }
-    }
-}
-
-/** The way into the statistics, with the week's listening time as a teaser. */
-@Composable
-private fun StatsCard(weekListenedMs: Long, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    val haptics = LocalHapticFeedback.current
-    val source = remember { MutableInteractionSource() }
-    val scale = animatePressAsState(source, 0.97f)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .scaleBy(scale)
-            .clip(RoundedCornerShape(28.dp))
-            .background(colors.surfaceContainerHigh)
-            .hairline(RoundedCornerShape(28.dp))
-            .cornerDecor(MaterialShapes.Cookie6Sided.toShape(), colors.onSurface.copy(alpha = 0.05f), size = 110.dp)
-            .clickable(interactionSource = source, indication = ripple()) {
-                haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
-                onClick()
-            }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(MaterialShapes.Cookie6Sided.toShape())
-                .background(colors.tertiaryContainer),
-        ) {
-            Icon(PlayerIcons.BarChart, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(22.dp))
-        }
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(Res.string.stats), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-            Text(
-                stringResource(Res.string.stats_week_summary, listenedTime(weekListenedMs)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
-            )
-        }
-        Icon(PlayerIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceVariant)
     }
 }

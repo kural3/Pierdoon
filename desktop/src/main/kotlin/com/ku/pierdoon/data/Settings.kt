@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 /** How the Delicious mode draws the music. */
 enum class DeliciousStyle { Aura, Waves, Dust, Calm }
 
+/** How the PC track list lays songs out: one card of rows, or compact tiles in columns. */
+enum class TrackView { List, Tiles }
+
 /** Narrowest navigation rail: a column of icons. */
 const val NAV_MIN_WIDTH = 88f
 /** Widest: the pills just fit the longest label. */
@@ -51,6 +54,8 @@ data class AppSettings(
     val deliciousStyle: DeliciousStyle = DeliciousStyle.Aura,
     /** The browser yt-dlp takes YouTube cookies from, so YouTube doesn't take downloads for a bot. */
     val cookiesBrowser: CookieBrowser = CookieBrowser.Off,
+    /** How the library lays out its tracks. */
+    val trackView: TrackView = TrackView.List,
 ) : SharedSettings by common {
     /** A change to the settings both apps have. */
     fun shared(change: CommonSettings.() -> CommonSettings): AppSettings = copy(common = common.change())
@@ -98,6 +103,7 @@ object SettingsStore {
             discordPresence = p.getBoolean(K_DISCORD, d.discordPresence),
             deliciousStyle = enumOr(p.getString(K_DELICIOUS, null), d.deliciousStyle),
             cookiesBrowser = enumOr(p.getString(K_COOKIES, null), d.cookiesBrowser),
+            trackView = enumOr(p.getString(K_TRACK_VIEW, null), d.trackView),
         )
     }
 
@@ -137,6 +143,7 @@ object SettingsStore {
             putBoolean(K_DISCORD, s.discordPresence)
             putString(K_DELICIOUS, s.deliciousStyle.name)
             putString(K_COOKIES, s.cookiesBrowser.name)
+            putString(K_TRACK_VIEW, s.trackView.name)
         }
     }
 
@@ -161,6 +168,7 @@ object SettingsStore {
     private const val K_DISCORD = "discord_presence"
     private const val K_DELICIOUS = "delicious_style"
     private const val K_COOKIES = "cookies_browser"
+    private const val K_TRACK_VIEW = "track_view"
 }
 
 /** Browsers yt-dlp can read cookies from on Windows, by its own names for them. */

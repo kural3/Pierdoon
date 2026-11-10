@@ -14,6 +14,7 @@
     <string name="remove_from_queue">Remove from queue</string>
     <string name="reorder">Drag</string>
     <string name="now_playing">Now playing</string>
+    <string name="home_continue">Continue listening</string>
     <string name="play">Play</string>
     <string name="pause">Pause</string>
     <string name="next">Next</string>
@@ -38,6 +39,9 @@
     <string name="colors_wallpaper">Wallpaper</string>
     <string name="colors_album">Cover</string>
     <string name="colors_custom">Custom</string>
+    <string name="settings_special">Special themes</string>
+    <string name="special_none">None</string>
+    <string name="special_nothing">Nothing</string>
     <string name="settings_colors_album_desc">The palette follows the cover of the current track</string>
     <string name="settings_colors_custom_desc">Palette from a color you pick</string>
     <string name="settings_colors_pick">Main color</string>
@@ -52,10 +56,11 @@
     <string name="font_jetbrains_mono">JetBrains Mono</string>
     <string name="font_ibm_plex_mono">IBM Plex Mono</string>
     <string name="font_sample">The quick brown fox jumps · 0123</string>
-    <string name="settings_nothing">Nothing style</string>
-    <string name="settings_nothing_desc">Monochrome with a red accent, dot-matrix cover and progress, no glass or blurred background</string>
-    <string name="settings_wavy">Wavy progress bar</string>
-    <string name="settings_wavy_desc">An animated wave while music plays</string>
+    <string name="settings_progress_style">Progress bar</string>
+    <string name="progress_wavy">Wave</string>
+    <string name="progress_line">Line</string>
+    <string name="progress_dots">Dots</string>
+    <string name="progress_thick">Thick</string>
     <string name="settings_feedback">Feedback</string>
     <string name="settings_haptics_desc">Haptic feedback on taps and gestures</string>
     <string name="settings_smooth">Maximum smoothness</string>
@@ -99,6 +104,10 @@
     </plurals>
     <string name="albums_count">Albums: %1$d</string>
     <string name="artists_count">Artists: %1$d</string>
+    <string name="playlists_count">Playlists: %1$d</string>
+    <string name="grid_large">Large covers</string>
+    <string name="grid_medium">Medium covers</string>
+    <string name="grid_small">Small covers</string>
     <string name="new_playlist">New playlist</string>
     <string name="playlist_name">Name</string>
     <string name="playlist_import">Import from file</string>
@@ -149,6 +158,8 @@
     <string name="sort_date_added">By date added</string>
     <string name="sort_duration">By length</string>
     <string name="sort_descending">Descending</string>
+    <string name="track_view_list">As a list</string>
+    <string name="track_view_tiles">As tiles</string>
     <string name="search_library">Search library</string>
     <string name="search_short">Search</string>
     <string name="search_library_hint">Track, artist or album</string>
@@ -304,7 +315,7 @@
     <string name="font_custom_failed">That file isn't a font</string>
     <string name="font_custom_title">Choose a font</string>
     <string name="settings_beta">Beta</string>
-    <string name="settings_beta_summary">Radio, cassette mode</string>
+    <string name="settings_beta_summary">Radio, cassette mode, lively motion</string>
     <string name="settings_beta_note">Still being tried out: may change or break.</string>
     <string name="settings_radio">Radio</string>
     <string name="settings_radio_desc">An endless queue from a track, an artist or your taste. Brings in new music from YouTube; keep what you like with the heart. Needs the internet for new tracks</string>
@@ -327,6 +338,7 @@
     <string name="radio_dislike">Not this</string>
     <string name="radio_offline">Offline: playing your library</string>
     <string name="radio_stop">Stop radio</string>
+    <string name="radio_on">On</string>
     <string name="radio_offline_short">offline</string>
     <string name="download_log">Download log</string>
     <string name="download_log_errors">Errors only</string>

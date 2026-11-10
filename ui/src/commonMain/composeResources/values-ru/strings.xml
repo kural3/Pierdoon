@@ -14,6 +14,7 @@
     <string name="remove_from_queue">Убрать из очереди</string>
     <string name="reorder">Перетащить</string>
     <string name="now_playing">Сейчас играет</string>
+    <string name="home_continue">Продолжить</string>
     <string name="play">Играть</string>
     <string name="pause">Пауза</string>
     <string name="next">Следующий</string>
@@ -38,6 +39,9 @@
     <string name="colors_wallpaper">Обои</string>
     <string name="colors_album">Обложка</string>
     <string name="colors_custom">Свой</string>
+    <string name="settings_special">Особые оттенки</string>
+    <string name="special_none">Нет</string>
+    <string name="special_nothing">Nothing</string>
     <string name="settings_colors_album_desc">Палитра подстраивается под обложку текущего трека</string>
     <string name="settings_colors_custom_desc">Палитра из выбранного цвета</string>
     <string name="settings_colors_pick">Основной цвет</string>
@@ -52,10 +56,11 @@
     <string name="font_jetbrains_mono">JetBrains Mono</string>
     <string name="font_ibm_plex_mono">IBM Plex Mono</string>
     <string name="font_sample">Съешь ещё этих мягких булок · 0123</string>
-    <string name="settings_nothing">Стиль Nothing</string>
-    <string name="settings_nothing_desc">Монохром с красным акцентом, обложка и прогресс из точек, без стекла и размытого фона</string>
-    <string name="settings_wavy">Волна на полосе прогресса</string>
-    <string name="settings_wavy_desc">Анимированная волна во время воспроизведения</string>
+    <string name="settings_progress_style">Полоса прогресса</string>
+    <string name="progress_wavy">Волна</string>
+    <string name="progress_line">Линия</string>
+    <string name="progress_dots">Точки</string>
+    <string name="progress_thick">Толстая</string>
     <string name="settings_feedback">Отклик</string>
     <string name="settings_haptics_desc">Тактильный отклик на нажатия и жесты</string>
     <string name="settings_smooth">Максимальная плавность</string>
@@ -101,6 +106,10 @@
     </plurals>
     <string name="albums_count">Альбомов: %1$d</string>
     <string name="artists_count">Артистов: %1$d</string>
+    <string name="playlists_count">Плейлистов: %1$d</string>
+    <string name="grid_large">Крупные обложки</string>
+    <string name="grid_medium">Средние обложки</string>
+    <string name="grid_small">Мелкие обложки</string>
     <string name="new_playlist">Новый плейлист</string>
     <string name="playlist_name">Название</string>
     <string name="playlist_import">Импорт из файла</string>
@@ -155,6 +164,8 @@
     <string name="sort_date_added">По дате добавления</string>
     <string name="sort_duration">По длительности</string>
     <string name="sort_descending">По убыванию</string>
+    <string name="track_view_list">Списком</string>
+    <string name="track_view_tiles">Плитками</string>
     <string name="search_library">Поиск по библиотеке</string>
     <string name="search_short">Поиск</string>
     <string name="search_library_hint">Трек, исполнитель или альбом</string>
@@ -312,7 +323,7 @@
     <string name="font_custom_failed">Этот файл не шрифт</string>
     <string name="font_custom_title">Выберите шрифт</string>
     <string name="settings_beta">Бета</string>
-    <string name="settings_beta_summary">Радио, кассетный режим</string>
+    <string name="settings_beta_summary">Радио, кассета, живые анимации</string>
     <string name="settings_beta_note">Ещё испытывается: может измениться или сломаться.</string>
     <string name="settings_radio">Радио</string>
     <string name="settings_radio_desc">Бесконечная очередь от трека, артиста или вашего вкуса. Подмешивает новую музыку с YouTube; понравившееся оставьте сердечком. Для новых треков нужен интернет</string>
@@ -335,6 +346,7 @@
     <string name="radio_dislike">Не то</string>
     <string name="radio_offline">Нет сети: играет ваша библиотека</string>
     <string name="radio_stop">Выключить радио</string>
+    <string name="radio_on">Включено</string>
     <string name="radio_offline_short">без сети</string>
     <string name="download_log">Журнал загрузок</string>
     <string name="download_log_errors">Только ошибки</string>

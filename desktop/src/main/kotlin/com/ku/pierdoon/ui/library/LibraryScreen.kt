@@ -13,6 +13,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -48,6 +49,8 @@ import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.data.MusicCollections
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.SongSort
+import com.ku.pierdoon.data.TrackView
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import com.ku.pierdoon.data.sortSongs
 import androidx.compose.runtime.LaunchedEffect
 import com.ku.pierdoon.ui.components.ConnectedChoice
@@ -71,9 +74,12 @@ fun LibraryScreen(
     sort: SongSort,
     sortDescending: Boolean,
     onSort: (SongSort, Boolean) -> Unit,
+    trackView: TrackView,
+    onTrackView: (TrackView) -> Unit,
     onBulk: (List<Song>, () -> Unit) -> Unit,
     /** Null where the system can't ask for consent to delete (below Android 11). */
     onDelete: ((List<Song>, () -> Unit) -> Unit)?,
+    lists: LibraryPlaylists,
     bottomInset: Dp,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -85,15 +91,19 @@ fun LibraryScreen(
     LaunchedEffect(section) { if (section != 0) selection.clear() }
     val sectionState = rememberSaveableStateHolder()
     val songsListState = rememberLazyListState()
+    val songsGridState = rememberLazyGridState()
     // A new order starts from the top; the list would otherwise hold on to the row that was first.
     var shownSort by rememberSaveable { mutableStateOf(sort to sortDescending) }
     LaunchedEffect(sort, sortDescending) {
         if (shownSort != sort to sortDescending) {
             shownSort = sort to sortDescending
             songsListState.scrollToItem(0)
+            songsGridState.scrollToItem(0)
         }
     }
-    val fabExpanded by remember { derivedStateOf { songsListState.firstVisibleItemIndex == 0 } }
+    val fabExpanded by remember { derivedStateOf {
+        songsListState.firstVisibleItemIndex == 0 && songsGridState.firstVisibleItemIndex == 0
+    } }
 
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
@@ -109,99 +119,122 @@ fun LibraryScreen(
     ).map { (s, res) -> s to stringResource(res) }
     val selectLabel = stringResource(Res.string.select)
     val descendingLabel = stringResource(Res.string.sort_descending)
+    val viewLabels = listOf(
+        TrackView.List to stringResource(Res.string.track_view_list),
+        TrackView.Tiles to stringResource(Res.string.track_view_tiles),
+    )
 
     AppScaffold(
         title = stringResource(Res.string.nav_library),
         subtitle = when (section) {
             0 -> stringResource(Res.string.tracks_count, songs.size)
             1 -> stringResource(Res.string.albums_count, collections.albums.size)
-            else -> stringResource(Res.string.artists_count, collections.artists.size)
+            2 -> stringResource(Res.string.artists_count, collections.artists.size)
+            else -> stringResource(Res.string.playlists_count, lists.playlists.size + lists.smart.size)
         },
         belowTitle = {
-            // Search and downloads have tabs of their own; while picking tracks, the selection
-            // tools take a row above the sections.
-            AnimatedVisibility(
-                visible = selection.active,
-                enter = expandVertically(effectsSize) + fadeIn(effects),
-                exit = shrinkVertically(effectsSize) + fadeOut(effects),
-            ) {
+            // Search and the section's menu; while picking tracks the same row holds the selection tools.
+            AnimatedContent(
+                targetState = selection.active,
+                transitionSpec = { fadeIn(effects).togetherWith(fadeOut(effects)) },
+                label = "libraryTools",
+            ) { selecting ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                 ) {
-                    ExpressiveIconButton(
-                        onClick = selection::clear,
-                        icon = PlayerIcons.Close,
-                        contentDescription = stringResource(Res.string.cancel),
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(56.dp),
-                    )
-                    Text(
-                        stringResource(Res.string.selected_count, selection.ids.size),
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(start = 4.dp),
-                    )
-                    SelectionActions(
-                        selection = selection,
-                        all = sorted,
-                        onBulk = { picked -> onBulk(picked, selection::clear) },
-                        onDelete = onDelete?.let { delete -> { picked -> delete(picked, selection::clear) } },
-                    )
+                    val toolColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    if (selecting) {
+                        ExpressiveIconButton(
+                            onClick = selection::clear,
+                            icon = PlayerIcons.Close,
+                            contentDescription = stringResource(Res.string.cancel),
+                            containerColor = toolColor,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(56.dp),
+                        )
+                        Text(
+                            stringResource(Res.string.selected_count, selection.ids.size),
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).padding(start = 4.dp),
+                        )
+                        SelectionActions(
+                            selection = selection,
+                            all = sorted,
+                            onBulk = { picked -> onBulk(picked, selection::clear) },
+                            onDelete = onDelete?.let { delete -> { picked -> delete(picked, selection::clear) } },
+                        )
+                    } else {
+                        SearchCapsule(
+                            text = stringResource(Res.string.search_library_hint),
+                            onClick = { onOpen(Route.Search) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (section == 0 && songs.isNotEmpty()) {
+                            OverflowMenu(
+                                listOf(
+                                    listOf(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() }),
+                                    sortLabels.map { (s, label) ->
+                                        MenuEntry(label, selected = s == sort) { onSort(s, sortDescending) }
+                                    },
+                                    listOf(
+                                        MenuEntry(descendingLabel, PlayerIcons.Sort, checked = sortDescending) {
+                                            onSort(sort, !sortDescending)
+                                        },
+                                    ),
+                                    viewLabels.map { (v, label) ->
+                                        MenuEntry(label, selected = v == trackView) { onTrackView(v) }
+                                    },
+                                ),
+                                containerColor = toolColor,
+                                size = 56.dp,
+                            )
+                        }
+                        if (section == PLAYLISTS) {
+                            PlaylistsMenu(lists, toolColor)
+                        }
+                    }
                 }
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ConnectedChoice(
+                options = listOf(
+                    stringResource(Res.string.nav_songs),
+                    stringResource(Res.string.nav_albums),
+                    stringResource(Res.string.nav_artists),
+                    stringResource(Res.string.nav_playlists),
+                ),
+                selected = section,
+                onSelect = { section = it },
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-            ) {
-                ConnectedChoice(
-                    options = listOf(
-                        stringResource(Res.string.nav_songs),
-                        stringResource(Res.string.nav_albums),
-                        stringResource(Res.string.nav_artists),
-                    ),
-                    selected = section,
-                    onSelect = { section = it },
-                    modifier = Modifier.weight(1f),
-                )
-                if (section == 0 && songs.isNotEmpty() && !selection.active) {
-                    OverflowMenu(
-                        listOf(
-                            listOf(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() }),
-                            sortLabels.map { (s, label) ->
-                                MenuEntry(label, selected = s == sort) { onSort(s, sortDescending) }
-                            },
-                            listOf(
-                                MenuEntry(descendingLabel, PlayerIcons.Sort, checked = sortDescending) {
-                                    onSort(sort, !sortDescending)
-                                },
-                            ),
-                        ),
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    )
-                }
-            }
+            )
         },
         floatingActionButton = {
-            AnimatedVisibility(
-                visible = section == 0 && songs.isNotEmpty() && !selection.active,
-                enter = scaleIn(spatialF, initialScale = 0.6f) + fadeIn(effects),
-                exit = scaleOut(spatialF, targetScale = 0.6f) + fadeOut(effects),
-                modifier = Modifier.padding(bottom = bottomInset),
-            ) {
-                ExtendedFloatingActionButton(
-                    text = { Text(stringResource(Res.string.shuffle_all)) },
-                    icon = { Icon(PlayerIcons.Shuffle, contentDescription = null) },
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                        onShuffleAll()
-                    },
-                    expanded = fabExpanded,
-                )
+            Box(Modifier.padding(bottom = bottomInset)) {
+                AnimatedVisibility(
+                    visible = section == 0 && songs.isNotEmpty() && !selection.active,
+                    enter = scaleIn(spatialF, initialScale = 0.6f) + fadeIn(effects),
+                    exit = scaleOut(spatialF, targetScale = 0.6f) + fadeOut(effects),
+                ) {
+                    ExtendedFloatingActionButton(
+                        text = { Text(stringResource(Res.string.shuffle_all)) },
+                        icon = { Icon(PlayerIcons.Shuffle, contentDescription = null) },
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                            onShuffleAll()
+                        },
+                        expanded = fabExpanded,
+                    )
+                }
+                AnimatedVisibility(
+                    visible = section == PLAYLISTS,
+                    enter = scaleIn(spatialF, initialScale = 0.6f) + fadeIn(effects),
+                    exit = scaleOut(spatialF, targetScale = 0.6f) + fadeOut(effects),
+                ) {
+                    NewPlaylistButton(lists.onCreate)
+                }
             }
         },
     ) { inner ->
@@ -220,9 +253,10 @@ fun LibraryScreen(
             // Each section keeps its own scroll position across switches.
             sectionState.SaveableStateProvider(s) {
                 when (s) {
-                    0 -> SongsList(sorted, currentSongId, onPlay, onSongLongPress, top, bottomInset, songsListState, selection)
+                    0 -> SongsList(sorted, currentSongId, onPlay, onSongLongPress, top, bottomInset, songsListState, songsGridState, selection, trackView)
                     1 -> AlbumsGrid(collections.albums, onOpen, top, bottomInset)
-                    else -> ArtistsList(collections.artists, onOpen, top, bottomInset)
+                    2 -> ArtistsList(collections.artists, onOpen, top, bottomInset)
+                    else -> PlaylistsList(lists, onOpen, top, bottomInset)
                 }
             }
         }

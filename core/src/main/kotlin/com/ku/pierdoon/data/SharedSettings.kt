@@ -14,6 +14,9 @@ enum class ThemeMode { System, Light, Dark }
 /** Where the palette comes from: the wallpaper (the Windows accent colour on a PC), current album art, or a chosen colour. */
 enum class ColorSource { Wallpaper, AlbumArt, Custom }
 
+/** How the seek bar is drawn. */
+enum class ProgressStyle { Wavy, Line, Dots, Thick }
+
 /** Typeface for the whole app; [Custom] is a font file the user brought (see [SharedSettings.customFontFile]). */
 enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono, Custom }
 
@@ -34,7 +37,8 @@ interface SharedSettings {
     /** Ask the display for its top refresh rate while animating. */
     val smoothAnimations: Boolean
     val glass: Boolean
-    val wavyProgress: Boolean
+    /** The seek bar's look; the Nothing style always uses dots. */
+    val progressStyle: ProgressStyle
     /** Nothing-style look: monochrome with a red accent, dot-matrix headings, dotted progress. */
     val nothingStyle: Boolean
     val font: AppFont
@@ -87,7 +91,7 @@ data class CommonSettings(
     override val haptics: Boolean = true,
     override val smoothAnimations: Boolean = true,
     override val glass: Boolean = true,
-    override val wavyProgress: Boolean = true,
+    override val progressStyle: ProgressStyle = ProgressStyle.Wavy,
     override val nothingStyle: Boolean = false,
     override val font: AppFont = AppFont.System,
     override val customFontFile: String? = null,
@@ -121,7 +125,7 @@ data class CommonSettings(
         putBoolean(K_HAPTICS, haptics)
         putBoolean(K_SMOOTH, smoothAnimations)
         putBoolean(K_GLASS, glass)
-        putBoolean(K_WAVY, wavyProgress)
+        putString(K_PROGRESS, progressStyle.name)
         putBoolean(K_NOTHING, nothingStyle)
         putString(K_FONT, font.name)
         putString(K_CUSTOM_FONT_FILE, customFontFile)
@@ -158,7 +162,9 @@ data class CommonSettings(
                 haptics = getBoolean(K_HAPTICS, d.haptics),
                 smoothAnimations = getBoolean(K_SMOOTH, d.smoothAnimations),
                 glass = getBoolean(K_GLASS, d.glass),
-                wavyProgress = getBoolean(K_WAVY, d.wavyProgress),
+                // Before the styles there was only the wave, on or off.
+                progressStyle = getString(K_PROGRESS, null)?.let { enumOr(it, d.progressStyle) }
+                    ?: if (getBoolean(K_WAVY, true)) d.progressStyle else ProgressStyle.Line,
                 nothingStyle = getBoolean(K_NOTHING, d.nothingStyle),
                 font = enumOr(getString(K_FONT, null), d.font),
                 customFontFile = getString(K_CUSTOM_FONT_FILE, d.customFontFile),
@@ -198,6 +204,7 @@ data class CommonSettings(
         private const val K_SMOOTH = "smooth_animations"
         private const val K_GLASS = "glass"
         private const val K_WAVY = "wavy_progress"
+        private const val K_PROGRESS = "progress_style"
         private const val K_NOTHING = "nothing_style"
         private const val K_FONT = "font"
         private const val K_CUSTOM_FONT_FILE = "custom_font_file"

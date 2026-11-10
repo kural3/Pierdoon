@@ -1,5 +1,16 @@
 package com.ku.pierdoon.ui.settings
 
+import com.ku.pierdoon.ui.components.livelyCard
+import com.ku.pierdoon.ui.components.rememberSpin
+import com.ku.pierdoon.ui.components.spinOn
+import com.ku.pierdoon.ui.components.spunBackground
+import com.ku.pierdoon.ui.components.lively
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -140,6 +152,50 @@ fun Group(title: String?, items: () -> List<@Composable (Shape) -> Unit>) {
     }
 }
 
+
+/** A row of a [FadingGroup] that other settings can hide. */
+class GroupRow(val visible: Boolean = true, val content: @Composable (Shape) -> Unit)
+
+/**
+ * A [Group] whose rows can come and go: a hidden row fades out while its place folds away, and
+ * the rows left take the group's rounded ends, so the page below glides instead of jumping.
+ */
+@Composable
+fun FadingGroup(title: String?, rows: () -> List<GroupRow>) {
+    val list = rows()
+    val shown = list.filter { it.visible }
+    Column(Modifier.fillMaxWidth()) {
+        if (title != null) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmallEmphasized,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 20.dp, top = 28.dp, bottom = 10.dp),
+            )
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
+        val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+        val fold = MaterialTheme.motionScheme.defaultEffectsSpec<IntSize>()
+        Column {
+            list.forEachIndexed { i, row ->
+                // A row fading out keeps the shape it had, not one for a place it no longer has.
+                val place = shown.indexOf(row)
+                val last = remember { arrayOf(groupShape(0, 1)) }
+                if (place >= 0) last[0] = groupShape(place, shown.size)
+                val shape = last[0]
+                AnimatedVisibility(
+                    visible = row.visible,
+                    enter = fadeIn(fade) + expandVertically(fold),
+                    exit = fadeOut(fade) + shrinkVertically(fold),
+                ) {
+                    Box(Modifier.padding(top = if (i == 0) 0.dp else 2.dp)) { row.content(shape) }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun ItemContainer(
     shape: Shape,
@@ -150,6 +206,7 @@ fun ItemContainer(
     Column(
         modifier
             .fillMaxWidth()
+            .lively(tilt = 0f, sink = 0.02f, mouseOnly = true)
             .clip(shape)
             .background(color)
     ) { content() }
@@ -187,22 +244,24 @@ fun SettingsHero(
 ) {
     val colors = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
+    val spin = rememberSpin()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
+            .livelyCard(spin)
             .clip(RoundedCornerShape(32.dp))
             .background(colors.primaryContainer)
-            .cornerDecor(MaterialShapes.Flower.toShape(), colors.onPrimaryContainer.copy(alpha = 0.07f), size = 170.dp)
+            .cornerDecor(MaterialShapes.Flower.toShape(), colors.onPrimaryContainer.copy(alpha = 0.07f), size = 170.dp, spin = spin)
             .padding(16.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(76.dp)
+                .spunBackground(MaterialShapes.Cookie12Sided.toShape(), colors.primary, spin)
                 .clip(MaterialShapes.Cookie12Sided.toShape())
-                .background(colors.primary)
                 .then(
                     if (onLogoClick == null) Modifier
                     else Modifier.clickable {
@@ -265,11 +324,13 @@ fun SectionItem(
         SectionTone.Tertiary -> colors.tertiaryContainer to colors.onTertiaryContainer
     }
     val haptics = LocalHapticFeedback.current
+    val spin = rememberSpin()
     ItemContainer(shape, color = if (selected) colors.secondaryContainer else colors.surfaceContainer) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
+                .spinOn(spin)
                 .clickable {
                     haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                     onClick()
@@ -280,8 +341,7 @@ fun SectionItem(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(46.dp)
-                    .clip(iconShape)
-                    .background(iconContainer),
+                    .spunBackground(iconShape, iconContainer, spin),
             ) {
                 Icon(
                     icon,
@@ -536,12 +596,16 @@ fun ColorsItem(
     onSeed: (Int) -> Unit,
     /** What the wallpaper option means here: the phone's wallpaper or the Windows accent colour. */
     wallpaperDescription: String,
+    /** Off while a special theme sets the colours: shown dimmed, untouchable. */
+    enabled: Boolean = true,
 ) {
     val shown = source.takeIf { it in sources } ?: ColorSource.Custom
     // The strength the user asked for; the seed may hold less where the screen can't show more
     // of that hue, and keeps it for hues that can.
     var chroma by remember { mutableFloatStateOf(wantedChroma(seed)) }
     ItemContainer(shape) {
+        // Locked, everything fades but the source choice, which fades itself as a disabled control.
+        val dim = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)
         Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
             Text(
                 when (shown) {
@@ -551,6 +615,7 @@ fun ColorsItem(
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = dim,
             )
             Spacer(Modifier.height(12.dp))
             ConnectedChoice(
@@ -566,8 +631,9 @@ fun ColorsItem(
                 selected = sources.indexOf(shown),
                 onSelect = { i -> onSource(sources[i]) },
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                enabled = enabled,
             )
-            if (shown != ColorSource.Wallpaper) {
+            if (shown != ColorSource.Wallpaper) Column(dim) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(
@@ -578,15 +644,14 @@ fun ColorsItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
-                SwatchRow(selected = seed, onSelect = { s -> chroma = wantedChroma(s); onSeed(s) })
-                Spacer(Modifier.height(16.dp))
                 SliderLabel(stringResource(Res.string.settings_colors_hue))
-                HuePicker(seed = seed, chroma = chroma, onSeed = onSeed)
+                HuePicker(seed = seed, chroma = chroma, onSeed = onSeed, enabled = enabled)
                 Spacer(Modifier.height(4.dp))
                 SliderLabel(stringResource(Res.string.settings_colors_chroma))
                 ChromaPicker(
                     seed = seed,
                     chroma = chroma,
+                    enabled = enabled,
                     onChroma = { c ->
                         chroma = c
                         onSeed(SchemeGenerator.seed(SchemeGenerator.hueOf(seed), c))
@@ -594,10 +659,13 @@ fun ColorsItem(
                 )
             }
             Spacer(Modifier.height(16.dp))
-            PalettePreview()
+            PalettePreview(dim)
         }
     }
 }
+
+/** How faint a locked item looks: Material's disabled content. */
+private const val DISABLED_ALPHA = 0.38f
 
 private fun wantedChroma(seed: Int): Float =
     if (seed == SchemeGenerator.MONOCHROME_SEED) 60f
