@@ -78,7 +78,7 @@ class UserLibraryReadTest {
         val file = File(dir.root, "library.json")
         repeat(5) { i ->
             file.writeText("broken $i")
-            UserLibrary.keepDamaged(file)
+            keepDamagedCopy(file)
             Thread.sleep(5)
         }
         val kept = dir.root.listFiles { f -> f.name.startsWith("library-damaged-") }!!.sortedBy { it.name }

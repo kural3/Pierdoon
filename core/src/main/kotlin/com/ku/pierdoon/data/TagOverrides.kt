@@ -45,16 +45,11 @@ class TagOverrides private constructor(private val file: File) {
     private fun loaded(): MutableMap<Long, TagOverride> = map ?: read().also { map = it }
 
     private fun read(): MutableMap<Long, TagOverride> {
-        val out = HashMap<Long, TagOverride>()
-        if (!recoverAtomicWrite(file)) return out
-        runCatching {
-            val o = JSONObject(file.readText())
-            o.keys().forEach { k ->
-                val t = o.getJSONObject(k)
-                out[k.toLong()] = TagOverride(t.optStringOrNull("title"), t.optStringOrNull("artist"), t.optStringOrNull("album"))
-            }
-        }
-        return out
+        if (!recoverAtomicWrite(file)) return HashMap()
+        val parsed = runCatching { file.readText() }.getOrNull()?.let(::parseTagOverrides)
+        // What couldn't be read would be gone with the next edit: the file as it was is put aside.
+        if (parsed == null || parsed.second) keepDamagedCopy(file)
+        return parsed?.first ?: HashMap()
     }
 
     private fun write(m: Map<Long, TagOverride>) {
@@ -69,9 +64,28 @@ class TagOverrides private constructor(private val file: File) {
         writeAtomically(file, o.toString())
     }
 
-    private fun JSONObject.optStringOrNull(key: String): String? = if (has(key)) getString(key) else null
-
     companion object {
+        /**
+         * The edits a file holds, and whether any had to be skipped; a broken entry costs only
+         * itself. Null when the text isn't such a file at all.
+         */
+        internal fun parseTagOverrides(text: String): Pair<HashMap<Long, TagOverride>, Boolean>? {
+            val o = runCatching { JSONObject(text) }.getOrNull() ?: return null
+            val out = HashMap<Long, TagOverride>()
+            var damaged = false
+            fun JSONObject.text(key: String): String? = opt(key)?.let { it as? String ?: run { damaged = true; null } }
+            o.keys().forEach { k ->
+                val id = k.toLongOrNull()
+                val t = o.opt(k) as? JSONObject
+                if (id == null || t == null) {
+                    damaged = true
+                } else {
+                    out[id] = TagOverride(t.text("title"), t.text("artist"), t.text("album"))
+                }
+            }
+            return out to damaged
+        }
+
         @Volatile private var instance: TagOverrides? = null
 
         /** The one instance, kept in `tag_overrides.json` in [dir]. */

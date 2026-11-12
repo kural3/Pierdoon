@@ -34,3 +34,22 @@ fun recoverAtomicWrite(file: File): Boolean {
     val tmp = File(file.parentFile, file.name + ".tmp")
     return tmp.exists() && tmp.renameTo(file)
 }
+
+/**
+ * For a file that couldn't be read whole: a copy next to it (`name-damaged-<time>.ext`) that no
+ * save touches, made before the next save writes over what was lost. The newest few are kept.
+ */
+fun keepDamagedCopy(file: File) {
+    runCatching {
+        val dir = file.parentFile ?: return
+        val prefix = file.nameWithoutExtension + "-damaged-"
+        val ext = file.extension.takeIf { it.isNotEmpty() }?.let { ".$it" }.orEmpty()
+        file.copyTo(File(dir, "$prefix${System.currentTimeMillis()}$ext"), overwrite = true)
+        dir.listFiles { f -> f.name.startsWith(prefix) }.orEmpty()
+            .sortedByDescending { it.name }
+            .drop(KEEP_DAMAGED)
+            .forEach { it.delete() }
+    }
+}
+
+private const val KEEP_DAMAGED = 3

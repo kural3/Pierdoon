@@ -195,7 +195,7 @@ class UserLibrary private constructor(private val file: File) {
         val parsed = text?.let(::parseUserData)
         // Whatever couldn't be read would be gone with the next save (one played track is
         // enough), so the file as it was is put aside first, for the user or a fix to bring back.
-        if (parsed == null || parsed.damaged) keepDamaged(file)
+        if (parsed == null || parsed.damaged) keepDamagedCopy(file)
         return parsed?.data ?: UserData(loaded = true)
     }
 
@@ -262,21 +262,6 @@ class UserLibrary private constructor(private val file: File) {
             )
             return Parsed(data, damaged)
         }
-
-        /** Copies [file] next to itself under a name no save touches; the newest few are kept. */
-        internal fun keepDamaged(file: File) {
-            runCatching {
-                val dir = file.parentFile ?: return
-                val prefix = file.nameWithoutExtension + "-damaged-"
-                file.copyTo(File(dir, "$prefix${System.currentTimeMillis()}.json"), overwrite = true)
-                dir.listFiles { f -> f.name.startsWith(prefix) }.orEmpty()
-                    .sortedByDescending { it.name }
-                    .drop(KEEP_DAMAGED)
-                    .forEach { it.delete() }
-            }
-        }
-
-        private const val KEEP_DAMAGED = 3
 
         /** The one instance, kept in `library.json` in [dir] (the folder of whoever asks first). */
         fun get(dir: File): UserLibrary = instance ?: synchronized(this) {

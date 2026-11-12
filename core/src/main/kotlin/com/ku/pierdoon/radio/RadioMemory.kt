@@ -1,5 +1,6 @@
 package com.ku.pierdoon.radio
 
+import com.ku.pierdoon.data.keepDamagedCopy
 import com.ku.pierdoon.data.normalizeTag
 import com.ku.pierdoon.data.recoverAtomicWrite
 import com.ku.pierdoon.data.writeAtomically
@@ -17,11 +18,25 @@ class RadioMemory private constructor(private val file: File) {
     private val artistStrikes = LinkedHashMap<String, Int>()
 
     init {
-        if (recoverAtomicWrite(file)) runCatching {
-            val o = JSONObject(file.readText())
-            o.optJSONArray(K_VIDEOS)?.let { a -> repeat(a.length()) { videos += a.getString(it) } }
-            o.optJSONArray(K_SONGS)?.let { a -> repeat(a.length()) { songs += a.getLong(it) } }
-            o.optJSONObject(K_ARTISTS)?.let { a -> a.keys().forEach { k -> artistStrikes[k] = a.optInt(k) } }
+        if (recoverAtomicWrite(file)) {
+            // A broken entry costs only itself; anything skipped would be gone with the next
+            // dislike, so the file as it was is put aside first.
+            var damaged = false
+            val o = runCatching { JSONObject(file.readText()) }.getOrNull()
+            if (o == null) {
+                damaged = true
+            } else {
+                o.optJSONArray(K_VIDEOS)?.let { a ->
+                    repeat(a.length()) { i -> (a.opt(i) as? String)?.let { videos += it } ?: run { damaged = true } }
+                }
+                o.optJSONArray(K_SONGS)?.let { a ->
+                    repeat(a.length()) { i -> (a.opt(i) as? Number)?.let { songs += it.toLong() } ?: run { damaged = true } }
+                }
+                o.optJSONObject(K_ARTISTS)?.let { a ->
+                    a.keys().forEach { k -> (a.opt(k) as? Number)?.let { artistStrikes[k] = it.toInt() } ?: run { damaged = true } }
+                }
+            }
+            if (damaged) keepDamagedCopy(file)
         }
     }
 
