@@ -544,4 +544,7 @@
     <string name="batch_unwritable">%1$d из %2$d файлов не принимают теги — они останутся как есть</string>
     <string name="batch_nothing">Ничего не изменилось</string>
     <string name="batch_progress">%1$d из %2$d</string>
+
+    <string name="settings_normalize">Ровная громкость</string>
+    <string name="settings_normalize_desc">Громкие треки тише, тихие громче. Каждый трек измеряется один раз, в фоне</string>
 </resources>

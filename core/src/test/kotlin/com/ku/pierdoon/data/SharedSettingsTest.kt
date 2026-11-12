@@ -70,6 +70,7 @@ class SharedSettingsTest {
             setOf(
                 "theme", "color_source", "seed_color", "pure_black", "haptics", "smooth_animations", "glass",
                 "progress_style", "nothing_style", "font", "custom_font_file", "custom_font_name", "lyrics_wifi_only", "lyrics_sync_controls", "skip_silence",
+                "normalize_volume",
                 "crossfade_seconds", "playback_speed", "crossfade_albums", "cassette_mode", "radio", "radio_novelty", "radio_buffer", "equalizer",
                 "equalizer_gains", "equalizer_preset", "edit_target", "check_updates", "download_format",
                 "song_sort", "song_sort_desc",

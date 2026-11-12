@@ -97,6 +97,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import com.ku.pierdoon.playback.EvenVolume
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
@@ -191,6 +192,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
             syncState(player)
             if (events.containsAny(*QUEUE_EVENTS)) syncQueue(player)
             eventTick.update { it + 1 }
+        }
+    }
+
+    init {
+        // With even volume on, the whole library gets measured, a track at a time.
+        viewModelScope.launch {
+            combine(SettingsStore.settings.map { it.normalizeVolume }.distinctUntilChanged(), _library) { on, lib -> on to lib }
+                .collect { (on, lib) ->
+                    if (on && lib is LibraryState.Ready) EvenVolume.loudness(getApplication()).scanLibrary(lib.songs)
+                }
         }
     }
 

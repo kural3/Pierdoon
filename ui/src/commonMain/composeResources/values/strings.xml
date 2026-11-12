@@ -524,4 +524,7 @@
     <string name="batch_unwritable">%1$d of %2$d files can't take tags; they stay as they are</string>
     <string name="batch_nothing">Nothing changed</string>
     <string name="batch_progress">%1$d of %2$d</string>
+
+    <string name="settings_normalize">Even volume</string>
+    <string name="settings_normalize_desc">Loud tracks quieter, quiet ones louder. Each track is measured once, in the background</string>
 </resources>

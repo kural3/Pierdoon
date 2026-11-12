@@ -30,7 +30,12 @@ import kotlinx.coroutines.launch
  * - Play and pause asked for by anyone (the app, the notification, headphones) press a key.
  */
 @OptIn(UnstableApi::class)
-class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope) {
+class TapeDeck(
+    private val player: ExoPlayer,
+    /** [player]'s volume: the deck mutes it while it winds. */
+    private val level: PlayerVolume,
+    private val scope: CoroutineScope,
+) {
 
     var tapeMode: Boolean = false
         set(value) {
@@ -91,8 +96,8 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
             when {
                 playWhenReady && spinning && windingFrom == null -> {
                     // Play pressed while a paused tape moves: it starts once the deck is done, silent till then.
-                    windingFrom = player.volume
-                    player.volume = 0f
+                    windingFrom = level.fade
+                    level.fade = 0f
                 }
                 playWhenReady -> finish()
                 reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM -> {
@@ -222,8 +227,8 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
 
     private fun muteWhilePlaying() {
         if (!player.playWhenReady) return
-        windingFrom = player.volume
-        player.volume = 0f
+        windingFrom = level.fade
+        level.fade = 0f
     }
 
     private fun run(sound: ShortArray, motion: TapeMotion, done: () -> Unit) {
@@ -263,7 +268,7 @@ class TapeDeck(private val player: ExoPlayer, private val scope: CoroutineScope)
                 volume != null -> player.seekTo(0)
             }
         }
-        volume?.let { player.volume = it }
+        volume?.let { level.fade = it }
         // A muted track may have run out and paused itself meanwhile: playing on takes the next one.
         if (playOn && player.playbackState != Player.STATE_IDLE && !player.playWhenReady) {
             playingOn = true

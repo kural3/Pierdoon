@@ -51,6 +51,8 @@ interface SharedSettings {
     /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
     val lyricsSyncControls: Boolean
     val skipSilence: Boolean
+    /** Loud tracks turned down and quiet ones up, toward one loudness (EBU R128). */
+    val normalizeVolume: Boolean
     /** Seconds one track fades into the next; 0 for none. */
     val crossfadeSeconds: Int
     /** Playback speed, pitch following it; one of [PlaybackSpeed.options]. */
@@ -99,6 +101,7 @@ data class CommonSettings(
     override val lyricsWifiOnly: Boolean = false,
     override val lyricsSyncControls: Boolean = false,
     override val skipSilence: Boolean = false,
+    override val normalizeVolume: Boolean = false,
     override val crossfadeSeconds: Int = 0,
     override val playbackSpeed: Float = 1f,
     override val crossfadeAlbums: Boolean = false,
@@ -133,6 +136,7 @@ data class CommonSettings(
         putBoolean(K_WIFI, lyricsWifiOnly)
         putBoolean(K_SYNC_CONTROLS, lyricsSyncControls)
         putBoolean(K_SILENCE, skipSilence)
+        putBoolean(K_NORMALIZE, normalizeVolume)
         putInt(K_CROSSFADE, crossfadeSeconds)
         putFloat(K_SPEED, playbackSpeed)
         putBoolean(K_CROSSFADE_ALBUMS, crossfadeAlbums)
@@ -172,6 +176,7 @@ data class CommonSettings(
                 lyricsWifiOnly = getBoolean(K_WIFI, d.lyricsWifiOnly),
                 lyricsSyncControls = getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
                 skipSilence = getBoolean(K_SILENCE, d.skipSilence),
+                normalizeVolume = getBoolean(K_NORMALIZE, d.normalizeVolume),
                 crossfadeSeconds = getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
                 playbackSpeed = PlaybackSpeed.nearest(getFloat(K_SPEED, d.playbackSpeed)),
                 crossfadeAlbums = getBoolean(K_CROSSFADE_ALBUMS, d.crossfadeAlbums),
@@ -212,6 +217,7 @@ data class CommonSettings(
         private const val K_WIFI = "lyrics_wifi_only"
         private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
         private const val K_SILENCE = "skip_silence"
+        private const val K_NORMALIZE = "normalize_volume"
         private const val K_CROSSFADE = "crossfade_seconds"
         private const val K_SPEED = "playback_speed"
         private const val K_CROSSFADE_ALBUMS = "crossfade_albums"

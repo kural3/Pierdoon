@@ -67,6 +67,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -166,6 +168,11 @@ class MainViewModel : TrackEditor {
                 scanDownloads()
                 rescanAfterDownload()
             }
+        }
+        // With even volume on, the whole library gets measured, a track at a time.
+        viewModelScope.launch {
+            combine(SettingsStore.settings.map { it.normalizeVolume }.distinctUntilChanged(), _library) { on, lib -> on to lib }
+                .collect { (on, lib) -> if (on && lib is LibraryState.Ready) PlaybackController.loudness.scanLibrary(lib.songs) }
         }
     }
 

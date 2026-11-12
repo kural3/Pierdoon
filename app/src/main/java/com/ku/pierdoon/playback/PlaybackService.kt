@@ -101,11 +101,17 @@ class PlaybackService : MediaLibraryService() {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
 
+        val volume = PlayerVolume(player)
+        val loudness = EvenVolume.loudness(this)
+
         // History lives here, not in the UI: tracks that play with the app closed count too.
         val library = UserLibrary.get(this.filesDir)
         val history = PlayHistory.get(this)
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // Each track at its own level, and the ones coming up measured in time.
+                volume.apply()
+                if (EvenVolume.enabled) measureAhead(player, loudness)
                 // Radio tracks not kept aren't in the library: nothing to remember them by.
                 mediaItem?.mediaId?.toLongOrNull()?.takeUnless { RadioTrack.isRadio(it) }?.let(library::recordPlayed)
             }
@@ -141,11 +147,11 @@ class PlaybackService : MediaLibraryService() {
         carLibrary = CarLibrary(this)
         widget = PlayerWidget.Updater(this, player, scope).also { it.start() }
 
-        val fader = Crossfader(this, player, scope).also { crossfader = it }
+        val fader = Crossfader(this, player, volume, scope).also { crossfader = it }
         fader.start()
         exoPlayer = player
         Radio.attach(this, player)
-        val cassette = TapeDeck(player, scope).also { tapeDeck = it }
+        val cassette = TapeDeck(player, volume, scope).also { tapeDeck = it }
         cassette.start()
         scope.launch {
             // No tape on the radio: an endless queue has no sides to turn or rewind.
@@ -182,6 +188,16 @@ class PlaybackService : MediaLibraryService() {
         }
 
         scope.launch {
+            SettingsStore.settings.map { it.normalizeVolume }.distinctUntilChanged().collect { on ->
+                EvenVolume.enabled = on
+                fader.applyLevels()
+                if (on) measureAhead(player, loudness) else loudness.stop()
+            }
+        }
+        // A track measured while it plays goes to its level there and then.
+        scope.launch { loudness.measured.collect { fader.applyLevels() } }
+
+        scope.launch {
             SleepTimer.state.collectLatest { timer ->
                 cassette.stopAtEnd = timer == SleepTimerState.EndOfTrack
                 if (timer !is SleepTimerState.At) return@collectLatest
@@ -190,14 +206,14 @@ class PlaybackService : MediaLibraryService() {
                 val steps = 20
                 try {
                     for (i in steps downTo 1) {
-                        player.volume = i / steps.toFloat()
+                        volume.fade = i / steps.toFloat()
                         delay(SLEEP_FADE_MS / steps)
                     }
                     cassette.cancel()
                     player.pause()
                     SleepTimer.fired()
                 } finally {
-                    player.volume = 1f
+                    volume.fade = 1f
                 }
             }
         }
@@ -502,6 +518,19 @@ class PlaybackService : MediaLibraryService() {
             { it ?: throw UnsupportedOperationException("Nothing to resume") },
             MoreExecutors.directExecutor(),
         )
+    }
+
+
+    /** The playing track and the two after it, measured ahead of the rest of the library. */
+    private fun measureAhead(player: Player, loudness: Loudness) {
+        var i = player.currentMediaItemIndex
+        val ids = ArrayList<Long>()
+        repeat(3) {
+            if (i == C.INDEX_UNSET || i >= player.mediaItemCount) return@repeat
+            player.getMediaItemAt(i).mediaId.toLongOrNull()?.takeUnless { RadioTrack.isRadio(it) }?.let(ids::add)
+            i = player.currentTimeline.getNextWindowIndex(i, Player.REPEAT_MODE_OFF, player.shuffleModeEnabled)
+        }
+        loudness.prioritize(ids.map { Song(it, "", "", "", 0L, 0L) })
     }
 
     private companion object {

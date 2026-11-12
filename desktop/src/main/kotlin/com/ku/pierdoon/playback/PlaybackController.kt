@@ -37,6 +37,10 @@ object PlaybackController {
     private var restoring = true
     private var started = false
 
+    /** How loud each track is, for the even-volume setting; measured in the background. */
+    val loudness = Loudness(java.io.File(AppDirs.cache, "loudness.json"), scope) { LoudnessScan.measure(it.file) }
+    private var normalizing = false
+
     private val _outputUnavailable = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     /** Playback stopped for want of an audio output; the UI says so. */
     val outputUnavailable: SharedFlow<Unit> = _outputUnavailable.asSharedFlow()
@@ -63,6 +67,7 @@ object PlaybackController {
                 }
             }
             if (events.any { it in QUEUE_EVENTS }) scheduleSave()
+            if (normalizing && Player.Event.Transition in events) measureAhead()
             syncMediaControls()
         }
         player.onOutputUnavailable = { _outputUnavailable.tryEmit(Unit) }
@@ -94,6 +99,15 @@ object PlaybackController {
         }
 
         scope.launch {
+            SettingsStore.settings.map { it.normalizeVolume }.distinctUntilChanged().collect { on ->
+                normalizing = on
+                // Radio tracks aren't in the library, nor measured: they play as they are.
+                player.trackGain = if (on) { file -> loudness.gain(Song.idFor(file)) } else { _ -> 1f }
+                if (on) measureAhead() else loudness.stop()
+            }
+        }
+
+        scope.launch {
             // No tape on the radio: an endless queue has no sides to turn or rewind.
             combine(SettingsStore.settings.map { it.cassetteMode }, Radio.state.map { it != null }) { tape, radio -> tape && !radio }
                 .distinctUntilChanged()
@@ -116,6 +130,12 @@ object PlaybackController {
                 onStop = { player.pause() },
             )
         }
+    }
+
+    /** The playing track and the next couple are measured before the rest of the library. */
+    private fun measureAhead() {
+        val i = player.currentMediaItemIndex.takeIf { it >= 0 } ?: return
+        loudness.prioritize((i..i + 2).mapNotNull { n -> if (n < player.mediaItemCount) player.getMediaItemAt(n).song else null })
     }
 
     /**

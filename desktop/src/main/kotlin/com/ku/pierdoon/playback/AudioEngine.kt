@@ -77,6 +77,8 @@ class AudioEngine(private val listener: Listener) {
     private val lock = Any()
 
     @Volatile var volume: Float = 1f
+    /** Each track's own level on top of [volume] (the even-volume setting); asked as it plays. */
+    @Volatile var trackGain: (File) -> Float = { 1f }
     @Volatile var skipSilence: Boolean = false
     /** How long the end of a track and the start of the next overlap; 0 for none. */
     @Volatile var crossfadeMs: Long = 0
@@ -112,6 +114,8 @@ class AudioEngine(private val listener: Listener) {
     @Volatile private var framesWritten = 0L
     /** The rest of a decoded frame whose writing a command interrupted; written before decoding on. */
     private var leftover: ShortBuffer? = null
+    /** The track's own level for [leftover]: 1 when it's from a mix, which has it in already. */
+    private var leftoverTrackGain = 1f
     private var playing = false
     private var pendingMark = true
     private var silentFrames = 0L
@@ -340,11 +344,14 @@ class AudioEngine(private val listener: Listener) {
         val count = out.remaining()
         val mixed = ShortArray(count)
         val start = out.position()
+        // Each track at its own level, then faded.
+        val levelOut = decoderFile?.let(trackGain) ?: 1f
+        val levelIn = incomingNext?.file?.let(trackGain) ?: 1f
         var i = 0
         while (i < count) {
             val t = ((fadeDone + i / CHANNELS).toDouble() / fadeFrames).coerceIn(0.0, 1.0)
-            val gainOut = cos(t * PI / 2)
-            val gainIn = sin(t * PI / 2)
+            val gainOut = cos(t * PI / 2) * levelOut
+            val gainIn = sin(t * PI / 2) * levelIn
             for (c in 0 until CHANNELS) {
                 if (i + c >= count) break
                 val a = out.get(start + i + c)
@@ -378,6 +385,7 @@ class AudioEngine(private val listener: Listener) {
         decoderFile = incomingNext?.file
         // Decoded already but not mixed in yet: it goes out first.
         leftover = incomingRest?.takeIf { it.hasRemaining() }
+        leftoverTrackGain = decoderFile?.let(trackGain) ?: 1f
         incoming = null
         incomingRest = null
         incomingNext = null
@@ -404,7 +412,9 @@ class AudioEngine(private val listener: Listener) {
         val samples = buffer.remaining()
         if (samples == 0) return 0
         val frames = samples / CHANNELS
-        val gain = volume.let { it * it * it }
+        // Mid-fade the mix carries each track's level itself.
+        val level = if (incoming != null) 1f else decoderFile?.let(trackGain) ?: 1f
+        val gain = volume.let { it * it * it } * level
 
         // Mid-fade the old track's quiet tail is part of the mix, not something to skip.
         if (skipSilence && incoming == null) {
@@ -440,6 +450,7 @@ class AudioEngine(private val listener: Listener) {
             return frames
         }
         // A view of its own: the grabber's buffer keeps its position for the next grab.
+        leftoverTrackGain = level
         writeSamples(l, if (incoming != null) mixIncoming(buffer.duplicate()) else buffer.duplicate(), gain, chunk)
         trimMarks()
         announceIfHeard()
@@ -478,7 +489,7 @@ class AudioEngine(private val listener: Listener) {
 
     private fun writeLeftover(rest: ShortBuffer, chunk: ByteArray) {
         val l = line ?: run { leftover = null; return }
-        writeSamples(l, rest, volume.let { it * it * it }, chunk)
+        writeSamples(l, rest, volume.let { it * it * it } * leftoverTrackGain, chunk)
         trimMarks()
         announceIfHeard()
     }

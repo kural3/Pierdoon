@@ -103,6 +103,11 @@ class Player {
         get() = engine.volume
         set(value) { engine.volume = value.coerceIn(0f, 1f) }
 
+    /** Each file's own level on top of [volume]; 1 for all with the even-volume setting off. */
+    var trackGain: (java.io.File) -> Float
+        get() = engine.trackGain
+        set(value) { engine.trackGain = value }
+
     var skipSilenceEnabled: Boolean
         get() = engine.skipSilence
         set(value) { engine.skipSilence = value }

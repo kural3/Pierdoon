@@ -59,6 +59,15 @@ fun LazyListScope.playbackSection(
                         onChange = { v -> onUpdate { copy(skipSilence = v) } },
                     )
                 },
+                { shape ->
+                    SwitchItem(
+                        shape = shape,
+                        title = stringResource(Res.string.settings_normalize),
+                        subtitle = stringResource(Res.string.settings_normalize_desc),
+                        checked = settings.normalizeVolume,
+                        onChange = { v -> onUpdate { copy(normalizeVolume = v) } },
+                    )
+                },
             )
         }
     }

@@ -30,7 +30,13 @@ import kotlin.math.sin
  * [player], for which this is an ordinary skip to the next track.
  */
 @OptIn(UnstableApi::class)
-class Crossfader(private val context: Context, private val player: ExoPlayer, private val scope: CoroutineScope) {
+class Crossfader(
+    private val context: Context,
+    private val player: ExoPlayer,
+    /** [player]'s volume; the fades set their share of it. */
+    private val volume: PlayerVolume,
+    private val scope: CoroutineScope,
+) {
 
     /** How long the fade lasts; 0 for none. */
     var fadeMs: Long = 0
@@ -45,6 +51,7 @@ class Crossfader(private val context: Context, private val player: ExoPlayer, pr
         }
 
     private var tail: ExoPlayer? = null
+    private var tailVolume: PlayerVolume? = null
     /** The item [tail] holds and where in it it starts; null with nothing prepared. */
     private var prepared: Prepared? = null
     private var fade: Job? = null
@@ -146,7 +153,7 @@ class Crossfader(private val context: Context, private val player: ExoPlayer, pr
         val item = player.currentMediaItem ?: return
         val t = tail ?: newTail().also { tail = it }
         t.setMediaItem(item, startMs)
-        t.volume = 1f
+        tailVolume?.fade = 1f
         // The old track goes on at the speed it was playing at.
         t.playbackParameters = player.playbackParameters
         t.playWhenReady = false
@@ -159,7 +166,7 @@ class Crossfader(private val context: Context, private val player: ExoPlayer, pr
         prepared = null
         handedOver = false
         fade = scope.launch {
-            t.volume = 0f
+            tailVolume?.fade = 0f
             val inStep = getInStep(t)
             while (inStep && player.currentPosition < p.startMs) delay(FINE_TICK_MS)
             val from = t.currentPosition
@@ -171,8 +178,8 @@ class Crossfader(private val context: Context, private val player: ExoPlayer, pr
                 return@launch
             }
             handedOver = true
-            t.volume = 1f
-            player.volume = 0f
+            tailVolume?.fade = 1f
+            volume.fade = 0f
             switching = true
             try {
                 player.seekToNextMediaItem()
@@ -183,13 +190,13 @@ class Crossfader(private val context: Context, private val player: ExoPlayer, pr
             while (isActive && t.playbackState != Player.STATE_ENDED && t.playbackState != Player.STATE_IDLE) {
                 val f = ((t.currentPosition - from).toDouble() / lengthMs).coerceIn(0.0, 1.0)
                 // Equal power: the overlap is as loud as either track alone.
-                player.volume = sin(f * PI / 2).toFloat()
-                t.volume = cos(f * PI / 2).toFloat()
+                volume.fade = sin(f * PI / 2).toFloat()
+                tailVolume?.fade = cos(f * PI / 2).toFloat()
                 if (f >= 1.0) break
                 delay(FADE_STEP_MS)
             }
             fade = null
-            player.volume = 1f
+            volume.fade = 1f
             dropTail()
         }
     }
@@ -221,7 +228,7 @@ class Crossfader(private val context: Context, private val player: ExoPlayer, pr
         val running = fade ?: return
         fade = null
         running.cancel()
-        player.volume = 1f
+        volume.fade = 1f
     }
 
     /** Lets go of the tail's file and decoder; the player itself is kept for the next fade. */
@@ -246,7 +253,16 @@ class Crossfader(private val context: Context, private val player: ExoPlayer, pr
                 /* handleAudioFocus = */ false,
             )
             .build()
-            .also { it.skipSilenceEnabled = skipSilence }
+            .also {
+                it.skipSilenceEnabled = skipSilence
+                tailVolume = PlayerVolume(it)
+            }
+    }
+
+    /** Both players at their tracks' levels again (even volume turned on or off, a track measured). */
+    fun applyLevels() {
+        volume.apply()
+        tailVolume?.apply()
     }
 
     private companion object {
