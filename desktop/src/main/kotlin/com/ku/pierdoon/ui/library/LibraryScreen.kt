@@ -4,12 +4,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -20,18 +18,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
 import com.ku.pierdoon.ui.components.ExpressiveIconButton
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -50,9 +44,6 @@ import com.ku.pierdoon.data.MusicCollections
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.SongSort
 import com.ku.pierdoon.data.TrackView
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import com.ku.pierdoon.data.sortSongs
-import androidx.compose.runtime.LaunchedEffect
 import com.ku.pierdoon.ui.components.ConnectedChoice
 import com.ku.pierdoon.ui.components.FrameRateBoost
 import com.ku.pierdoon.ui.components.PlayerIcons
@@ -84,39 +75,19 @@ fun LibraryScreen(
 ) {
     val haptics = LocalHapticFeedback.current
     var section by rememberSaveable { mutableIntStateOf(0) }
-    val sorted = remember(songs, sort, sortDescending) { sortSongs(songs, sort, sortDescending) }
-    val selection = rememberSongSelection()
-    SelectionBackHandler(selection)
-    // The selection belongs to the track list; other sections and a changed library end it.
-    LaunchedEffect(section) { if (section != 0) selection.clear() }
+    val tracks = rememberLibraryTracks(songs, sort, sortDescending, section)
+    val sorted = tracks.sorted
+    val selection = tracks.selection
+    val songsListState = tracks.listState
     val sectionState = rememberSaveableStateHolder()
-    val songsListState = rememberLazyListState()
-    val songsGridState = rememberLazyGridState()
-    // A new order starts from the top; the list would otherwise hold on to the row that was first.
-    var shownSort by rememberSaveable { mutableStateOf(sort to sortDescending) }
-    LaunchedEffect(sort, sortDescending) {
-        if (shownSort != sort to sortDescending) {
-            shownSort = sort to sortDescending
-            songsListState.scrollToItem(0)
-            songsGridState.scrollToItem(0)
-        }
-    }
-    val fabExpanded by remember { derivedStateOf {
-        songsListState.firstVisibleItemIndex == 0 && songsGridState.firstVisibleItemIndex == 0
-    } }
+    val songsGridState = tracks.gridState
 
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val spatialF = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val effects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     val effectsSize = MaterialTheme.motionScheme.fastSpatialSpec<IntSize>()
 
-    val sortLabels = listOf(
-        SongSort.Title to Res.string.sort_title,
-        SongSort.Artist to Res.string.sort_artist,
-        SongSort.Album to Res.string.sort_album,
-        SongSort.DateAdded to Res.string.sort_date_added,
-        SongSort.Duration to Res.string.sort_duration,
-    ).map { (s, res) -> s to stringResource(res) }
+    val sortLabels = songSortLabels()
     val selectLabel = stringResource(Res.string.select)
     val descendingLabel = stringResource(Res.string.sort_descending)
     val viewLabels = listOf(
@@ -225,7 +196,7 @@ fun LibraryScreen(
                             haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                             onShuffleAll()
                         },
-                        expanded = fabExpanded,
+                        expanded = tracks.atTop,
                     )
                 }
                 AnimatedVisibility(
