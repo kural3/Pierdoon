@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.remote
 
+import androidx.compose.foundation.layout.offset
 import android.text.format.DateUtils
 import com.ku.pierdoon.ui.settings.SwitchItem
 import com.ku.pierdoon.ui.settings.ActionItem
@@ -11,10 +12,10 @@ import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.pluralStringResource
-import com.ku.pierdoon.ui.components.MenuAction
+import com.ku.pierdoon.ui.library.MenuEntry
 import com.ku.pierdoon.ui.components.ChoiceChip
 import com.ku.pierdoon.ui.components.ConnectedChoice
-import com.ku.pierdoon.ui.components.AppMenu
+import com.ku.pierdoon.ui.library.EntryMenu
 import com.ku.pierdoon.remote.PcDownload
 import com.ku.pierdoon.data.download.findUrl
 import com.ku.pierdoon.data.download.SearchSource
@@ -525,12 +526,12 @@ private fun RemoteScreen(
         actions = {
             Box {
                 IconButton(onClick = { menu = true }) { Icon(PlayerIcons.More, contentDescription = null) }
-                AppMenu(
+                EntryMenu(
                     expanded = menu,
                     onDismiss = { menu = false },
                     groups = listOf(
                         listOf(
-                            MenuAction(
+                            MenuEntry(
                                 label = stringResource(Res.string.pc_forget),
                                 icon = PlayerIcons.LinkOff,
                                 destructive = true,
@@ -1033,33 +1034,32 @@ private fun LazyListScope.songItems(songs: List<PcSong>, currentId: Long?, prefi
                 onLongClick = { menu = true },
             )
             // Under the title, not the cover: the menu is about this one track.
-            Box(Modifier.align(Alignment.BottomStart).padding(start = 88.dp)) {
-                AppMenu(
+            Box(Modifier.align(Alignment.BottomStart).padding(start = 88.dp).offset(y = (-4).dp)) {
+                EntryMenu(
                     expanded = menu,
                     onDismiss = { menu = false },
                     groups = listOf(
                         listOf(
-                            MenuAction(song.title, PlayerIcons.Play, supporting = song.artist.ifBlank { null }) {
+                            MenuEntry(song.title, PlayerIcons.Play, supporting = song.artist.ifBlank { null }) {
                                 PcRemote.playSongs(ids, i)
                             },
                         ),
                         listOf(
-                            MenuAction(stringResource(Res.string.play_next), PlayerIcons.PlayNext) {
+                            MenuEntry(stringResource(Res.string.play_next), PlayerIcons.PlayNext) {
                                 PcRemote.playNext(listOf(song.id))
                             },
-                            MenuAction(stringResource(Res.string.add_to_queue), PlayerIcons.Queue) {
+                            MenuEntry(stringResource(Res.string.add_to_queue), PlayerIcons.Queue) {
                                 PcRemote.addToQueue(listOf(song.id))
                             },
                         ),
                         listOfNotNull(
                             onSave?.let { save ->
-                                MenuAction(stringResource(Res.string.transfer_save_to_phone), PlayerIcons.Smartphone) {
+                                MenuEntry(stringResource(Res.string.transfer_save_to_phone), PlayerIcons.Smartphone) {
                                     save(listOf(song))
                                 }
                             },
                         ),
                     ).filter { it.isNotEmpty() },
-                    offset = DpOffset(0.dp, (-4).dp),
                 )
             }
         }

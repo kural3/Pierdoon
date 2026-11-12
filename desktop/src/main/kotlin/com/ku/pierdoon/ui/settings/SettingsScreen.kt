@@ -13,10 +13,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Icon
@@ -24,13 +22,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,51 +35,25 @@ import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.BuildConfig
 import com.ku.pierdoon.radio.RadioMemory
 import com.ku.pierdoon.platform.AppDirs
-import com.ku.pierdoon.data.AppFont
 import com.ku.pierdoon.data.AppLanguage
 import com.ku.pierdoon.data.AppSettings
 import com.ku.pierdoon.data.ColorSource
-import com.ku.pierdoon.data.ProgressStyle
-import com.ku.pierdoon.data.CustomFonts
 import com.ku.pierdoon.data.NAV_MAX_WIDTH
 import com.ku.pierdoon.data.NAV_MIN_WIDTH
 import com.ku.pierdoon.data.SettingsStore
-import com.ku.pierdoon.data.ThemeMode
-import com.ku.pierdoon.data.download.DownloadFormat
 import com.ku.pierdoon.data.download.Downloader
-import com.ku.pierdoon.data.download.EngineUpdate
 import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.playback.AudioEngine
 import com.ku.pierdoon.playback.DiscordPresence
-import com.ku.pierdoon.playback.EqPreset
 import com.ku.pierdoon.ui.components.PlayerIcons
 import com.ku.pierdoon.ui.desktop.Files
 import com.ku.pierdoon.ui.desktop.Toast
-import com.ku.pierdoon.ui.desktop.formatFileSize
-import com.ku.pierdoon.ui.library.CONTENT_MAX_WIDTH
 import com.ku.pierdoon.ui.library.AppScaffold
 import com.ku.pierdoon.ui.library.listBottomPadding
 import com.ku.pierdoon.ui.resources.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
-
-/** The headings the sections are listed under. */
-enum class SectionGroup(val title: StringResource) {
-    Music(Res.string.settings_group_music),
-    Sound(Res.string.settings_group_sound),
-    App(Res.string.settings_group_app),
-}
-
-/** A page of settings, opened from the list on the Settings tab, in the order they're listed. */
-enum class SettingsSection(val group: SectionGroup) {
-    Library(SectionGroup.Music), Lyrics(SectionGroup.Music), Downloads(SectionGroup.Music),
-    Playback(SectionGroup.Sound), Equalizer(SectionGroup.Sound),
-    Appearance(SectionGroup.App), System(SectionGroup.App), Backup(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App), About(SectionGroup.App),
-}
 
 private typealias Update = ((AppSettings) -> AppSettings) -> Unit
 
@@ -132,20 +99,31 @@ fun SettingsScreen(
 
     // One page's items, whichever layout holds them.
     val page: LazyListScope.(SettingsSection) -> Unit = { s ->
+        // Pages both apps have change only the settings both have.
+        val shared: SharedUpdate = { change -> onUpdate { it.shared(change) } }
         when (s) {
-            SettingsSection.Appearance -> appearance(settings, onUpdate)
+            SettingsSection.Appearance -> appearanceSection(
+                settings = settings,
+                onUpdate = shared,
+                // "Wallpaper" here is Windows' accent colour.
+                colorSources = ColorSource.entries,
+                fontsDir = SettingsStore.fontsDir,
+                styleRows = listOf(floatingNavRow(settings, onUpdate)),
+                languageRow = languageRow(settings, onUpdate),
+            )
+            SettingsSection.Sync -> error("not on this platform")
             SettingsSection.System -> system(settings, onUpdate)
-            SettingsSection.Playback -> playback(settings, onUpdate)
-            SettingsSection.Equalizer -> equalizer(settings, onUpdate)
-            SettingsSection.Lyrics -> lyrics(settings, onUpdate, lyricsCacheSize, onClearLyricsCache)
+            SettingsSection.Playback -> playbackSection(settings, shared, before = listOf(outputDeviceRow(settings, onUpdate)))
+            SettingsSection.Equalizer -> equalizerSection(settings, shared)
+            SettingsSection.Lyrics -> lyricsSection(settings, shared, lyricsCacheSize, onClearLyricsCache)
             SettingsSection.Library -> {
                 library(settings, trackCount, onRescan, onAddFolder, onRemoveFolder, onExcludeFolder, onUnexcludeFolder)
                 duplicatesItem(onFindDuplicates)
             }
             SettingsSection.Backup -> backupItems(onExportBackup, onImportBackup)
             SettingsSection.Downloads -> downloads(settings, onUpdate, onDownloadFolder)
-            SettingsSection.Updates -> updates(settings, onUpdate, updateState, updateStatus, onCheckUpdates, onShowUpdate)
-            SettingsSection.Beta -> beta(settings, onUpdate)
+            SettingsSection.Updates -> updatesSection(settings, shared, updateState, updateStatus, onCheckUpdates, onShowUpdate)
+            SettingsSection.Beta -> betaSection(settings, shared, onForgetDislikes = { RadioMemory.get(AppDirs.files).clear() })
             SettingsSection.About -> item(key = "about") { AboutContent(version) }
         }
     }
@@ -153,7 +131,7 @@ fun SettingsScreen(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         if (maxWidth >= TWO_PANE_WIDTH) {
             // Wide: the sections stay listed on the left and the one picked opens beside them.
-            var picked by remember(section) { mutableStateOf(section ?: SettingsSection.entries.first()) }
+            var picked by remember(section) { mutableStateOf(section ?: SettingsSection.computer.first()) }
             AppScaffold(
                 title = stringResource(Res.string.nav_settings),
                 onBack = null,
@@ -201,6 +179,7 @@ private val SECTION_LIST_WIDTH = 400.dp
 
 private fun SettingsSection.title(): StringResource = when (this) {
     SettingsSection.Appearance -> Res.string.settings_appearance
+    SettingsSection.Sync -> error("not on this platform")
     SettingsSection.System -> Res.string.settings_system
     SettingsSection.Backup -> Res.string.settings_backup
     SettingsSection.Playback -> Res.string.settings_playback
@@ -215,6 +194,7 @@ private fun SettingsSection.title(): StringResource = when (this) {
 
 private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Appearance -> PlayerIcons.Palette
+    SettingsSection.Sync -> error("not on this platform")
     SettingsSection.System -> PlayerIcons.Desktop
     SettingsSection.Backup -> PlayerIcons.Restore
     SettingsSection.Playback -> PlayerIcons.Play
@@ -246,7 +226,7 @@ private fun LazyListScope.sectionList(
     }
     for (group in SectionGroup.entries) item(key = "sections_${group.name}") {
         Group(stringResource(group.title)) {
-            SettingsSection.entries.filter { it.group == group }.map { s ->
+            SettingsSection.computer.filter { it.group == group }.map { s ->
                 { shape ->
                     SectionItem(
                         shape = shape,
@@ -254,6 +234,7 @@ private fun LazyListScope.sectionList(
                         title = stringResource(s.title()),
                         summary = when (s) {
                             SettingsSection.Appearance -> stringResource(Res.string.settings_appearance_summary)
+                            SettingsSection.Sync -> error("not on this platform")
                             SettingsSection.System -> stringResource(Res.string.settings_system_summary)
                             SettingsSection.Backup -> stringResource(Res.string.settings_backup_summary)
                             SettingsSection.Playback -> playbackSummary(settings)
@@ -272,176 +253,11 @@ private fun LazyListScope.sectionList(
                         selected = s == selected,
                         chevron = selected == null,
                         tone = sectionTone(group.ordinal),
-                        iconShape = sectionIconShape(s.ordinal),
+                        iconShape = sectionIconShape(s.iconIndex),
                     )
                 }
             }
         }
-    }
-}
-
-private fun LazyListScope.appearance(settings: AppSettings, onUpdate: Update) {
-    item(key = "theme") {
-        FadingGroup(stringResource(Res.string.settings_theme)) {
-            buildList<GroupRow> {
-                add(GroupRow { shape ->
-                    ChoiceRowItem(
-                        shape = shape,
-                        options = listOf(
-                            stringResource(Res.string.theme_system),
-                            stringResource(Res.string.theme_light),
-                            stringResource(Res.string.theme_dark),
-                        ),
-                        selected = settings.theme.ordinal,
-                        onSelect = { i -> onUpdate { it.shared { copy(theme = ThemeMode.entries[i]) } } },
-                    )
-                })
-                // The Nothing style brings its own palette.
-                add(GroupRow(visible = !settings.nothingStyle) { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_black),
-                        subtitle = stringResource(Res.string.settings_black_desc),
-                        checked = settings.pureBlack,
-                        onChange = { v -> onUpdate { it.shared { copy(pureBlack = v) } } },
-                    )
-                })
-            }
-        }
-    }
-    item(key = "colors") {
-        Group(stringResource(Res.string.settings_colors)) {
-            buildList<@Composable (Shape) -> Unit> {
-                // A special theme brings its own colours; the picker stays, locked, until it's off.
-                add { shape ->
-                    ColorsItem(
-                        shape = shape,
-                        // "Wallpaper" here is Windows' accent colour.
-                        sources = ColorSource.entries,
-                        source = settings.colorSource,
-                        seed = settings.seedColor,
-                        onSource = { s -> onUpdate { it.shared { copy(colorSource = s) } } },
-                        onSeed = { seed -> onUpdate { it.shared { copy(seedColor = seed) } } },
-                        wallpaperDescription = stringResource(Res.string.settings_colors_wallpaper_desc),
-                        enabled = !settings.nothingStyle,
-                    )
-                }
-                add { shape ->
-                    DropdownItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_special),
-                        options = listOf(false, true),
-                        selected = settings.nothingStyle,
-                        label = { on -> stringResource(if (on) Res.string.special_nothing else Res.string.special_none) },
-                        onSelect = { on -> onUpdate { it.shared { copy(nothingStyle = on) } } },
-                    )
-                }
-            }
-        }
-    }
-    item(key = "style") {
-        FadingGroup(stringResource(Res.string.settings_style)) {
-            buildList<GroupRow> {
-                // The Nothing style has no glass and its own dotted progress bar.
-                add(GroupRow(visible = !settings.nothingStyle) { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_glass),
-                        subtitle = stringResource(Res.string.settings_glass_desc),
-                        checked = settings.glass,
-                        onChange = { v -> onUpdate { it.shared { copy(glass = v) } } },
-                    )
-                })
-                add(GroupRow(visible = !settings.nothingStyle) { shape ->
-                    ChoiceRowItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_progress_style),
-                        options = listOf(
-                            stringResource(Res.string.progress_wavy),
-                            stringResource(Res.string.progress_line),
-                            stringResource(Res.string.progress_dots),
-                            stringResource(Res.string.progress_thick),
-                        ),
-                        selected = settings.progressStyle.ordinal,
-                        onSelect = { i -> onUpdate { it.shared { copy(progressStyle = ProgressStyle.entries[i]) } } },
-                    )
-                })
-                add(GroupRow { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_floating_nav),
-                        subtitle = stringResource(Res.string.settings_floating_nav_desc),
-                        checked = settings.navWidth <= NAV_MIN_WIDTH,
-                        onChange = { v -> onUpdate { it.copy(navWidth = if (v) NAV_MIN_WIDTH else NAV_MAX_WIDTH) } },
-                    )
-                })
-            }
-        }
-    }
-    item(key = "text") {
-        val pickFont = rememberFontPicker(onUpdate)
-        Group(stringResource(Res.string.settings_text)) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    FontItem(
-                        shape = shape,
-                        font = settings.font,
-                        customFontPath = settings.customFontPath,
-                        customFontName = settings.customFontName,
-                        onSelect = { f -> onUpdate { it.shared { copy(font = f) } } },
-                        onPickFile = pickFont,
-                    )
-                },
-                { shape ->
-                    DropdownItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_language),
-                        options = AppLanguage.entries,
-                        selected = settings.language,
-                        label = { languageLabel(it) },
-                        onSelect = { l -> onUpdate { it.copy(language = l) } },
-                    )
-                },
-            )
-        }
-    }
-}
-
-/**
- * Opens the Windows file dialog for a font; the file is copied into the app's data and becomes
- * the font. Anything that turns out not to be a font is turned away with a message.
- */
-@Composable
-private fun rememberFontPicker(onUpdate: Update): () -> Unit {
-    val scope = rememberCoroutineScope()
-    val title = stringResource(Res.string.font_custom_title)
-    val failed = stringResource(Res.string.font_custom_failed)
-    return {
-        Files.pickFont(title)?.let { file ->
-            scope.launch {
-                val imported = withContext(Dispatchers.IO) {
-                    runCatching { CustomFonts.import(file.inputStream(), file.name, SettingsStore.fontsDir) }.getOrNull()
-                }
-                if (imported == null) {
-                    Toast.show(failed)
-                } else {
-                    onUpdate { it.shared { copy(font = AppFont.Custom, customFontFile = imported.file, customFontName = imported.name) } }
-                }
-            }
-        }
-    }
-}
-
-private fun LazyListScope.beta(settings: AppSettings, onUpdate: Update) {
-    item(key = "beta") {
-        BetaGroups(
-            settings = settings,
-            onRadio = { on -> onUpdate { it.shared { copy(radioEnabled = on) } } },
-            onNovelty = { n -> onUpdate { it.shared { copy(radioNovelty = n) } } },
-            onBuffer = { n -> onUpdate { it.shared { copy(radioBuffer = n) } } },
-            onForgetDislikes = { RadioMemory.get(AppDirs.files).clear() },
-            onCassette = { v -> onUpdate { it.shared { copy(cassetteMode = v) } } },
-        )
     }
 }
 
@@ -468,137 +284,6 @@ private fun LazyListScope.system(settings: AppSettings, onUpdate: Update) {
                     )
                 }
             }
-        }
-    }
-}
-
-private fun LazyListScope.playback(settings: AppSettings, onUpdate: Update) {
-    item(key = "sound") {
-        // Listing the outputs asks every sound driver; once per visit is plenty.
-        val devices = remember { AudioEngine.outputDevices() }
-        val default = stringResource(Res.string.output_default)
-        Group(stringResource(Res.string.settings_sound)) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    DropdownItem(
-                        shape = shape,
-                        title = stringResource(Res.string.output_device),
-                        options = listOf<String?>(null) + devices,
-                        // A device that was unplugged plays through the default one.
-                        selected = settings.outputDevice?.takeIf { it in devices },
-                        label = { it ?: default },
-                        onSelect = { name -> onUpdate { it.copy(outputDevice = name) } },
-                    )
-                },
-                { shape -> SpeedItem(shape, settings.playbackSpeed) { v -> onUpdate { it.shared { copy(playbackSpeed = v) } } } },
-                { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_silence),
-                        subtitle = stringResource(Res.string.settings_silence_desc),
-                        checked = settings.skipSilence,
-                        onChange = { v -> onUpdate { it.shared { copy(skipSilence = v) } } },
-                    )
-                },
-            )
-        }
-    }
-    item(key = "transitions") {
-        Group(stringResource(Res.string.settings_transitions)) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    CrossfadeItem(shape, settings.crossfadeSeconds) { s -> onUpdate { it.shared { copy(crossfadeSeconds = s) } } }
-                },
-                { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_crossfade_albums),
-                        subtitle = stringResource(Res.string.settings_crossfade_albums_desc),
-                        checked = settings.crossfadeAlbums,
-                        enabled = settings.crossfadeSeconds > 0,
-                        onChange = { v -> onUpdate { it.shared { copy(crossfadeAlbums = v) } } },
-                    )
-                },
-            )
-        }
-    }
-}
-
-private fun LazyListScope.equalizer(settings: AppSettings, onUpdate: Update) {
-    item(key = "equalizer") {
-        Group(null) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_equalizer),
-                        subtitle = stringResource(Res.string.settings_equalizer_desc),
-                        checked = settings.eqEnabled,
-                        onChange = { v -> onUpdate { it.shared { copy(eqEnabled = v) } } },
-                    )
-                },
-                { shape ->
-                    EqualizerItem(
-                        shape = shape,
-                        enabled = settings.eqEnabled,
-                        preset = settings.eqPreset,
-                        gains = settings.eqGains,
-                        onPreset = { p -> onUpdate { it.shared { copy(eqPreset = p, eqGains = p.gains ?: eqGains) } } },
-                        onBand = { band, db ->
-                            onUpdate {
-                                it.shared { copy(eqGains = eqGains.toMutableList().also { g -> g[band] = db }, eqPreset = EqPreset.Custom) }
-                            }
-                        },
-                    )
-                },
-            )
-        }
-    }
-}
-
-private fun LazyListScope.lyrics(
-    settings: AppSettings,
-    onUpdate: Update,
-    lyricsCacheSize: suspend () -> Long,
-    onClearLyricsCache: () -> Unit,
-) {
-    item(key = "lyrics") {
-        var cacheRefresh by remember { mutableIntStateOf(0) }
-        val cacheBytes by produceState(0L, cacheRefresh) { value = lyricsCacheSize() }
-        val cleared = stringResource(Res.string.settings_cache_cleared)
-        Group(null) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_wifi_only),
-                        subtitle = stringResource(Res.string.settings_wifi_only_desc),
-                        checked = settings.lyricsWifiOnly,
-                        onChange = { v -> onUpdate { it.shared { copy(lyricsWifiOnly = v) } } },
-                    )
-                },
-                { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_sync_controls),
-                        subtitle = stringResource(Res.string.settings_sync_controls_desc),
-                        checked = settings.lyricsSyncControls,
-                        onChange = { v -> onUpdate { it.shared { copy(lyricsSyncControls = v) } } },
-                    )
-                },
-                { shape ->
-                    ActionItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_clear_cache),
-                        subtitle = stringResource(Res.string.settings_cache_size, formatFileSize(cacheBytes)),
-                        onClick = {
-                            onClearLyricsCache()
-                            cacheRefresh++
-                            Toast.show(cleared)
-                        },
-                    )
-                },
-            )
         }
     }
 }
@@ -734,51 +419,7 @@ private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update, onD
             }
         }
     }
-    item(key = "download_format") {
-        Group(stringResource(Res.string.download_format)) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    ChoiceRowItem(
-                        shape = shape,
-                        options = listOf(
-                            stringResource(Res.string.download_format_m4a),
-                            stringResource(Res.string.download_format_opus),
-                        ),
-                        selected = settings.downloadFormat.ordinal,
-                        onSelect = { i -> onUpdate { it.shared { copy(downloadFormat = DownloadFormat.entries[i]) } } },
-                        description = stringResource(
-                            if (settings.downloadFormat == DownloadFormat.M4a) Res.string.download_format_m4a_desc
-                            else Res.string.download_format_opus_desc
-                        ),
-                    )
-                },
-            )
-        }
-    }
-    item(key = "download_engine") {
-        LaunchedEffect(Unit) { Downloader.warmUp() }
-        val version by Downloader.engineVersion.collectAsState()
-        val engineUpdate by Downloader.engineUpdate.collectAsState()
-        Group(null) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    ActionItem(
-                        shape = shape,
-                        title = stringResource(Res.string.download_engine_update),
-                        subtitle = when (engineUpdate) {
-                            EngineUpdate.Idle -> version?.let { stringResource(Res.string.download_engine, it) }
-                                ?: stringResource(Res.string.download_engine_unknown)
-                            EngineUpdate.Running -> stringResource(Res.string.download_engine_updating)
-                            EngineUpdate.Updated -> stringResource(Res.string.download_engine_updated)
-                            EngineUpdate.UpToDate -> stringResource(Res.string.download_engine_latest)
-                            EngineUpdate.Failed -> stringResource(Res.string.download_engine_failed)
-                        },
-                        onClick = { if (engineUpdate != EngineUpdate.Running) Downloader.updateEngine() },
-                    )
-                },
-            )
-        }
-    }
+    downloadFormatAndEngine(settings, { change -> onUpdate { it.shared(change) } }, Downloader)
     item(key = "youtube_cookies") {
         Group(stringResource(Res.string.youtube_group)) {
             listOf<@Composable (Shape) -> Unit>({ shape ->
@@ -806,41 +447,41 @@ private fun LazyListScope.downloads(settings: AppSettings, onUpdate: Update, onD
     downloadLog(Downloader.log.entries, Downloader.log::clear)
 }
 
-private fun LazyListScope.updates(
-    settings: AppSettings,
-    onUpdate: Update,
-    updateState: UpdateState,
-    updateStatus: String,
-    onCheckUpdates: () -> Unit,
-    onShowUpdate: () -> Unit,
-) {
-    item(key = "updates") {
-        Group(null) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
-                    SwitchItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_updates_auto),
-                        subtitle = stringResource(Res.string.settings_updates_auto_desc),
-                        checked = settings.checkUpdates,
-                        onChange = { v -> onUpdate { it.shared { copy(checkUpdates = v) } } },
-                    )
-                },
-                { shape ->
-                    ActionItem(
-                        shape = shape,
-                        title = stringResource(Res.string.settings_check_updates),
-                        subtitle = updateStatus,
-                        onClick = {
-                            when (updateState) {
-                                UpdateState.Idle, UpdateState.UpToDate, UpdateState.CheckFailed -> onCheckUpdates()
-                                UpdateState.Checking -> Unit
-                                else -> onShowUpdate()
-                            }
-                        },
-                    )
-                },
-            )
-        }
-    }
+/** Which sound card plays; "the system's default" unless one is picked. */
+private fun outputDeviceRow(settings: AppSettings, onUpdate: Update): @Composable (Shape) -> Unit = { shape ->
+    // Listing the outputs asks every sound driver; once per visit is plenty.
+    val devices = remember { AudioEngine.outputDevices() }
+    val default = stringResource(Res.string.output_default)
+    DropdownItem(
+        shape = shape,
+        title = stringResource(Res.string.output_device),
+        options = listOf<String?>(null) + devices,
+        // A device that was unplugged plays through the default one.
+        selected = settings.outputDevice?.takeIf { it in devices },
+        label = { it ?: default },
+        onSelect = { name -> onUpdate { it.copy(outputDevice = name) } },
+    )
+}
+
+/** Icons only, or icons with their names: the rail's width, also dragged by its edge. */
+private fun floatingNavRow(settings: AppSettings, onUpdate: Update) = GroupRow { shape ->
+    SwitchItem(
+        shape = shape,
+        title = stringResource(Res.string.settings_floating_nav),
+        subtitle = stringResource(Res.string.settings_floating_nav_desc),
+        checked = settings.navWidth <= NAV_MIN_WIDTH,
+        onChange = { v -> onUpdate { it.copy(navWidth = if (v) NAV_MIN_WIDTH else NAV_MAX_WIDTH) } },
+    )
+}
+
+/** The interface language, kept by the app itself on Windows. */
+private fun languageRow(settings: AppSettings, onUpdate: Update): @Composable (Shape) -> Unit = { shape ->
+    DropdownItem(
+        shape = shape,
+        title = stringResource(Res.string.settings_language),
+        options = AppLanguage.entries,
+        selected = settings.language,
+        label = { languageLabel(it) },
+        onSelect = { l -> onUpdate { it.copy(language = l) } },
+    )
 }

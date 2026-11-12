@@ -191,29 +191,12 @@ class UserLibrary private constructor(private val file: File) {
 
     private fun read(): UserData {
         if (!recoverAtomicWrite(file)) return UserData(loaded = true)
-        return runCatching {
-            val o = JSONObject(file.readText())
-            val playlists = o.optJSONArray("playlists")?.let { arr ->
-                List(arr.length()) { i ->
-                    val p = arr.getJSONObject(i)
-                    Playlist(
-                        id = p.getLong("id"),
-                        name = p.getString("name"),
-                        songIds = p.getJSONArray("songs").toLongList(),
-                        shape = p.optString("shape").takeIf { it.isNotEmpty() },
-                    )
-                }
-            }.orEmpty()
-            UserData(
-                loaded = true,
-                playlists = playlists,
-                favorites = o.optJSONArray("favorites")?.toLongList().orEmpty().toSet(),
-                recent = o.optJSONArray("recent")?.toLongList().orEmpty(),
-                smartPlaylists = o.optJSONArray("smart")?.let { arr ->
-                    List(arr.length()) { arr.getJSONObject(it) }.mapNotNull(SmartPlaylist::fromJson)
-                }.orEmpty(),
-            )
-        }.getOrElse { UserData(loaded = true) }
+        val text = runCatching { file.readText() }.getOrNull()
+        val parsed = text?.let(::parseUserData)
+        // Whatever couldn't be read would be gone with the next save (one played track is
+        // enough), so the file as it was is put aside first, for the user or a fix to bring back.
+        if (parsed == null || parsed.damaged) keepDamaged(file)
+        return parsed?.data ?: UserData(loaded = true)
     }
 
     private fun write(d: UserData) {
@@ -233,10 +216,67 @@ class UserLibrary private constructor(private val file: File) {
         writeAtomically(file, o.toString())
     }
 
-    private fun JSONArray.toLongList(): List<Long> = List(length()) { getLong(it) }
-
     companion object {
         @Volatile private var instance: UserLibrary? = null
+
+        /** What a library file holds, and whether any of it had to be skipped. */
+        internal class Parsed(val data: UserData, val damaged: Boolean)
+
+        /**
+         * Reads a library file. A broken playlist or id is skipped rather than costing
+         * everything else; null when the text isn't a library at all.
+         */
+        internal fun parseUserData(text: String): Parsed? {
+            val o = runCatching { JSONObject(text) }.getOrNull() ?: return null
+            var damaged = false
+            fun JSONArray.longs(): List<Long> = (0 until length()).mapNotNull { i ->
+                val v = opt(i)
+                (v as? Number)?.toLong() ?: (v as? String)?.toLongOrNull() ?: run { damaged = true; null }
+            }
+            fun <T> JSONObject.items(key: String, item: (JSONObject) -> T?): List<T> {
+                val arr = opt(key) ?: return emptyList()
+                if (arr !is JSONArray) { damaged = true; return emptyList() }
+                return (0 until arr.length()).mapNotNull { i ->
+                    (arr.opt(i) as? JSONObject)?.let { runCatching { item(it) }.getOrNull() } ?: run { damaged = true; null }
+                }
+            }
+            fun JSONObject.ids(key: String): List<Long> {
+                val arr = opt(key) ?: return emptyList()
+                if (arr !is JSONArray) { damaged = true; return emptyList() }
+                return arr.longs()
+            }
+            val data = UserData(
+                loaded = true,
+                playlists = o.items("playlists") { p ->
+                    Playlist(
+                        id = p.getLong("id"),
+                        name = p.getString("name"),
+                        // Kept, empty, if its tracks can't be read; the file is put aside with them.
+                        songIds = p.optJSONArray("songs")?.longs() ?: run { damaged = true; emptyList() },
+                        shape = p.optString("shape").takeIf { it.isNotEmpty() },
+                    )
+                },
+                favorites = o.ids("favorites").toSet(),
+                recent = o.ids("recent"),
+                smartPlaylists = o.items("smart", SmartPlaylist::fromJson),
+            )
+            return Parsed(data, damaged)
+        }
+
+        /** Copies [file] next to itself under a name no save touches; the newest few are kept. */
+        internal fun keepDamaged(file: File) {
+            runCatching {
+                val dir = file.parentFile ?: return
+                val prefix = file.nameWithoutExtension + "-damaged-"
+                file.copyTo(File(dir, "$prefix${System.currentTimeMillis()}.json"), overwrite = true)
+                dir.listFiles { f -> f.name.startsWith(prefix) }.orEmpty()
+                    .sortedByDescending { it.name }
+                    .drop(KEEP_DAMAGED)
+                    .forEach { it.delete() }
+            }
+        }
+
+        private const val KEEP_DAMAGED = 3
 
         /** The one instance, kept in `library.json` in [dir] (the folder of whoever asks first). */
         fun get(dir: File): UserLibrary = instance ?: synchronized(this) {

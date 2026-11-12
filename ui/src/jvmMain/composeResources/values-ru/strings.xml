@@ -15,7 +15,7 @@
     <string name="settings_wifi_only_desc">Только тексты, уже сохранённые на компьютере</string>
     <string name="settings_rescan_desc">Найти новые аудиофайлы в папках</string>
     <string name="empty_playlist">Плейлист пуст. Нажмите на трек правой кнопкой, чтобы добавить его сюда.</string>
-    <string name="delete_from_device">Удалить с устройства</string>
+    <string name="delete_from_device">Удалить с компьютера</string>
     <string name="download_unsupported_os">Загрузчик недоступен</string>
     <string name="cover_gallery">Выбрать файл</string>
     <string name="search_hint">Нажмите на результат, чтобы подставить теги и обложку</string>

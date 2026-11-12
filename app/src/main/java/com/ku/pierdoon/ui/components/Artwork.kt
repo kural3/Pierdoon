@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.components
 
+import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.ALBUM_ART_URI
 import androidx.compose.ui.draw.blur
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -304,7 +305,7 @@ private val Vibrant = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturat
 
 /** Full-bleed frosted album art. A static image: zero per-frame cost once drawn. */
 @Composable
-fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
+private fun FrostedArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
     LocalRemoteCovers.current?.let { covers ->
         // A small copy, blurred by the GPU: the phone has no file to pre-blur.
         return RemoteImage(covers(songId, REMOTE_SMALL_PX), modifier.blur(48.dp), maxPx = REMOTE_SMALL_PX)
@@ -348,4 +349,29 @@ object PhoneArtwork : ArtworkLoader {
     @Composable
     override fun FileArtwork(file: File, version: Long, modifier: Modifier, large: Boolean, placeholderIconSize: Dp) =
         PictureFileArtwork(file, version, modifier, large, placeholderIconSize)
+
+    @Composable
+    override fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier) = FrostedArtwork(songId, albumId, modifier)
+
+    @Composable
+    override fun hasArt(songId: Long, albumId: Long): Boolean {
+        val context = LocalContext.current.applicationContext
+        val cover = CoverStore.songVersion(songId)
+        val revision = ArtworkCache.albumRevision(albumId)
+        return produceState(false, songId, albumId, cover, revision) {
+            value = ArtworkCache.load(context, songId, albumId, large = false) != null
+        }.value
+    }
+
+    override suspend fun remotePicture(url: String, maxPx: Int): ImageBitmap? {
+        val bytes = MetadataSearch.download(url) ?: return null
+        return withContext(Dispatchers.Default) {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= maxPx) sample *= 2
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+                ?.asImageBitmap()
+        }
+    }
 }

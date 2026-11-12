@@ -1,5 +1,6 @@
 package com.ku.pierdoon.data.download
 
+import com.ku.pierdoon.data.init
 import com.ku.pierdoon.data.DEFAULT_SAVE_FOLDER
 import android.content.ContentUris
 import android.content.ContentValues
@@ -56,55 +57,6 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import kotlin.coroutines.coroutineContext
 
-enum class FailReason { Unsupported, Unavailable, Bot, Drm, NoAudio, Network, Save, Other }
-
-sealed interface DownloadStatus {
-    data object Queued : DownloadStatus
-
-    /** Starting yt-dlp and reading the page. */
-    data object Preparing : DownloadStatus
-
-    /** [progress] 0..1, or null while unknown. */
-    data class Downloading(val progress: Float?) : DownloadStatus
-
-    /** Tags, cover and the copy into the music folder. */
-    data object Saving : DownloadStatus
-
-    data class Done(val songId: Long) : DownloadStatus
-    data class Failed(val reason: FailReason, val detail: String?) : DownloadStatus
-}
-
-@Immutable
-data class DownloadTask(
-    val id: Long,
-    val url: String,
-    val format: DownloadFormat,
-    val title: String? = null,
-    val artist: String? = null,
-    val status: DownloadStatus = DownloadStatus.Queued,
-    /** Set on the tracks of a playlist or album link; they end up in a Pier.doon playlist together. */
-    val group: DownloadGroup? = null,
-) {
-    val active: Boolean get() = status !is DownloadStatus.Done && status !is DownloadStatus.Failed
-}
-
-@Immutable
-data class DownloadGroup(val id: Long, val name: String)
-
-enum class SearchSource(internal val prefix: String) { YouTube("ytsearch"), SoundCloud("scsearch") }
-
-/** One search result: enough to recognise the track, and the link to download it. */
-@Immutable
-data class SearchHit(val url: String, val title: String, val artist: String, val durationSec: Int?, val thumbnail: String?)
-
-sealed interface EngineUpdate {
-    data object Idle : EngineUpdate
-    data object Running : EngineUpdate
-    data object UpToDate : EngineUpdate
-    data object Updated : EngineUpdate
-    data object Failed : EngineUpdate
-}
-
 /**
  * Downloads audio from YouTube, SoundCloud, Bandcamp and the many other sites yt-dlp knows,
  * one link at a time, into Music/Pier.doon, where the library picks it up like any other file.
@@ -113,9 +65,9 @@ sealed interface EngineUpdate {
  * itself from GitHub at most once a day, without waiting for a new Pier.doon release.
  * A foreground [DownloadService] keeps the process alive while anything is in the queue.
  */
-object Downloader {
+object Downloader : DownloadQueue {
     /** MediaStore's RELATIVE_PATH and IS_PENDING arrived in Android 10. */
-    val supported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+    override val supported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
     private lateinit var app: Context
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -154,13 +106,13 @@ object Downloader {
     val log: DownloadLog by lazy { DownloadLog(File(app.filesDir, "download-log.json")) }
 
     private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
-    val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
+    override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
 
     private val _engineVersion = MutableStateFlow<String?>(null)
-    val engineVersion: StateFlow<String?> = _engineVersion.asStateFlow()
+    override val engineVersion: StateFlow<String?> = _engineVersion.asStateFlow()
 
     private val _engineUpdate = MutableStateFlow<EngineUpdate>(EngineUpdate.Idle)
-    val engineUpdate: StateFlow<EngineUpdate> = _engineUpdate.asStateFlow()
+    override val engineUpdate: StateFlow<EngineUpdate> = _engineUpdate.asStateFlow()
 
     /** Set by a link shared into the app; the UI opens the downloads page and clears it. */
     val openRequest = MutableStateFlow(false)
@@ -178,11 +130,11 @@ object Downloader {
     }
 
     /** Unpacks Python and yt-dlp ahead of time (a few seconds, once per install) so a download starts quicker. */
-    fun warmUp() {
+    override fun warmUp() {
         if (supported) scope.launch { runCatching { ensureEngine(update = false) } }
     }
 
-    fun enqueue(url: String, format: DownloadFormat, title: String? = null, artist: String? = null) {
+    override fun enqueue(url: String, format: DownloadFormat, title: String?, artist: String?) {
         if (!supported) return
         val task = synchronized(this) { DownloadTask(nextId++, url.trim(), format, title, artist) }
         _tasks.update { it + task }
@@ -191,7 +143,7 @@ object Downloader {
     }
 
     /** Stops [id] if it's running and takes it off the list. */
-    fun remove(id: Long) {
+    override fun remove(id: Long) {
         val group = _tasks.value.firstOrNull { it.id == id }?.group
         _tasks.update { list -> list.filterNot { it.id == id } }
         synchronized(this) { running?.takeIf { it.first == id }?.second?.cancel() }
@@ -203,7 +155,7 @@ object Downloader {
      * Up to [SEARCH_RESULTS] tracks for [query]. Throws when yt-dlp can't reach the site.
      * SoundCloud's 30-second previews of paid tracks are left out: that's all a download would get.
      */
-    suspend fun search(query: String, source: SearchSource): List<SearchHit> = withContext(Dispatchers.IO) {
+    override suspend fun search(query: String, source: SearchSource): List<SearchHit> = withContext(Dispatchers.IO) {
         ensureEngine(update = true)
         val request = YoutubeDLRequest("${source.prefix}$SEARCH_RESULTS:${query.trim()}").apply {
             addOption("--flat-playlist")
@@ -220,7 +172,7 @@ object Downloader {
         }
     }
 
-    fun retry(id: Long) {
+    override fun retry(id: Long) {
         _tasks.update { list ->
             list.map { if (it.id == id && it.status is DownloadStatus.Failed) it.copy(status = DownloadStatus.Queued) else it }
         }
@@ -228,9 +180,9 @@ object Downloader {
         wake.trySend(Unit)
     }
 
-    fun clearFinished() = _tasks.update { list -> list.filter { it.active } }
+    override fun clearFinished() = _tasks.update { list -> list.filter { it.active } }
 
-    fun updateEngine() {
+    override fun updateEngine() {
         if (!supported || _engineUpdate.value == EngineUpdate.Running) return
         scope.launch {
             _engineUpdate.value = EngineUpdate.Running

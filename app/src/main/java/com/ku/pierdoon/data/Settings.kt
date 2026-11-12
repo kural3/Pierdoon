@@ -68,6 +68,7 @@ object SettingsStore {
             excludedFolders = p.getStringSet(K_EXCLUDED, null)?.toSet() ?: d.excludedFolders,
             albumGrid = AlbumGrid.entries.firstOrNull { it.name == p.getString(K_ALBUM_GRID, null) } ?: d.albumGrid,
         )
+        SharedSettingsStore.attach(settings) { change -> update { it.shared(change) } }
     }
 
     fun update(transform: (AppSettings) -> AppSettings) {

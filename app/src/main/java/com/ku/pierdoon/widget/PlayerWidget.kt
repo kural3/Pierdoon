@@ -1,5 +1,6 @@
 package com.ku.pierdoon.widget
 
+import com.ku.pierdoon.data.init
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider

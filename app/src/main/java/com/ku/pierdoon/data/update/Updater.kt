@@ -42,7 +42,7 @@ import java.net.URL
  * Process-wide like [com.ku.pierdoon.data.SettingsStore]: the install result arrives in a
  * receiver, outside any screen.
  */
-object Updater {
+object Updater : AppUpdater {
     private const val RELEASES = "https://api.github.com/repos/kural3/Pierdoon/releases?per_page=30"
     private const val CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
     private const val K_LAST_CHECK = "last_check"
@@ -54,7 +54,7 @@ object Updater {
     private var download: Job? = null
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
-    val state: StateFlow<UpdateState> = _state.asStateFlow()
+    override val state: StateFlow<UpdateState> = _state.asStateFlow()
 
     const val currentVersion: String = BuildConfig.VERSION_NAME
 
@@ -65,15 +65,15 @@ object Updater {
         prefs = app.getSharedPreferences("updates", Context.MODE_PRIVATE)
     }
 
-    fun isDue(): Boolean = System.currentTimeMillis() - prefs.getLong(K_LAST_CHECK, 0L) >= CHECK_INTERVAL_MS
+    override fun isDue(): Boolean = System.currentTimeMillis() - prefs.getLong(K_LAST_CHECK, 0L) >= CHECK_INTERVAL_MS
 
-    fun isSkipped(release: AppRelease): Boolean = prefs.getString(K_SKIPPED, null) == release.version
+    override fun isSkipped(release: AppRelease): Boolean = prefs.getString(K_SKIPPED, null) == release.version
 
     /** "Later" on a release: the automatic check stays quiet about it; a manual one still shows it. */
-    fun skip(release: AppRelease) = prefs.edit { putString(K_SKIPPED, release.version) }
+    override fun skip(release: AppRelease) = prefs.edit { putString(K_SKIPPED, release.version) }
 
     /** Asks GitHub for the latest release. Never interrupts a download or install under way. */
-    suspend fun check(): UpdateState {
+    override suspend fun check(): UpdateState {
         when (_state.value) {
             is UpdateState.Downloading, is UpdateState.Installing, UpdateState.Checking -> return _state.value
             else -> Unit
@@ -98,7 +98,7 @@ object Updater {
     }
 
     /** Downloads [release] and opens the system install prompt. */
-    fun install(release: AppRelease) {
+    override fun install(release: AppRelease) {
         if (download?.isActive == true) return
         download = scope.launch {
             _state.value = UpdateState.Downloading(release, null)
@@ -118,7 +118,7 @@ object Updater {
         }
     }
 
-    fun cancel() {
+    override fun cancel() {
         download?.cancel()
     }
 

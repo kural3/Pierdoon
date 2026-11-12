@@ -88,7 +88,7 @@ class DownloadService : Service() {
             .apply {
                 when (val s = active.firstOrNull()?.status) {
                     is DownloadStatus.Downloading ->
-                        if (s.progress != null) setProgress(100, (s.progress * 100).toInt(), false) else setProgress(0, 0, true)
+                        s.progress?.let { setProgress(100, (it * 100).toInt(), false) } ?: setProgress(0, 0, true)
                     else -> setProgress(0, 0, true)
                 }
             }

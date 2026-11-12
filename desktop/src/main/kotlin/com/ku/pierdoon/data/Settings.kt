@@ -105,6 +105,7 @@ object SettingsStore {
             cookiesBrowser = enumOr(p.getString(K_COOKIES, null), d.cookiesBrowser),
             trackView = enumOr(p.getString(K_TRACK_VIEW, null), d.trackView),
         )
+        SharedSettingsStore.attach(settings) { change -> update { it.shared(change) } }
     }
 
     @Synchronized

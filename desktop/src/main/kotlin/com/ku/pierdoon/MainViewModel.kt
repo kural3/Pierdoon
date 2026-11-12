@@ -1,6 +1,11 @@
 package com.ku.pierdoon
 
-import androidx.compose.runtime.Immutable
+import com.ku.pierdoon.data.lyrics.LyricsRepository
+import com.ku.pierdoon.data.lyrics.LyricsOffsets
+import com.ku.pierdoon.ui.components.PickedImage
+import com.ku.pierdoon.ui.edit.TrackEditor
+import kotlinx.coroutines.flow.Flow
+import com.ku.pierdoon.data.metadata.MetadataCandidate
 import com.ku.pierdoon.data.USER_AGENT
 import com.ku.pierdoon.data.Backup
 import com.ku.pierdoon.data.LibraryChanges
@@ -26,11 +31,7 @@ import com.ku.pierdoon.data.UserData
 import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.data.lyrics.Lyrics
-import com.ku.pierdoon.data.lyrics.LyricsOffsets
 import com.ku.pierdoon.data.lyrics.LyricsCandidate
-import com.ku.pierdoon.data.lyrics.LyricsQuery
-import com.ku.pierdoon.data.lyrics.LyricsRepository
-import com.ku.pierdoon.data.lyrics.NetworkNotAllowedException
 import com.ku.pierdoon.data.metadata.CoverEdit
 import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.TagWriter
@@ -56,10 +57,8 @@ import com.ku.pierdoon.playback.nextRepeatMode
 import com.ku.pierdoon.ui.components.ArtworkCache
 import java.awt.Desktop
 import java.io.File
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -67,12 +66,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -87,7 +82,7 @@ sealed interface LibraryState {
 }
 
 /** The app's state and actions, shared by every screen. One per process, like the window. */
-class MainViewModel {
+class MainViewModel : TrackEditor {
 
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val repository = MusicRepository()
@@ -125,86 +120,35 @@ class MainViewModel {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PositionSnapshot())
 
-    private val lyricsRepository = LyricsRepository(AppDirs.cache, USER_AGENT, AppDirs.files)
-    private val lyricsVisible = MutableStateFlow(false)
-    private val lyricsRetry = MutableStateFlow(0)
     private var songsById: Map<Long, Song> = emptyMap()
 
-    /** Fetched lazily: only while the lyrics panel is open, once per track. */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val lyrics: StateFlow<LyricsState> = combine(
-        _player.map { it.nowPlaying }.distinctUntilChanged { a, b -> a?.songId == b?.songId },
-        lyricsVisible,
-        lyricsRetry,
-    ) { np, visible, _ -> if (visible) np else null }
-        .flatMapLatest { np ->
-            if (np == null) return@flatMapLatest flowOf<LyricsState>(LyricsState.Idle)
-            flow<LyricsState> {
-                lyricsRepository.peek(np.songId)?.let { emit(LyricsState.Ready(it, lyricsRepository.isOwn(np.songId))); return@flow }
-                emit(LyricsState.Loading)
-                val song = songsById[np.songId]
-                val query = LyricsQuery(
-                    songId = np.songId,
-                    title = song?.title ?: np.title,
-                    artist = song?.artist ?: np.artist,
-                    album = song?.album.orEmpty(),
-                    durationMs = song?.durationMs ?: _player.value.durationMs,
-                )
-                emit(
-                    try {
-                        LyricsState.Ready(
-                            lyricsRepository.get(query, allowNetwork = networkAllowed()),
-                            lyricsRepository.isOwn(np.songId),
-                        )
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: NetworkNotAllowedException) {
-                        LyricsState.WifiOnly
-                    } catch (_: Exception) {
-                        LyricsState.Error
-                    }
-                )
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LyricsState.Idle)
+    private val lyricsModel = LyricsModel(
+        scope = viewModelScope,
+        repository = LyricsRepository(AppDirs.cache, USER_AGENT, AppDirs.files),
+        offsets = LyricsOffsets(),
+        nowPlaying = _player.map { it.nowPlaying },
+        current = { _player.value.let { it.nowPlaying to it.durationMs } },
+        song = { songsById[it] },
+        networkAllowed = ::networkAllowed,
+        stopTimeoutMs = STOP_TIMEOUT_MS,
+    )
 
-    private val lyricsOffsets = LyricsOffsets()
+    /** Fetched lazily: only while the lyrics panel is open, once per track. */
+    val lyrics: StateFlow<LyricsState> get() = lyricsModel.lyrics
 
     /** Hand-set sync correction of the current track's lyrics; positive = lines show later. */
-    val lyricsOffset: StateFlow<Long> = combine(
-        _player.map { it.nowPlaying?.songId }.distinctUntilChanged(),
-        lyricsOffsets.version,
-    ) { id, _ -> id?.let(lyricsOffsets::get) ?: 0L }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0L)
+    val lyricsOffset: StateFlow<Long> get() = lyricsModel.offset
+
+    fun shiftLyrics(deltaMs: Long) = lyricsModel.shift(deltaMs)
+    fun resetLyricsOffset() = lyricsModel.resetOffset()
 
     /** Lyrics of any track, not only the one on screen; for the phone. Null if unknown or failed. */
-    suspend fun lyricsFor(songId: Long): Lyrics? {
-        lyricsRepository.peek(songId)?.let { return it }
-        val song = songsById[songId] ?: return null
-        return try {
-            lyricsRepository.get(
-                LyricsQuery(song.id, song.title, song.artist, song.album, song.durationMs),
-                allowNetwork = networkAllowed(),
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            null
-        }
-    }
+    suspend fun lyricsFor(songId: Long): Lyrics? = lyricsModel.lyricsFor(songId)
 
-    fun lyricsOffsetFor(songId: Long): Long = lyricsOffsets.get(songId)
+    fun lyricsOffsetFor(songId: Long): Long = lyricsModel.offsetFor(songId)
 
     /** Changes whenever any track's lyrics offset does. */
-    val lyricsOffsetsVersion: StateFlow<Int> get() = lyricsOffsets.version
-
-    fun shiftLyrics(deltaMs: Long) {
-        _player.value.nowPlaying?.let { lyricsOffsets.shift(it.songId, deltaMs) }
-    }
-
-    fun resetLyricsOffset() {
-        _player.value.nowPlaying?.let { lyricsOffsets.set(it.songId, 0L) }
-    }
+    val lyricsOffsetsVersion: StateFlow<Int> get() = lyricsModel.offsetsVersion
 
     private val listener = Player.Listener { p, events ->
         syncState(p)
@@ -241,38 +185,16 @@ class MainViewModel {
         }
     }
 
-    val update: StateFlow<UpdateState> = Updater.state
-    private val _updatePrompt = MutableStateFlow(false)
+    // Quietly on launch, unless switched off.
+    private val updates = UpdatePrompt(viewModelScope, Updater, autoCheck = SettingsStore.settings.value.checkUpdates)
+    val update: StateFlow<UpdateState> get() = updates.state
     /** Whether the "new version" dialog is up. */
-    val updatePrompt: StateFlow<Boolean> = _updatePrompt.asStateFlow()
+    val updatePrompt: StateFlow<Boolean> get() = updates.shown
 
-    init {
-        // Quietly on launch; a release the user put off with "Later" isn't offered again.
-        if (SettingsStore.settings.value.checkUpdates && Updater.isDue()) {
-            viewModelScope.launch {
-                val s = Updater.check()
-                if (s is UpdateState.Available && !Updater.isSkipped(s.release)) _updatePrompt.value = true
-            }
-        }
-    }
-
-    fun checkForUpdates() {
-        viewModelScope.launch {
-            if (Updater.check() is UpdateState.Available) _updatePrompt.value = true
-        }
-    }
-
-    fun showUpdate() { _updatePrompt.value = true }
-    fun installUpdate(release: AppRelease) = Updater.install(release)
-
-    fun dismissUpdate() {
-        when (val s = Updater.state.value) {
-            is UpdateState.Downloading -> Updater.cancel()
-            is UpdateState.Available -> Updater.skip(s.release)
-            else -> Unit
-        }
-        _updatePrompt.value = false
-    }
+    fun checkForUpdates() = updates.check()
+    fun showUpdate() = updates.show()
+    fun installUpdate(release: AppRelease) = updates.install(release)
+    fun dismissUpdate() = updates.dismiss()
 
     private var loadJob: Job? = null
     private var lastLoadAt = 0L
@@ -559,49 +481,29 @@ class MainViewModel {
 
     private fun networkAllowed(): Boolean = !SettingsStore.settings.value.lyricsWifiOnly
 
-    suspend fun lyricsCacheSize(): Long = lyricsRepository.cacheSizeBytes()
-    fun clearLyricsCache() { viewModelScope.launch { lyricsRepository.clear() } }
+    suspend fun lyricsCacheSize(): Long = lyricsModel.cacheSize()
+    fun clearLyricsCache() = lyricsModel.clearCache()
     fun rescanLibrary() = loadLibrary(force = true)
 
-    fun setLyricsVisible(visible: Boolean) { lyricsVisible.value = visible }
-    fun retryLyrics() { lyricsRetry.update { it + 1 } }
+    fun setLyricsVisible(visible: Boolean) = lyricsModel.setVisible(visible)
+    fun retryLyrics() = lyricsModel.retry()
 
     /** Where a lyrics search starts: the current track's artist and title. */
-    fun lyricsSearchText(): String {
-        val np = _player.value.nowPlaying ?: return ""
-        val song = songsById[np.songId]
-        return listOf(song?.artist ?: np.artist, song?.title ?: np.title).filter { it.isNotBlank() }.joinToString(" ")
-    }
+    fun lyricsSearchText(): String = lyricsModel.searchText()
 
-    suspend fun searchLyrics(text: String): List<LyricsCandidate> = lyricsRepository.search(text)
+    suspend fun searchLyrics(text: String): List<LyricsCandidate> = lyricsModel.search(text)
 
     /** Puts lyrics picked by hand on the current track, for good. */
-    fun pickLyrics(lyrics: Lyrics) {
-        val id = _player.value.nowPlaying?.songId ?: return
-        viewModelScope.launch {
-            lyricsRepository.choose(id, lyrics)
-            lyricsRetry.update { it + 1 }
-        }
-    }
+    fun pickLyrics(lyrics: Lyrics) = lyricsModel.pick(lyrics)
 
     fun currentSongId(): Long? = _player.value.nowPlaying?.songId
 
-    suspend fun ownLyrics(songId: Long): String? = lyricsRepository.ownText(songId)
+    suspend fun ownLyrics(songId: Long): String? = lyricsModel.own(songId)
 
     /** Lyrics the user wrote in the editor: they stay over anything found, until removed. */
-    fun saveOwnLyrics(songId: Long, text: String) {
-        viewModelScope.launch {
-            runCatching { lyricsRepository.saveOwn(songId, text) }
-            lyricsRetry.update { it + 1 }
-        }
-    }
+    fun saveOwnLyrics(songId: Long, text: String) = lyricsModel.saveOwn(songId, text)
 
-    fun removeOwnLyrics(songId: Long) {
-        viewModelScope.launch {
-            lyricsRepository.removeOwn(songId)
-            lyricsRetry.update { it + 1 }
-        }
-    }
+    fun removeOwnLyrics(songId: Long) = lyricsModel.removeOwn(songId)
 
     fun toggleShuffle() {
         controller.shuffleModeEnabled = !controller.shuffleModeEnabled
@@ -618,18 +520,20 @@ class MainViewModel {
     /** The track as its file has it, to tell in-app edits apart from what's really there. */
     suspend fun fileTags(id: Long): Song? = songsById[id]?.let { repository.fileTags(it) }
 
-    fun hasInAppEdits(songId: Long): Boolean = tagOverrides.has(songId) || CoverStore.songVersion(songId) != null
+    override fun hasInAppEdits(songId: Long): Boolean = tagOverrides.has(songId) || CoverStore.songVersion(songId) != null
 
-    fun searchMetadata(query: String, durationMs: Long) = MetadataSearch.search(query, durationMs)
+    override fun searchMetadata(query: String, durationMs: Long): Flow<List<MetadataCandidate>> = MetadataSearch.search(query, durationMs)
 
     /** A picture file as a cover-sized JPEG; null if it couldn't be read as an image. */
+    override suspend fun importCover(image: PickedImage): File? = importCover(image.file)
+
     suspend fun importCover(image: File): File? = withContext(Dispatchers.IO) {
         val raw = coverPickFile("img")
         runCatching { image.copyTo(raw, overwrite = true) }
         toCoverJpeg(raw)
     }
 
-    suspend fun downloadCover(url: String): File? {
+    override suspend fun downloadCover(url: String): File? {
         val bytes = MetadataSearch.download(url) ?: return null
         return withContext(Dispatchers.IO) {
             val raw = coverPickFile("img")
@@ -651,7 +555,7 @@ class MainViewModel {
     }
 
     /** Saves [edit] as app records: the file stays untouched. Empty fields fall back to the file's tags. */
-    suspend fun saveInApp(song: Song, edit: TrackEdit) {
+    override suspend fun saveInApp(song: Song, edit: TrackEdit) {
         val file = repository.fileTags(song)
         withContext(Dispatchers.IO) {
             tagOverrides.set(
@@ -672,13 +576,13 @@ class MainViewModel {
     }
 
     /** Whether the file's format takes tags at all (raw AAC, for one, doesn't). */
-    suspend fun canWriteTags(song: Song): Boolean = TagWriter.canWrite(song.file.name) && song.file.canWrite()
+    override suspend fun canWriteTags(song: Song): Boolean = TagWriter.canWrite(song.file.name) && song.file.canWrite()
 
     /**
      * Writes [edit] into the file's tags.
      * The app's own edits of this track are folded in and then dropped: the file is the truth now.
      */
-    suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean {
+    override suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean {
         val cover = withContext(Dispatchers.IO) {
             when (val c = edit.cover) {
                 // A cover picked "in the app" earlier goes into the file rather than being lost.
@@ -746,19 +650,19 @@ class MainViewModel {
             if (c.getMediaItemAt(i).song.id == songId) c.removeMediaItem(i)
         }
         userLibrary.forgetSong(songId)
-        lyricsOffsets.set(songId, 0L)
+        lyricsModel.dropOffset(songId)
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 tagOverrides.set(songId, null)
                 CoverStore.removeSongCover(songId)
             }
-            lyricsRepository.forget(songId)
+            lyricsModel.forget(songId)
         }
         loadLibrary(force = true)
     }
 
     /** Drops the app's edits of a track: tags and cover come from the file again. */
-    suspend fun resetEdits(song: Song) {
+    override suspend fun resetEdits(song: Song) {
         withContext(Dispatchers.IO) {
             tagOverrides.set(song.id, null)
             CoverStore.removeSongCover(song.id)

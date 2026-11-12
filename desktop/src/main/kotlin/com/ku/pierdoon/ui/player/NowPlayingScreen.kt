@@ -342,6 +342,7 @@ private fun WideNowPlaying(
                             onTap = onTogglePlay,
                             onSeek = onSeek,
                             tape = queue.tape.takeIf { cassetteMode },
+                            flowers = true,
                             modifier = Modifier.align(Alignment.CenterHorizontally).scaledSquare(normal, roomy) { grow.value },
                         )
                         Spacer(Modifier.height(20.dp))

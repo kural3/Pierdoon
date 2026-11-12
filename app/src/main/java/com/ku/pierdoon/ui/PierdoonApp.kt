@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui
 
+import com.ku.pierdoon.ui.components.ExpressiveIconButton
 import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -67,16 +68,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -92,8 +90,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -109,7 +105,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.boundsInRoot
@@ -680,7 +675,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             firstSong = vm.resolve(p.songIds.take(1)).firstOrNull(),
             onDismiss = { coverSheetFor = null },
             onShape = { vm.setPlaylistShape(p.id, it) },
-            onPickImage = { vm.setPlaylistCover(p.id, it) },
+            onPickImage = { vm.setPlaylistCover(p.id, it.uri) },
             onRemoveImage = { vm.removePlaylistCover(p.id) },
         )
     }
@@ -791,6 +786,16 @@ private fun Screens(
                 Route.Home -> {
                     val recent = remember(userData.recent, songs) { vm.resolve(userData.recent) }
                     HomeScreen(
+                        greetingAction = {
+                            ExpressiveIconButton(
+                                onClick = { nav.push(Route.Computer) },
+                                icon = PlayerIcons.Desktop,
+                                contentDescription = stringResource(Res.string.pc_open),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(48.dp),
+                            )
+                        },
                         recent = recent,
                         collections = collections,
                         playlists = userData.playlists,
@@ -862,10 +867,12 @@ private fun Screens(
                     onBack = { nav.pop() },
                     onPlay = onPlay,
                     onSongLongPress = { onSongLongPress(it, null) },
-                    onOpen = nav::push,
+                    onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
+                    onOpenAlbum = { nav.push(Route.AlbumDetail(it)) },
                     bottomInset = bottomInset,
                 )
                 Route.Downloads -> DownloadScreen(
+                    downloads = Downloader,
                     onBack = { nav.pop() },
                     onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
                     bottomInset = bottomInset,
@@ -879,6 +886,8 @@ private fun Screens(
                         null
                     },
                 )
+                // The computer's page for the phone; nothing leads there on the phone.
+                Route.Phone -> Unit
                 Route.Settings, is Route.SettingsPage -> {
                     SettingsScreen(
                         section = (route as? Route.SettingsPage)?.section,
@@ -1003,7 +1012,7 @@ private fun Screens(
                     onBack = { nav.pop() },
                     onPlay = onPlay,
                     onSongLongPress = { onSongLongPress(it, null) },
-                    onOpen = nav::push,
+                    onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
                     onClear = PlayHistory.get(LocalContext.current)::clear,
                     onYearReview = { nav.push(Route.YearReview(it)) },
                     bottomInset = bottomInset,
@@ -1106,7 +1115,7 @@ private fun Screens(
             val from = initialState
             val to = targetState
             val direction = when {
-                from is Route.Tab && to is Route.Tab -> NavDirection.Tab
+                from in PhoneTabs && to in PhoneTabs -> NavDirection.Tab
                 nav.forward -> NavDirection.Forward
                 else -> NavDirection.Back
             }
@@ -1178,7 +1187,7 @@ private fun FloatingNavBar(nav: Navigator, backdrop: com.ku.pierdoon.ui.componen
             )
             .padding(8.dp),
     ) {
-        Route.tabs.forEach { tab ->
+        PhoneTabs.forEach { tab ->
             val selected = nav.tab == tab
             val weight by animateFloatAsState(
                 targetValue = if (selected) SELECTED_WEIGHT else 1f,
@@ -1247,6 +1256,9 @@ private fun FloatingNavItem(tab: Route.Tab, selected: Boolean, onClick: () -> Un
     }
 }
 
+/** The phone's tabs, along the bottom; Downloads and the computer open as pages. */
+private val PhoneTabs: List<Route.Tab> = listOf(Route.Home, Route.Library, Route.Playlists, Route.Settings)
+
 private val FLOATING_NAV_HEIGHT = 72.dp
 private const val SELECTED_WEIGHT = 3f
 
@@ -1255,6 +1267,7 @@ private fun Route.Tab.icon() = when (this) {
     Route.Library -> PlayerIcons.Library
     Route.Playlists -> PlayerIcons.Playlist
     Route.Settings -> PlayerIcons.Settings
+    Route.Downloads, Route.Phone -> error("not a tab on the phone")
 }
 
 private fun Route.Tab.label() = when (this) {
@@ -1262,6 +1275,7 @@ private fun Route.Tab.label() = when (this) {
     Route.Library -> Res.string.nav_library
     Route.Playlists -> Res.string.nav_playlists
     Route.Settings -> Res.string.nav_settings
+    Route.Downloads, Route.Phone -> error("not a tab on the phone")
 }
 
 /** Keeps the last track around so exit animations don't render an empty player. */

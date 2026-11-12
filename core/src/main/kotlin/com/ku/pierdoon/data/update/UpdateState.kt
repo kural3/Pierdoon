@@ -25,3 +25,29 @@ sealed interface UpdateState {
     data class Installing(val release: AppRelease) : UpdateState
     data class InstallFailed(val release: AppRelease) : UpdateState
 }
+
+/**
+ * Each app's updater: the same GitHub releases, a different file (an APK, an .msi) and a
+ * different way to install it.
+ */
+interface AppUpdater {
+    val state: kotlinx.coroutines.flow.StateFlow<UpdateState>
+
+    /** The last check was long enough ago for a quiet one on launch. */
+    fun isDue(): Boolean
+
+    /** The user put [release] off with "Later". */
+    fun isSkipped(release: AppRelease): Boolean
+
+    /** "Later" on a release: the automatic check stays quiet about it; a manual one still shows it. */
+    fun skip(release: AppRelease)
+
+    /** Asks GitHub for the latest release. Never interrupts a download or install under way. */
+    suspend fun check(): UpdateState
+
+    /** Downloads [release] and hands it to the system's installer. */
+    fun install(release: AppRelease)
+
+    /** Stops a download under way. */
+    fun cancel()
+}

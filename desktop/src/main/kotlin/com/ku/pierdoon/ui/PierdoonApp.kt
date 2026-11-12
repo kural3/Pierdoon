@@ -11,12 +11,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.animateDpAsState
@@ -24,7 +20,6 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -68,7 +63,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -598,7 +592,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
             firstSong = vm.resolve(p.songIds.take(1)).firstOrNull(),
             onDismiss = { coverSheetFor = null },
             onShape = { vm.setPlaylistShape(p.id, it) },
-            onPickImage = { vm.setPlaylistCover(p.id, it) },
+            onPickImage = { vm.setPlaylistCover(p.id, it.file) },
             onRemoveImage = { vm.removePlaylistCover(p.id) },
         )
     }
@@ -841,15 +835,19 @@ private fun Screens(
                     onBack = { nav.pop() },
                     onPlay = onPlay,
                     onSongLongPress = { onSongLongPress(it, null) },
-                    onOpen = nav::push,
+                    onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
+                    onOpenAlbum = { nav.push(Route.AlbumDetail(it)) },
                     bottomInset = bottomInset,
                 )
                 Route.Downloads -> DownloadScreen(
+                    downloads = Downloader,
                     onBack = null,
                     onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
                     bottomInset = bottomInset,
                 )
                 Route.Phone -> PhoneScreen(settings = settings, bottomInset = bottomInset)
+                // The phone's pages; nothing leads there on the computer.
+                Route.Playlists, Route.Computer -> Unit
                 Route.Settings, is Route.SettingsPage -> {
                     val updateState by vm.update.collectAsState()
                     SettingsScreen(
@@ -986,7 +984,7 @@ private fun Screens(
                     onBack = { nav.pop() },
                     onPlay = onPlay,
                     onSongLongPress = { onSongLongPress(it, null) },
-                    onOpen = nav::push,
+                    onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
                     onClear = PlayHistory::clear,
                     onYearReview = { nav.push(Route.YearReview(it)) },
                     bottomInset = bottomInset,
@@ -1079,7 +1077,7 @@ private fun Screens(
             val from = initialState
             val to = targetState
             val direction = when {
-                from is Route.Tab && to is Route.Tab -> NavDirection.Tab
+                from in DesktopTabs && to in DesktopTabs -> NavDirection.Tab
                 // Settings and its pages change in place, as tabs do, rather than sliding.
                 from.isSettings() && to.isSettings() -> NavDirection.Tab
                 nav.forward -> NavDirection.Forward
@@ -1126,6 +1124,9 @@ private fun Screens(
         )
     }
 }
+
+/** The computer's tabs, down the rail on the left. */
+internal val DesktopTabs: List<Route.Tab> = listOf(Route.Home, Route.Library, Route.Downloads, Route.Phone, Route.Settings)
 
 private fun Route.isSettings() = this == Route.Settings || this is Route.SettingsPage
 
@@ -1203,7 +1204,7 @@ private fun NavRail(
                     )
                 }
             }
-            Route.tabs.forEach { tab ->
+            DesktopTabs.forEach { tab ->
                 RailItem(tab = tab, selected = nav.tab == tab, compact = compact) {
                     nav.selectTab(tab)
                 }
@@ -1298,6 +1299,7 @@ private fun Route.Tab.icon() = when (this) {
     Route.Downloads -> PlayerIcons.Download
     Route.Phone -> PlayerIcons.Smartphone
     Route.Settings -> PlayerIcons.Settings
+    Route.Playlists -> error("not a tab on the computer")
 }
 
 private fun Route.Tab.label() = when (this) {
@@ -1306,6 +1308,7 @@ private fun Route.Tab.label() = when (this) {
     Route.Downloads -> Res.string.nav_downloads
     Route.Phone -> Res.string.nav_phone
     Route.Settings -> Res.string.nav_settings
+    Route.Playlists -> error("not a tab on the computer")
 }
 
 /** Keeps the last track around so exit animations don't render an empty player. */

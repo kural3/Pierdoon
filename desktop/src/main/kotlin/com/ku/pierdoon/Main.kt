@@ -1,5 +1,6 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.data.init
 import com.ku.pierdoon.platform.GpuMemory
 import kotlinx.coroutines.delay
 import com.ku.pierdoon.ui.components.trimRemoteImages

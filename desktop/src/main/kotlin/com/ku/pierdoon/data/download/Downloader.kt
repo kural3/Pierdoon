@@ -44,55 +44,6 @@ import java.net.URL
 import java.security.DigestInputStream
 import java.security.MessageDigest
 
-enum class FailReason { Unsupported, Unavailable, Bot, Drm, NoAudio, Network, Save, Other }
-
-sealed interface DownloadStatus {
-    data object Queued : DownloadStatus
-
-    /** Starting yt-dlp and reading the page. */
-    data object Preparing : DownloadStatus
-
-    /** [progress] 0..1, or null while unknown. */
-    data class Downloading(val progress: Float?) : DownloadStatus
-
-    /** Tags, cover and the copy into the music folder. */
-    data object Saving : DownloadStatus
-
-    data class Done(val songId: Long) : DownloadStatus
-    data class Failed(val reason: FailReason, val detail: String?) : DownloadStatus
-}
-
-@Immutable
-data class DownloadTask(
-    val id: Long,
-    val url: String,
-    val format: DownloadFormat,
-    val title: String? = null,
-    val artist: String? = null,
-    val status: DownloadStatus = DownloadStatus.Queued,
-    /** Set on the tracks of a playlist or album link; they end up in a Pier.doon playlist together. */
-    val group: DownloadGroup? = null,
-) {
-    val active: Boolean get() = status !is DownloadStatus.Done && status !is DownloadStatus.Failed
-}
-
-@Immutable
-data class DownloadGroup(val id: Long, val name: String)
-
-enum class SearchSource(internal val prefix: String) { YouTube("ytsearch"), SoundCloud("scsearch") }
-
-/** One search result: enough to recognise the track, and the link to download it. */
-@Immutable
-data class SearchHit(val url: String, val title: String, val artist: String, val durationSec: Int?, val thumbnail: String?)
-
-sealed interface EngineUpdate {
-    data object Idle : EngineUpdate
-    data object Running : EngineUpdate
-    data object UpToDate : EngineUpdate
-    data object Updated : EngineUpdate
-    data object Failed : EngineUpdate
-}
-
 /**
  * Downloads audio from YouTube, SoundCloud, Bandcamp and the many other sites yt-dlp knows,
  * one link at a time, into Music/Pier.doon, where the library picks it up like any other file.
@@ -101,8 +52,8 @@ sealed interface EngineUpdate {
  * a day, without waiting for a new Pier.doon release. FFmpeg (bundled with the app) only
  * repackages the audio: WebM into .opus, YouTube's fragmented m4a into a plain one.
  */
-object Downloader {
-    val supported: Boolean = true
+object Downloader : DownloadQueue {
+    override val supported: Boolean = true
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val engineLock = Mutex()
@@ -115,13 +66,13 @@ object Downloader {
     val log: DownloadLog by lazy { DownloadLog(File(AppDirs.files, "download-log.json")) }
 
     private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
-    val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
+    override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
 
     private val _engineVersion = MutableStateFlow<String?>(null)
-    val engineVersion: StateFlow<String?> = _engineVersion.asStateFlow()
+    override val engineVersion: StateFlow<String?> = _engineVersion.asStateFlow()
 
     private val _engineUpdate = MutableStateFlow<EngineUpdate>(EngineUpdate.Idle)
-    val engineUpdate: StateFlow<EngineUpdate> = _engineUpdate.asStateFlow()
+    override val engineUpdate: StateFlow<EngineUpdate> = _engineUpdate.asStateFlow()
 
     /** Set by a link dropped on the window; the UI opens the downloads page and clears it. */
     val openRequest = MutableStateFlow(false)
@@ -158,18 +109,18 @@ object Downloader {
     }
 
     /** Fetches yt-dlp ahead of time so the first download starts quicker. */
-    fun warmUp() {
+    override fun warmUp() {
         scope.launch { runCatching { ensureEngine(update = false) } }
     }
 
-    fun enqueue(url: String, format: DownloadFormat, title: String? = null, artist: String? = null) {
+    override fun enqueue(url: String, format: DownloadFormat, title: String?, artist: String?) {
         val task = synchronized(this) { DownloadTask(nextId++, url.trim(), format, title, artist) }
         _tasks.update { it + task }
         wake.trySend(Unit)
     }
 
     /** Stops [id] if it's running and takes it off the list. */
-    fun remove(id: Long) {
+    override fun remove(id: Long) {
         val group = _tasks.value.firstOrNull { it.id == id }?.group
         _tasks.update { list -> list.filterNot { it.id == id } }
         synchronized(this) { running?.takeIf { it.first == id }?.second?.cancel() }
@@ -181,7 +132,7 @@ object Downloader {
      * Up to [SEARCH_RESULTS] tracks for [query]. Throws when yt-dlp can't reach the site.
      * SoundCloud's 30-second previews of paid tracks are left out: that's all a download would get.
      */
-    suspend fun search(query: String, source: SearchSource): List<SearchHit> = withContext(Dispatchers.IO) {
+    override suspend fun search(query: String, source: SearchSource): List<SearchHit> = withContext(Dispatchers.IO) {
         ensureEngine(update = true)
         val out = execute(listOf("${source.prefix}$SEARCH_RESULTS:${query.trim()}", "--flat-playlist", "-J"))
         val entries = JSONObject(out).optJSONArray("entries") ?: return@withContext emptyList()
@@ -194,16 +145,16 @@ object Downloader {
         }
     }
 
-    fun retry(id: Long) {
+    override fun retry(id: Long) {
         _tasks.update { list ->
             list.map { if (it.id == id && it.status is DownloadStatus.Failed) it.copy(status = DownloadStatus.Queued) else it }
         }
         wake.trySend(Unit)
     }
 
-    fun clearFinished() = _tasks.update { list -> list.filter { it.active } }
+    override fun clearFinished() = _tasks.update { list -> list.filter { it.active } }
 
-    fun updateEngine() {
+    override fun updateEngine() {
         if (_engineUpdate.value == EngineUpdate.Running) return
         scope.launch {
             _engineUpdate.value = EngineUpdate.Running

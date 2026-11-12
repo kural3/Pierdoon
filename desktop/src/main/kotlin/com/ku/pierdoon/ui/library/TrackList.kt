@@ -173,14 +173,6 @@ private fun TitleAndArtist(song: Song, isCurrent: Boolean, modifier: Modifier = 
     }
 }
 
-/** Flowers a cover turns into: the playing track's in the list, the paused one in the player. */
-internal val CoverFlowers by lazy {
-    listOf(
-        MaterialShapes.Flower, MaterialShapes.Clover4Leaf, MaterialShapes.Clover8Leaf, MaterialShapes.Sunny,
-        MaterialShapes.Cookie9Sided, MaterialShapes.Cookie12Sided, MaterialShapes.SoftBurst, MaterialShapes.Puffy,
-    )
-}
-
 /** A rounded square as a polygon the cover can morph from; [corner] is a share of the side. */
 private fun roundedSquare(corner: Float): RoundedPolygon =
     RoundedPolygon.rectangle(width = 2f, height = 2f, rounding = CornerRounding(corner * 2f)).normalized()

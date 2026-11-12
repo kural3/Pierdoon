@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.components
 
+import com.ku.pierdoon.data.metadata.MetadataSearch
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -336,7 +337,7 @@ private val Vibrant = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturat
  * once per size into a bitmap; every frame after that is a plain copy.
  */
 @Composable
-fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
+private fun FrostedArtwork(songId: Long, albumId: Long, modifier: Modifier = Modifier) {
     val cover = CoverStore.songVersion(songId)
     val revision = ArtworkCache.albumRevision(albumId)
     val bitmap by produceState(ArtworkCache.peekBlurred(songId, albumId), songId, albumId, cover, revision) {
@@ -389,4 +390,21 @@ object DesktopArtwork : ArtworkLoader {
     @Composable
     override fun FileArtwork(file: File, version: Long, modifier: Modifier, large: Boolean, placeholderIconSize: Dp) =
         PictureFileArtwork(file, version, modifier, large, placeholderIconSize)
+
+    @Composable
+    override fun BlurredArtwork(songId: Long, albumId: Long, modifier: Modifier) = FrostedArtwork(songId, albumId, modifier)
+
+    @Composable
+    override fun hasArt(songId: Long, albumId: Long): Boolean {
+        val cover = CoverStore.songVersion(songId)
+        val revision = ArtworkCache.albumRevision(albumId)
+        return produceState(false, songId, albumId, cover, revision) {
+            value = ArtworkCache.load(songId, albumId, large = false) != null
+        }.value
+    }
+
+    override suspend fun remotePicture(url: String, maxPx: Int): ImageBitmap? {
+        val bytes = MetadataSearch.download(url) ?: return null
+        return withContext(Dispatchers.Default) { Images.decode(bytes)?.let { Images.scaledBitmap(it, maxPx) } }
+    }
 }

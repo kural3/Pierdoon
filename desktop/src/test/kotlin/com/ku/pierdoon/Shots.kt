@@ -1,5 +1,6 @@
 package com.ku.pierdoon
 
+import com.ku.pierdoon.data.init
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.collectAsState
@@ -125,7 +126,7 @@ fun main(args: Array<String>) {
                 when (p[0]) {
                     "size" -> Unit
                     "wait" -> run(p[1].toLong())
-                    "tab" -> nav.selectTab(Route.tabs.first { it::class.simpleName == p[1] })
+                    "tab" -> nav.selectTab(com.ku.pierdoon.ui.DesktopTabs.first { it::class.simpleName == p[1] })
                     "page" -> nav.push(Route.SettingsPage(SettingsSection.valueOf(p[1])))
                     "open" -> nav.push(Route.decode(p[1]))
                     "font" -> if (p[1] == "Custom") {
