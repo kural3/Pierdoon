@@ -63,6 +63,7 @@ import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.TagWriter
 import com.ku.pierdoon.data.metadata.TrackEdit
+import com.ku.pierdoon.data.metadata.SaveTarget
 import com.ku.pierdoon.data.writeScaledJpeg
 import com.ku.pierdoon.ui.components.ArtworkCache
 import java.io.File
@@ -568,6 +569,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
 
     /** Saves [edit] as app records: the file stays untouched. Empty fields fall back to the file's tags. */
     override suspend fun saveInApp(song: Song, edit: TrackEdit) {
+        storeInApp(song, edit)
+        refreshAfterEdit()
+    }
+
+    override suspend fun saveAll(edits: List<Pair<Song, TrackEdit>>, target: SaveTarget, onProgress: (Int) -> Unit): Int {
+        var saved = 0
+        edits.forEachIndexed { i, (song, edit) ->
+            if (target == SaveTarget.App) {
+                storeInApp(song, edit)
+                saved++
+            } else if (writeToFile(song, edit)) {
+                saved++
+            }
+            onProgress(i + 1)
+        }
+        // The library is read again once, not after every track.
+        if (saved > 0) refreshAfterEdit()
+        return saved
+    }
+
+    private suspend fun storeInApp(song: Song, edit: TrackEdit) {
         val file = repository.fileTags(song.id)
         withContext(Dispatchers.IO) {
             tagOverrides.set(
@@ -584,13 +606,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
                 is CoverEdit.Replace -> CoverStore.setSongCover(song.id, cover.file)
             }
         }
-        refreshAfterEdit()
     }
 
     /** Android 11+ asks the user before an app may change someone else's file; null below that. */
-    override fun fileWriteRequest(song: Song): IntentSender? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            MediaStore.createWriteRequest(getApplication<Application>().contentResolver, listOf(song.uri)).intentSender
+    override fun fileWriteRequest(songs: List<Song>): IntentSender? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && songs.isNotEmpty()) {
+            MediaStore.createWriteRequest(getApplication<Application>().contentResolver, songs.map { it.uri }).intentSender
         } else {
             null
         }
@@ -604,7 +625,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
      * Writes [edit] into the file's tags; call once the user granted [fileWriteRequest].
      * The app's own edits of this track are folded in and then dropped: the file is the truth now.
      */
-    override suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean {
+    override suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean =
+        writeToFile(song, edit).also { if (it) refreshAfterEdit() }
+
+    private suspend fun writeToFile(song: Song, edit: TrackEdit): Boolean {
         val app = getApplication<Application>()
         val name = TagWriter.displayName(app, song) ?: return false
         val cover = withContext(Dispatchers.IO) {
@@ -638,7 +662,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
             c.prepare()
             c.playWhenReady = playWhenReady
         }
-        if (ok) refreshAfterEdit()
         return ok
     }
 

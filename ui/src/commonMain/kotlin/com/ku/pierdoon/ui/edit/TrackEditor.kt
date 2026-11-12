@@ -3,6 +3,7 @@ package com.ku.pierdoon.ui.edit
 import androidx.compose.runtime.Composable
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.metadata.MetadataCandidate
+import com.ku.pierdoon.data.metadata.SaveTarget
 import com.ku.pierdoon.data.metadata.TrackEdit
 import com.ku.pierdoon.ui.components.PickedImage
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,12 @@ interface TrackEditor : PlatformTrackEditor {
     /** Writes the edit into the file itself; false if that failed. */
     suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean
 
+    /**
+     * Several tracks' edits in one go, the library read again once at the end; [onProgress] gets
+     * how many are done. Returns how many were saved.
+     */
+    suspend fun saveAll(edits: List<Pair<Song, TrackEdit>>, target: SaveTarget, onProgress: (Int) -> Unit = {}): Int
+
     /** Drops what was saved in the app for the track. */
     suspend fun resetEdits(song: Song)
 
@@ -37,8 +44,8 @@ interface TrackEditor : PlatformTrackEditor {
 expect interface PlatformTrackEditor
 
 /**
- * Asks the system whether the app may write the track's file; [onResult] gets the answer.
- * Only Android asks: on a computer the answer is yes at once.
+ * Asks the system whether the app may write the tracks' files, all with one question; [onResult]
+ * gets the answer. Only Android asks: on a computer the answer is yes at once.
  */
 @Composable
-internal expect fun rememberWriteConsent(editor: TrackEditor, onResult: (granted: Boolean) -> Unit): (Song) -> Unit
+internal expect fun rememberWriteConsent(editor: TrackEditor, onResult: (granted: Boolean) -> Unit): (List<Song>) -> Unit

@@ -110,6 +110,7 @@ class MusicRepository(private val context: Context) {
                     dateAdded = c.getLong(addedCol),
                     // A real album in a folder of its name has track numbers; untagged files don't.
                     albumFromFolder = c.getInt(trackCol) == 0 && album == folder.substringAfterLast('/'),
+                    folder = folder,
                 )
                 songs += if (withOverrides) overrides.apply(song) else song
             }

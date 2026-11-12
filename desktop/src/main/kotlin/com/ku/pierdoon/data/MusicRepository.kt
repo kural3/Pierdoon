@@ -93,6 +93,7 @@ class MusicRepository {
             durationMs = t.durationMs,
             dateAdded = minOf(entry.created, entry.modified) / 1000,
             path = file.absolutePath,
+            folder = folder,
         )
         return if (withOverrides) overrides.apply(song) else song
     }

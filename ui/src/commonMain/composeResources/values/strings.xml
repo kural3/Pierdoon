@@ -508,4 +508,20 @@
 
     <string name="mini_player">Mini player</string>
     <string name="mini_player_back">Back to the full window</string>
+
+    <string name="folders">Folders</string>
+    <plurals name="folders_count">
+        <item quantity="one">%1$d folder</item>
+        <item quantity="other">%1$d folders</item>
+    </plurals>
+    <string name="folders_none">No folders with music</string>
+    <string name="queue_save">Save as playlist</string>
+    <string name="queue_saved">Saved as %1$s</string>
+
+    <string name="edit_tags">Edit tags</string>
+    <string name="batch_mixed">Differs — each keeps its own</string>
+    <string name="batch_saved">Saved %1$d of %2$d</string>
+    <string name="batch_unwritable">%1$d of %2$d files can't take tags; they stay as they are</string>
+    <string name="batch_nothing">Nothing changed</string>
+    <string name="batch_progress">%1$d of %2$d</string>
 </resources>

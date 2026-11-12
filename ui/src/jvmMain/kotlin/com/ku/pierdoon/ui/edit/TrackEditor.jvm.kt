@@ -8,7 +8,7 @@ import com.ku.pierdoon.data.Song
 actual interface PlatformTrackEditor
 
 @Composable
-internal actual fun rememberWriteConsent(editor: TrackEditor, onResult: (granted: Boolean) -> Unit): (Song) -> Unit {
+internal actual fun rememberWriteConsent(editor: TrackEditor, onResult: (granted: Boolean) -> Unit): (List<Song>) -> Unit {
     val callback by rememberUpdatedState(onResult)
     return { callback(true) }
 }

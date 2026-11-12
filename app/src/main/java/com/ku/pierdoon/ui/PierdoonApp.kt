@@ -11,6 +11,8 @@ import com.ku.pierdoon.ui.library.YearReviewScreen
 import com.ku.pierdoon.ui.library.SmartPlaylistEditor
 import com.ku.pierdoon.ui.library.SmartPlaylistCover
 import com.ku.pierdoon.ui.library.DuplicatesScreen
+import com.ku.pierdoon.ui.library.FoldersScreen
+import com.ku.pierdoon.ui.edit.BatchEditScreen
 import com.ku.pierdoon.data.history.YearReview
 import com.ku.pierdoon.data.SmartPlaylist
 import com.ku.pierdoon.data.Duplicates
@@ -573,6 +575,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
                             onPlayQueueEntry = vm::playQueueEntry,
                             onRemoveQueueEntry = vm::removeQueueEntry,
                             onMoveQueueEntry = vm::moveQueueEntry,
+                            onSaveQueue = { name, songs -> vm.createPlaylist(name, songs.map { it.id }) },
                             onSongLongPress = { songAction = SongActionTarget(it) },
                             onRetryLyrics = vm::retryLyrics,
                             lyricsOffsetMs = lyricsOffset,
@@ -651,6 +654,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel()) {
             onRemoveFromPlaylist = { target.playlistId?.let { vm.removeFromPlaylist(it, ids.toSet()) } },
             onDelete = deleteSongs?.let { delete -> { delete(target.songs, target.onDone) } },
             onSendToComputer = pcPaired?.let { { PcTransfers.sendToComputer(target.songs) } },
+            onEditTags = { nav.push(Route.EditSongs(target.songs.map { it.id })) },
         )
     }
     playlistAction?.let { p ->
@@ -982,6 +986,14 @@ private fun Screens(
                         },
                     )
                 }
+                is Route.EditSongs -> {
+                    val picked = remember(songs, route.songIds) { route.songIds.mapNotNull(vm::song) }
+                    if (picked.isNotEmpty()) {
+                        BatchEditScreen(songs = picked, vm = vm, onBack = { nav.pop() }, bottomInset = bottomInset)
+                    } else {
+                        LaunchedEffect(Unit) { nav.pop() }
+                    }
+                }
                 is Route.EditSong -> {
                     val song = remember(songs, route.songId) { vm.song(route.songId) }
                     if (song != null) {
@@ -1026,6 +1038,30 @@ private fun Screens(
                     onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
                     bottomInset = bottomInset,
                 )
+                Route.Folders -> FoldersScreen(
+                    folders = collections.folders,
+                    onBack = { nav.pop() },
+                    onOpen = { nav.push(Route.FolderDetail(it.path)) },
+                    bottomInset = bottomInset,
+                )
+                is Route.FolderDetail -> {
+                    val folder = collections.folders.firstOrNull { it.path == route.path }
+                    val tracks = folder?.songs.orEmpty()
+                    CollectionScreen(
+                        title = folder?.name.orEmpty(),
+                        subtitle = folder?.location.orEmpty(),
+                        songs = tracks,
+                        currentSongId = currentSongId,
+                        cover = { m -> MixCollage(tracks, m) },
+                        onBack = { nav.pop() },
+                        onPlay = onPlay,
+                        onShuffle = onShuffle,
+                        onSongLongPress = { onSongLongPress(it, null) },
+                        onBulk = { picked, done -> onBulk(picked, null, done) },
+                        onDelete = onDeleteSongs,
+                        bottomInset = bottomInset,
+                    )
+                }
                 Route.Duplicates -> {
                     val groups by produceState<List<DuplicateGroup>?>(null, songs, userData, plays) {
                         value = withContext(Dispatchers.Default) {

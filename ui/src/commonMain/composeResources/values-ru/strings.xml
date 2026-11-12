@@ -526,4 +526,22 @@
 
     <string name="mini_player">Мини-плеер</string>
     <string name="mini_player_back">Вернуться в полное окно</string>
+
+    <string name="folders">Папки</string>
+    <plurals name="folders_count">
+        <item quantity="one">%1$d папка</item>
+        <item quantity="few">%1$d папки</item>
+        <item quantity="many">%1$d папок</item>
+        <item quantity="other">%1$d папки</item>
+    </plurals>
+    <string name="folders_none">Нет папок с музыкой</string>
+    <string name="queue_save">Сохранить как плейлист</string>
+    <string name="queue_saved">Сохранено: %1$s</string>
+
+    <string name="edit_tags">Изменить теги</string>
+    <string name="batch_mixed">Разные — у каждого останется свой</string>
+    <string name="batch_saved">Сохранено %1$d из %2$d</string>
+    <string name="batch_unwritable">%1$d из %2$d файлов не принимают теги — они останутся как есть</string>
+    <string name="batch_nothing">Ничего не изменилось</string>
+    <string name="batch_progress">%1$d из %2$d</string>
 </resources>

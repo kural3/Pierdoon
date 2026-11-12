@@ -113,6 +113,8 @@ fun BulkActionsSheet(
     onDelete: (() -> Unit)?,
     /** Null without a paired computer (and always on the computer itself). */
     onSendToComputer: (() -> Unit)? = null,
+    /** One artist, album or cover for all of them. */
+    onEditTags: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     var pickingPlaylist by remember { mutableStateOf(false) }
@@ -142,6 +144,9 @@ fun BulkActionsSheet(
                     ActionItem(PlayerIcons.PlaylistAdd, stringResource(Res.string.add_to_playlist)) {
                         haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                         pickingPlaylist = true
+                    }
+                    if (onEditTags != null) {
+                        ActionItem(PlayerIcons.Edit, stringResource(Res.string.edit_tags)) { act(onEditTags) }
                     }
                     val sendLabel = PlatformStrings.sendToComputer
                     if (onSendToComputer != null && sendLabel != null) {

@@ -11,18 +11,18 @@ import androidx.compose.runtime.rememberUpdatedState
 import com.ku.pierdoon.data.Song
 
 actual interface PlatformTrackEditor {
-    /** The system's "allow Pier.doon to modify this file?" request; null when it can't be asked. */
-    fun fileWriteRequest(song: Song): IntentSender?
+    /** The system's "allow Pier.doon to modify these files?" request; null when it can't be asked. */
+    fun fileWriteRequest(songs: List<Song>): IntentSender?
 }
 
 @Composable
-internal actual fun rememberWriteConsent(editor: TrackEditor, onResult: (granted: Boolean) -> Unit): (Song) -> Unit {
+internal actual fun rememberWriteConsent(editor: TrackEditor, onResult: (granted: Boolean) -> Unit): (List<Song>) -> Unit {
     val callback by rememberUpdatedState(onResult)
     val consent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
         callback(r.resultCode == Activity.RESULT_OK)
     }
-    return { song ->
-        val request = editor.fileWriteRequest(song)
+    return { songs ->
+        val request = editor.fileWriteRequest(songs)
         if (request != null) consent.launch(IntentSenderRequest.Builder(request).build()) else callback(false)
     }
 }

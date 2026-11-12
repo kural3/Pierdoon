@@ -93,6 +93,8 @@ fun FullPlayer(
     onPlayQueueEntry: (String) -> Unit,
     onRemoveQueueEntry: (String) -> Unit,
     onMoveQueueEntry: (String, Int) -> Unit,
+    /** Saves the queue as a new playlist; none where the queue isn't this device's. */
+    onSaveQueue: ((name: String, songs: List<Song>) -> Unit)? = null,
     onSongLongPress: (Song) -> Unit,
     onRetryLyrics: () -> Unit,
     lyricsOffsetMs: Long,
@@ -262,6 +264,7 @@ fun FullPlayer(
                         onPlay = onPlayQueueEntry,
                         onRemove = onRemoveQueueEntry,
                         onMove = onMoveQueueEntry,
+                        onSaveAsPlaylist = onSaveQueue,
                         onLongPress = onSongLongPress,
                         tapeMode = cassetteMode,
                         // The column's side padding is for the art; rows bring their own inset.

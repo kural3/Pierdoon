@@ -110,6 +110,8 @@ fun NowPlayingScreen(
     onPlayQueueEntry: (String) -> Unit,
     onRemoveQueueEntry: (String) -> Unit,
     onMoveQueueEntry: (String, Int) -> Unit,
+    /** Saves the queue as a new playlist; none where the queue isn't this device's. */
+    onSaveQueue: ((name: String, songs: List<Song>) -> Unit)? = null,
     onSongLongPress: (Song) -> Unit,
     onRetryLyrics: () -> Unit,
     lyricsOffsetMs: Long,
@@ -154,6 +156,7 @@ fun NowPlayingScreen(
                 onPlayQueueEntry = onPlayQueueEntry,
                 onRemoveQueueEntry = onRemoveQueueEntry,
                 onMoveQueueEntry = onMoveQueueEntry,
+                onSaveQueue = onSaveQueue,
                 onSongLongPress = onSongLongPress,
                 onRetryLyrics = onRetryLyrics,
                 lyricsOffsetMs = lyricsOffsetMs,
@@ -175,7 +178,7 @@ fun NowPlayingScreen(
             WideNowPlaying(
                 nowPlaying, state, position, lyrics, showLyrics, queue, showQueue, isFavorite, volume, muted,
                 onToggleFavorite, onToggleLyrics, onToggleQueue, onPlayQueueEntry, onRemoveQueueEntry,
-                onMoveQueueEntry, onSongLongPress, onRetryLyrics, lyricsOffsetMs, onShiftLyrics,
+                onMoveQueueEntry, onSaveQueue, onSongLongPress, onRetryLyrics, lyricsOffsetMs, onShiftLyrics,
                 onResetLyricsOffset, onTogglePlay, onPrevious, onNext, onSeek, onToggleShuffle,
                 onCycleRepeat, onVolume, onToggleMute, onOpenArtist, onCollapse, onOpenDelicious, dragModifier, radio,
             )
@@ -202,6 +205,8 @@ private fun WideNowPlaying(
     onPlayQueueEntry: (String) -> Unit,
     onRemoveQueueEntry: (String) -> Unit,
     onMoveQueueEntry: (String, Int) -> Unit,
+    /** Saves the queue as a new playlist; none where the queue isn't this device's. */
+    onSaveQueue: ((name: String, songs: List<Song>) -> Unit)? = null,
     onSongLongPress: (Song) -> Unit,
     onRetryLyrics: () -> Unit,
     lyricsOffsetMs: Long,
@@ -472,6 +477,7 @@ private fun WideNowPlaying(
                                     onPlay = onPlayQueueEntry,
                                     onRemove = onRemoveQueueEntry,
                                     onMove = onMoveQueueEntry,
+                                    onSaveAsPlaylist = onSaveQueue,
                                     onLongPress = onSongLongPress,
                                     tapeMode = cassetteMode,
                                     modifier = Modifier.fillMaxSize(),

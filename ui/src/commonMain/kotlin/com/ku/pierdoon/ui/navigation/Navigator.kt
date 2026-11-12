@@ -30,8 +30,11 @@ sealed interface Route {
     data object Stats : Route { override val key = "stats" }
     data class YearReview(val year: Int) : Route { override val key = "year:$year" }
     data object Duplicates : Route { override val key = "duplicates" }
+    data object Folders : Route { override val key = "folders" }
+    data class FolderDetail(val path: String) : Route { override val key = "folder:$path" }
     data class SmartPlaylistDetail(val playlistId: Long) : Route { override val key = "smart:$playlistId" }
     data class EditSong(val songId: Long) : Route { override val key = "edit:$songId" }
+    data class EditSongs(val songIds: List<Long>) : Route { override val key = "editmany:" + songIds.joinToString(",") }
     data object Search : Route { override val key = "search" }
     /** The phone's page for the computer. */
     data object Computer : Route { override val key = "computer" }
@@ -45,12 +48,15 @@ sealed interface Route {
             key.startsWith("artist:") -> ArtistDetail(key.removePrefix("artist:"))
             key.startsWith("playlist:") -> PlaylistDetail(key.removePrefix("playlist:").toLong())
             key.startsWith("edit:") -> EditSong(key.removePrefix("edit:").toLong())
+            key.startsWith("editmany:") -> EditSongs(key.removePrefix("editmany:").split(",").mapNotNull { it.toLongOrNull() })
             key == Favorites.key -> Favorites
             key == DailyMix.key -> DailyMix
             key == Stats.key -> Stats
             key.startsWith("year:") -> YearReview(key.removePrefix("year:").toInt())
             key.startsWith("smart:") -> SmartPlaylistDetail(key.removePrefix("smart:").toLong())
             key == Duplicates.key -> Duplicates
+            key == Folders.key -> Folders
+            key.startsWith("folder:") -> FolderDetail(key.removePrefix("folder:"))
             key == Search.key -> Search
             key == Computer.key -> Computer
             key.startsWith("settings:") -> SettingsSection.entries.firstOrNull { it.name == key.removePrefix("settings:") }

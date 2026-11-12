@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -43,6 +44,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -59,6 +61,8 @@ import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.playback.QueueEntry
 import com.ku.pierdoon.playback.QueueState
 import com.ku.pierdoon.ui.components.PlayerIcons
+import com.ku.pierdoon.ui.components.rememberToast
+import com.ku.pierdoon.ui.library.PlaylistNameDialog
 import com.ku.pierdoon.ui.library.SongRow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -79,6 +83,8 @@ fun QueuePanel(
     modifier: Modifier = Modifier,
     /** Cassette mode: the queue under the sides of its tape. */
     tapeMode: Boolean = false,
+    /** Saves the queue as it stands, the playing track first, as a new playlist of that name. */
+    onSaveAsPlaylist: ((name: String, songs: List<Song>) -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -160,6 +166,31 @@ fun QueuePanel(
     val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val removeLabel = stringResource(Res.string.remove_from_queue)
 
+    var naming by remember { mutableStateOf(false) }
+    val toast = rememberToast()
+    val queued = listOfNotNull(queue.current?.song) + upcoming.map { it.song }
+    val saveAction: (@Composable () -> Unit)? = if (onSaveAsPlaylist != null && queued.isNotEmpty()) {
+        {
+            IconButton(onClick = { naming = true }, modifier = Modifier.size(32.dp)) {
+                Icon(PlayerIcons.PlaylistAdd, contentDescription = stringResource(Res.string.queue_save), modifier = Modifier.size(20.dp))
+            }
+        }
+    } else {
+        null
+    }
+    if (naming && onSaveAsPlaylist != null) {
+        PlaylistNameDialog(
+            title = stringResource(Res.string.queue_save),
+            confirmLabel = stringResource(Res.string.save),
+            onDismiss = { naming = false },
+            onConfirm = { name ->
+                naming = false
+                onSaveAsPlaylist(name.trim(), queued)
+                scope.launch { toast(getString(Res.string.queue_saved, name.trim())) }
+            },
+        )
+    }
+
     LazyColumn(
         state = listState,
         contentPadding = PaddingValues(vertical = 16.dp),
@@ -168,7 +199,10 @@ fun QueuePanel(
         queue.current?.let { current ->
             item(key = "label:now") {
                 val onSide = queue.tape?.takeIf { tapeMode }?.let { if (it.onSideB) "B" else "A" }
-                Label(if (onSide != null) stringResource(Res.string.queue_now_on_side, onSide) else stringResource(Res.string.now_playing))
+                Label(
+                    if (onSide != null) stringResource(Res.string.queue_now_on_side, onSide) else stringResource(Res.string.now_playing),
+                    action = saveAction,
+                )
             }
             item(key = current.key) {
                 SongRow(
@@ -182,7 +216,7 @@ fun QueuePanel(
         }
         item(key = "label:next") {
             Column(Modifier.animateItem(fade, placement, fade)) {
-                Label(stringResource(Res.string.up_next))
+                Label(stringResource(Res.string.up_next), action = saveAction.takeIf { queue.current == null })
                 if (!queue.canReorder && upcoming.size > 1) {
                     Text(
                         text = stringResource(Res.string.queue_shuffled_hint),
@@ -367,13 +401,22 @@ private fun DragHandle(onDragStart: () -> Unit, onDrag: (Float) -> Unit, onDragE
 }
 
 @Composable
-private fun Label(text: String, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 6.dp)) {
+private fun Label(text: String, modifier: Modifier = Modifier, action: (@Composable () -> Unit)? = null) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth().padding(start = 22.dp, end = if (action != null) 12.dp else 22.dp, top = 12.dp, bottom = 6.dp),
+    ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
         )
+        // Kept to the label's own height, so the list doesn't move when it shows.
+        if (action != null) Box(Modifier.layout { m, c ->
+            val p = m.measure(c)
+            layout(p.width, 0) { p.place(0, -p.height / 2) }
+        }) { action() }
     }
 }
 

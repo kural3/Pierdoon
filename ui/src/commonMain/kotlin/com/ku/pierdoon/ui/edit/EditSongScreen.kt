@@ -185,7 +185,7 @@ fun EditSongScreen(song: Song, vm: TrackEditor, onBack: () -> Unit, bottomInset:
         }
         saving = true
         pendingFileEdit = edit
-        askWrite(song)
+        askWrite(listOf(song))
     }
 
     fun runSearch() {
@@ -218,7 +218,7 @@ fun EditSongScreen(song: Song, vm: TrackEditor, onBack: () -> Unit, bottomInset:
         val tagItems: LazyListScope.() -> Unit = {
             item(key = "cover") {
                 CoverHeader(
-                    song = song,
+                    original = { m -> Artwork(song.id, song.albumId, m, large = true, placeholderIconSize = 64.dp) },
                     picked = pickedCover,
                     removed = coverRemoved,
                     loading = coverLoading,
@@ -332,47 +332,9 @@ fun EditSongScreen(song: Song, vm: TrackEditor, onBack: () -> Unit, bottomInset:
         // Where it's saved, and the save button.
         val saveItems: LazyListScope.() -> Unit = {
             item(key = "target") {
-                Group(stringResource(Res.string.save_where)) {
-                    listOf<@Composable (androidx.compose.ui.graphics.Shape) -> Unit>({ shape ->
-                        ItemContainer(shape) {
-                            Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                                ConnectedChoice(
-                                    options = listOf(
-                                        stringResource(Res.string.save_in_app),
-                                        stringResource(Res.string.save_in_file),
-                                    ),
-                                    selected = target.ordinal,
-                                    onSelect = { i -> SharedSettingsStore.update { copy(editTarget = SaveTarget.entries[i]) } },
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                )
-                                Spacer(Modifier.height(12.dp))
-                                val explanation = when {
-                                    target == SaveTarget.App -> Res.string.save_in_app_desc
-                                    PlatformStrings.fileWritesUnavailable != null -> PlatformStrings.fileWritesUnavailable!!
-                                    fileWritable == false -> Res.string.save_in_file_unsupported
-                                    else -> PlatformStrings.saveInFileDesc
-                                }
-                                val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-                                val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-                                AnimatedContent(
-                                    targetState = explanation,
-                                    transitionSpec = { fadeIn(fadeInSpec).togetherWith(fadeOut(fadeOutSpec)) },
-                                    label = "saveTargetDesc",
-                                ) { res ->
-                                    Text(
-                                        stringResource(res),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (res == PlatformStrings.fileWritesUnavailable || res == Res.string.save_in_file_unsupported) {
-                                            MaterialTheme.colorScheme.error
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    })
-                }
+                val problem = PlatformStrings.fileWritesUnavailable?.let { stringResource(it) }
+                    ?: if (fileWritable == false) stringResource(Res.string.save_in_file_unsupported) else null
+                SaveTargetGroup(target, fileProblem = problem)
             }
 
             item(key = "actions") {
@@ -440,9 +402,52 @@ fun EditSongScreen(song: Song, vm: TrackEditor, onBack: () -> Unit, bottomInset:
     }
 }
 
+/** Where an edit is saved, the app or the file, and what that means; [fileProblem] says why the file can't be written. */
 @Composable
-private fun CoverHeader(
-    song: Song,
+internal fun SaveTargetGroup(target: SaveTarget, fileProblem: String?) {
+    Group(stringResource(Res.string.save_where)) {
+        listOf<@Composable (androidx.compose.ui.graphics.Shape) -> Unit>({ shape ->
+            ItemContainer(shape) {
+                Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                    ConnectedChoice(
+                        options = listOf(
+                            stringResource(Res.string.save_in_app),
+                            stringResource(Res.string.save_in_file),
+                        ),
+                        selected = target.ordinal,
+                        onSelect = { i -> SharedSettingsStore.update { copy(editTarget = SaveTarget.entries[i]) } },
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    val isProblem = target == SaveTarget.File && fileProblem != null
+                    val explanation = when {
+                        target == SaveTarget.App -> stringResource(Res.string.save_in_app_desc)
+                        fileProblem != null -> fileProblem
+                        else -> stringResource(PlatformStrings.saveInFileDesc)
+                    }
+                    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                    AnimatedContent(
+                        targetState = explanation to isProblem,
+                        transitionSpec = { fadeIn(fadeInSpec).togetherWith(fadeOut(fadeOutSpec)) },
+                        label = "saveTargetDesc",
+                    ) { (text, problem) ->
+                        Text(
+                            text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (problem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        })
+    }
+}
+
+@Composable
+internal fun CoverHeader(
+    /** The cover as it is now. */
+    original: @Composable (Modifier) -> Unit,
     picked: String?,
     removed: Boolean,
     loading: Boolean,
@@ -471,7 +476,7 @@ private fun CoverHeader(
                 label = "editCover",
             ) { state ->
                 when (state) {
-                    null -> Artwork(song.id, song.albumId, cover, large = true, placeholderIconSize = 64.dp)
+                    null -> original(cover)
                     "" -> Box(
                         cover.background(MaterialTheme.colorScheme.secondaryContainer),
                         contentAlignment = Alignment.Center,
@@ -524,13 +529,21 @@ private fun CoverHeader(
 }
 
 @Composable
-private fun TagField(value: String, onChange: (String) -> Unit, label: StringResource, last: Boolean = false) {
+internal fun TagField(
+    value: String,
+    onChange: (String) -> Unit,
+    label: StringResource,
+    last: Boolean = false,
+    /** A line under the field, such as that the tracks differ here. */
+    note: String? = null,
+) {
     TextField(
         shape = SoftFieldShape,
         colors = softFieldColors(),
         value = value,
         onValueChange = onChange,
         label = { Text(stringResource(label)) },
+        supportingText = note?.let { { Text(it) } },
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = if (last) ImeAction.Done else ImeAction.Next),
         modifier = Modifier.fillMaxWidth(),

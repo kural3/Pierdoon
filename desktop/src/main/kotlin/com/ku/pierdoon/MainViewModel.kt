@@ -36,6 +36,7 @@ import com.ku.pierdoon.data.metadata.CoverEdit
 import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.TagWriter
 import com.ku.pierdoon.data.metadata.TrackEdit
+import com.ku.pierdoon.data.metadata.SaveTarget
 import com.ku.pierdoon.data.update.AppRelease
 import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.data.update.Updater
@@ -556,6 +557,27 @@ class MainViewModel : TrackEditor {
 
     /** Saves [edit] as app records: the file stays untouched. Empty fields fall back to the file's tags. */
     override suspend fun saveInApp(song: Song, edit: TrackEdit) {
+        storeInApp(song, edit)
+        refreshAfterEdit()
+    }
+
+    override suspend fun saveAll(edits: List<Pair<Song, TrackEdit>>, target: SaveTarget, onProgress: (Int) -> Unit): Int {
+        var saved = 0
+        edits.forEachIndexed { i, (song, edit) ->
+            if (target == SaveTarget.App) {
+                storeInApp(song, edit)
+                saved++
+            } else if (writeToFile(song, edit)) {
+                saved++
+            }
+            onProgress(i + 1)
+        }
+        // The library is read again once, not after every track.
+        if (saved > 0) refreshAfterEdit()
+        return saved
+    }
+
+    private suspend fun storeInApp(song: Song, edit: TrackEdit) {
         val file = repository.fileTags(song)
         withContext(Dispatchers.IO) {
             tagOverrides.set(
@@ -572,7 +594,6 @@ class MainViewModel : TrackEditor {
                 is CoverEdit.Replace -> CoverStore.setSongCover(song.id, cover.file)
             }
         }
-        refreshAfterEdit()
     }
 
     /** Whether the file's format takes tags at all (raw AAC, for one, doesn't). */
@@ -582,7 +603,10 @@ class MainViewModel : TrackEditor {
      * Writes [edit] into the file's tags.
      * The app's own edits of this track are folded in and then dropped: the file is the truth now.
      */
-    override suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean {
+    override suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean =
+        writeToFile(song, edit).also { if (it) refreshAfterEdit() }
+
+    private suspend fun writeToFile(song: Song, edit: TrackEdit): Boolean {
         val cover = withContext(Dispatchers.IO) {
             when (val c = edit.cover) {
                 // A cover picked "in the app" earlier goes into the file rather than being lost.
@@ -614,7 +638,6 @@ class MainViewModel : TrackEditor {
             c.prepare()
             c.playWhenReady = playWhenReady
         }
-        if (ok) refreshAfterEdit()
         return ok
     }
 

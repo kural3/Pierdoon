@@ -23,6 +23,8 @@ data class Song(
     val path: String = "",
     /** Android: [album] is only the folder's name, which MediaStore gives tracks without an album tag. */
     val albumFromFolder: Boolean = false,
+    /** The folder the file lies in: "Music/Rock" on Android, the absolute path on Windows. */
+    val folder: String = "",
 ) {
     val file: File get() = File(path)
 

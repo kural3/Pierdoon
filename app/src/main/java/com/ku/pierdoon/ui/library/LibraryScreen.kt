@@ -151,7 +151,10 @@ fun LibraryScreen(
                         if (section == 0 && songs.isNotEmpty()) {
                             OverflowMenu(
                                 listOf(
-                                    listOf(MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() }),
+                                    listOf(
+                                        MenuEntry(selectLabel, PlayerIcons.Checklist) { selection.start() },
+                                        MenuEntry(stringResource(Res.string.folders), PlayerIcons.Folder) { onOpen(Route.Folders) },
+                                    ),
                                     sortLabels.map { (s, label) ->
                                         MenuEntry(label, selected = s == sort) { onSort(s, sortDescending) }
                                     },
