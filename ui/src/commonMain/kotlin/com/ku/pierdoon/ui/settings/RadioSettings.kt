@@ -1,12 +1,12 @@
 package com.ku.pierdoon.ui.settings
 
+import com.ku.pierdoon.ui.components.ValueSlider
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -124,7 +124,7 @@ private fun BufferItem(shape: Shape, buffer: Int, onChange: (Int) -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Slider(
+            ValueSlider(
                 value = dragged.toFloat(),
                 onValueChange = {
                     val v = it.roundToInt().coerceIn(RADIO_BUFFER_RANGE)
@@ -156,7 +156,7 @@ private fun NoveltyItem(shape: Shape, novelty: Int, onChange: (Int) -> Unit) {
                 Spacer(Modifier.width(16.dp))
                 Text("$dragged%", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             }
-            Slider(
+            ValueSlider(
                 value = dragged.toFloat(),
                 onValueChange = {
                     val v = (it / 10f).roundToInt() * 10

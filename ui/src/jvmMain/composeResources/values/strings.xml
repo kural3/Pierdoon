@@ -40,7 +40,7 @@
     <string name="nav_phone">Phone</string>
     <string name="phone_hint">Open Pier.doon on an Android phone on the same network, pick this computer and enter the code</string>
     <string name="remote_control">Phone control</string>
-    <string name="remote_control_desc">Pier.doon for Android on the same Wi-Fi network sees the player, queue, lyrics and library</string>
+    <string name="remote_control_desc">Pier.doon for Android on the same Wi-Fi network sees the player, queue, lyrics and library. The connection isn't encrypted: turn this on only on a network you trust, such as your home Wi-Fi</string>
     <string name="remote_pair_title">Pairing code</string>
     <string name="remote_pair_desc">Enter it in the phone app. The code changes after each pairing</string>
     <string name="remote_address">Computer address</string>

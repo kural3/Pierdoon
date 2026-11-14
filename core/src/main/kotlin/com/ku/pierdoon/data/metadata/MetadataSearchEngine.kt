@@ -12,7 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
+import com.ku.pierdoon.data.webUrl
 import java.net.URLEncoder
 import kotlin.math.abs
 
@@ -165,7 +165,7 @@ open class MetadataSearchEngine(private val userAgent: String) {
 
     /** @return the open connection, or null on 404. Follows redirects (Cover Art Archive uses them). */
     private fun httpGet(url: String, accept: String): HttpURLConnection? {
-        val conn = URL(url).openConnection() as HttpURLConnection
+        val conn = webUrl(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 8_000
         conn.readTimeout = 10_000
         conn.instanceFollowRedirects = true

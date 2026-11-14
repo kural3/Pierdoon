@@ -53,6 +53,7 @@
     <string name="pc_manual_failed">По этому адресу Pier.doon не отвечает</string>
     <string name="pc_code_title">Код для «%1$s»</string>
     <string name="pc_code_hint">Шесть цифр с экрана компьютера</string>
+    <string name="pc_trusted_network">Телефон и компьютер общаются без шифрования. Подключайтесь и синхронизируйте только в сети, которой доверяете, например в домашнем Wi-Fi, а не в кафе или другой общественной сети</string>
     <string name="pc_connect">Подключить</string>
     <string name="pc_wrong_code">Неверный код</string>
     <string name="pc_too_many_attempts">Слишком много неверных кодов. Подождите 30 секунд</string>

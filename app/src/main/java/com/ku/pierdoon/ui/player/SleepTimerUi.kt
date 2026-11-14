@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -65,7 +66,7 @@ fun sleepTimerLabel(state: SleepTimerState?): String? {
 @Composable
 fun SleepTimerSheet(state: SleepTimerState?, onDismiss: () -> Unit) {
     val haptics = LocalHapticFeedback.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     fun act(block: () -> Unit) {
         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
         block()

@@ -5,6 +5,7 @@ import com.ku.pierdoon.data.COVER_MAX_PX
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.TagOverride
+import com.ku.pierdoon.data.webUrl
 import com.ku.pierdoon.data.TagOverrides
 import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.data.USER_AGENT
@@ -40,7 +41,6 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
 import java.security.DigestInputStream
 import java.security.MessageDigest
 
@@ -336,7 +336,7 @@ object Downloader : DownloadQueue {
     }
 
     private fun <T> httpGet(url: String, read: (java.io.InputStream) -> T): T {
-        val conn = URL(url).openConnection() as HttpURLConnection
+        val conn = webUrl(url).openConnection() as HttpURLConnection
         try {
             conn.instanceFollowRedirects = true
             conn.connectTimeout = 15_000

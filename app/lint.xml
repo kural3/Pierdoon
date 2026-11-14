@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Warnings looked at and left on purpose, each only where it was looked at. -->
+<lint>
+    <!-- These objects keep context.applicationContext, which lives as long as the process: no leak. -->
+    <issue id="StaticFieldLeak">
+        <ignore path="src/main/java/com/ku/pierdoon/data/download/Downloader.kt" />
+        <ignore path="src/main/java/com/ku/pierdoon/data/update/Updater.kt" />
+        <ignore path="src/main/java/com/ku/pierdoon/playback/Radio.kt" />
+        <ignore path="src/main/java/com/ku/pierdoon/remote/PcTransfers.kt" />
+    </issue>
+    <!-- Newer Android's attributes; older versions skip them, which is what's wanted. -->
+    <issue id="UnusedAttribute" severity="ignore" />
+    <!-- The round launcher icon is the square one: the mark is round already. -->
+    <issue id="IconDuplicates" severity="ignore" />
+    <!-- arm64 only, on purpose: yt-dlp's Python is ~15 MB per ABI (see build.gradle.kts). -->
+    <issue id="ChromeOsAbiSupport" severity="ignore" />
+    <!-- ".bp" is appended to a suffix that already starts with a dot. -->
+    <issue id="GradlePath">
+        <ignore path="build.gradle.kts" />
+    </issue>
+    <!--
+        The computer remote is plain HTTP to an address in the local network found at run time
+        (see res/xml/network_security_config.xml and docs/remote-api.md).
+    -->
+    <issue id="InsecureBaseConfiguration">
+        <ignore path="src/main/res/xml/network_security_config.xml" />
+    </issue>
+</lint>

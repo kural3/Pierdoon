@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.remote
 
+import com.ku.pierdoon.ui.components.ValueSlider
 import androidx.compose.foundation.layout.offset
 import android.text.format.DateUtils
 import com.ku.pierdoon.ui.settings.SwitchItem
@@ -75,13 +76,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -189,7 +190,7 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
 
     var searching by remember { mutableStateOf(false) }
     var found by remember { mutableStateOf<List<FoundPc>>(emptyList()) }
-    var searchRound by remember { mutableStateOf(0) }
+    var searchRound by remember { mutableIntStateOf(0) }
     LaunchedEffect(allowed, searchRound) {
         if (!allowed) return@LaunchedEffect
         searching = true
@@ -330,6 +331,13 @@ private fun PairingScreen(onBack: () -> Unit, bottomInset: Dp, revoked: Boolean)
                                         Button(onClick = submit, enabled = code.length == 6 && !pairing, modifier = Modifier.fillMaxWidth()) {
                                             Text(stringResource(Res.string.pc_connect))
                                         }
+                                        Spacer(Modifier.height(12.dp))
+                                        // The connection isn't encrypted (docs/remote-api.md).
+                                        Text(
+                                            stringResource(Res.string.pc_trusted_network),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
                                 }
                             })
@@ -580,7 +588,7 @@ private fun RemoteScreen(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     Spacer(Modifier.width(12.dp))
-                                    Slider(
+                                    ValueSlider(
                                         value = if (state.muted) 0f else state.volume,
                                         onValueChange = PcRemote::setVolume,
                                         modifier = Modifier.weight(1f),

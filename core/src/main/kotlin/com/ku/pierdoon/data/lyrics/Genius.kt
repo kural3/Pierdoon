@@ -5,7 +5,7 @@ import com.ku.pierdoon.data.splitArtists
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
+import com.ku.pierdoon.data.webUrl
 import java.net.URLEncoder
 
 /**
@@ -55,7 +55,7 @@ class Genius(private val userAgent: String) {
     }
 
     private fun get(url: String): String? {
-        val conn = URL(url).openConnection() as HttpURLConnection
+        val conn = webUrl(url).openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = 8_000
             conn.readTimeout = 12_000

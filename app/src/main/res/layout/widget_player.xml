@@ -51,6 +51,7 @@
 
     <ImageButton
         android:id="@+id/widget_previous"
+        android:contentDescription="@string/previous"
         android:layout_width="40dp"
         android:layout_height="48dp"
         android:background="?android:attr/selectableItemBackgroundBorderless"
@@ -58,6 +59,7 @@
 
     <ImageButton
         android:id="@+id/widget_play"
+        android:contentDescription="@string/play"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:background="@drawable/widget_play_background"
@@ -65,6 +67,7 @@
 
     <ImageButton
         android:id="@+id/widget_next"
+        android:contentDescription="@string/next"
         android:layout_width="40dp"
         android:layout_height="48dp"
         android:background="?android:attr/selectableItemBackgroundBorderless"

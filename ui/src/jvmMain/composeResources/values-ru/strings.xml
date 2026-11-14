@@ -40,7 +40,7 @@
     <string name="nav_phone">Телефон</string>
     <string name="phone_hint">Откройте Pier.doon на Android, подключённом к той же сети, выберите этот компьютер и введите код</string>
     <string name="remote_control">Управление с телефона</string>
-    <string name="remote_control_desc">Pier.doon на Android в той же сети Wi-Fi видит плеер, очередь, тексты и библиотеку</string>
+    <string name="remote_control_desc">Pier.doon на Android в той же сети Wi-Fi видит плеер, очередь, тексты и библиотеку. Соединение не шифруется: включайте только в сети, которой доверяете, например в домашнем Wi-Fi</string>
     <string name="remote_pair_title">Код для подключения</string>
     <string name="remote_pair_desc">Введите его в приложении на телефоне. После подключения код сменится</string>
     <string name="remote_address">Адрес компьютера</string>

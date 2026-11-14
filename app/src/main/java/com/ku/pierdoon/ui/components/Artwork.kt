@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.scale
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -135,7 +136,7 @@ object ArtworkCache {
         val small = load(context, songId, albumId, large = false) ?: return null
         return withContext(io) {
             val src = small.asAndroidBitmap()
-            val scaled = Bitmap.createScaledBitmap(src, BLUR_PX, BLUR_PX, true)
+            val scaled = src.scale(BLUR_PX, BLUR_PX)
             val pixels = IntArray(BLUR_PX * BLUR_PX)
             scaled.getPixels(pixels, 0, BLUR_PX, 0, 0, BLUR_PX, BLUR_PX)
             repeat(3) { boxBlur(pixels, BLUR_PX, BLUR_PX, radius = 2) }

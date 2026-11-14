@@ -110,6 +110,7 @@ fun FullPlayer(
     onPlayQueueEntry: (String) -> Unit,
     onRemoveQueueEntry: (String) -> Unit,
     onMoveQueueEntry: (String, Int) -> Unit,
+    modifier: Modifier = Modifier,
     /** Saves the queue as a new playlist; none where the queue isn't this device's. */
     onSaveQueue: ((name: String, songs: List<Song>) -> Unit)? = null,
     onSongLongPress: (Song) -> Unit,
@@ -127,7 +128,6 @@ fun FullPlayer(
     /** False where the artist line leads to the same place whoever is chosen. */
     pickArtist: Boolean = true,
     onCollapse: () -> Unit,
-    modifier: Modifier = Modifier,
     /** Swiping the art back: the track before, where the button may restart this one instead. */
     onPreviousTrack: () -> Unit = onPrevious,
     /** The expanding sheet owns the vertical drag (swipe down shrinks the player back). */

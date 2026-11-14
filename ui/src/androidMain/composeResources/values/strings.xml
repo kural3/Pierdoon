@@ -51,6 +51,7 @@
     <string name="pc_manual_failed">Pier.doon doesn't answer at this address</string>
     <string name="pc_code_title">Code for “%1$s”</string>
     <string name="pc_code_hint">Six digits from the computer screen</string>
+    <string name="pc_trusted_network">The phone and the computer talk without encryption. Connect and sync only on a network you trust, such as your home Wi-Fi, not in a café or other public network</string>
     <string name="pc_connect">Connect</string>
     <string name="pc_wrong_code">Wrong code</string>
     <string name="pc_too_many_attempts">Too many wrong codes. Wait 30 seconds</string>

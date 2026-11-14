@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.settings
 
+import com.ku.pierdoon.ui.components.ValueSlider
 import com.ku.pierdoon.ui.components.livelyCard
 import com.ku.pierdoon.ui.components.rememberSpin
 import com.ku.pierdoon.ui.components.spinOn
@@ -34,7 +35,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -738,7 +738,7 @@ fun CrossfadeItem(shape: Shape, seconds: Int, onChange: (Int) -> Unit) {
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-            Slider(
+            ValueSlider(
                 value = dragged.toFloat(),
                 onValueChange = {
                     val s = it.roundToInt()

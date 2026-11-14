@@ -6,7 +6,7 @@ import org.json.JSONArray
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
+import com.ku.pierdoon.data.webUrl
 import java.security.DigestInputStream
 import java.security.MessageDigest
 
@@ -87,7 +87,7 @@ object GitHubReleases {
     }
 
     private fun open(url: String, accept: String, userAgent: String): HttpURLConnection {
-        val conn = URL(url).openConnection() as HttpURLConnection
+        val conn = webUrl(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 20_000
         conn.instanceFollowRedirects = true

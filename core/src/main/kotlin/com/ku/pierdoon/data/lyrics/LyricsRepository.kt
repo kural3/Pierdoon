@@ -11,7 +11,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
+import com.ku.pierdoon.data.webUrl
 import java.net.URLEncoder
 import kotlin.math.abs
 
@@ -255,7 +255,7 @@ class LyricsRepository(cacheDir: File, private val userAgent: String, filesDir: 
 
     /** @return body, or null on 404. */
     private fun httpGet(url: String): String? {
-        val conn = URL(url).openConnection() as HttpURLConnection
+        val conn = webUrl(url).openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = 8_000
             conn.readTimeout = 10_000

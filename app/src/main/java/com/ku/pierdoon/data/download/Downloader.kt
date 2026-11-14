@@ -19,6 +19,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Immutable
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.core.graphics.scale
 import com.ku.pierdoon.data.COVER_MAX_PX
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.TagOverride
@@ -161,7 +162,15 @@ object Downloader : DownloadQueue {
             addOption("--flat-playlist")
             addOption("-J")
         }
-        val out = execute(request, "pierdoon-search-${System.nanoTime()}").out
+        val out = try {
+            execute(request, "pierdoon-search-${System.nanoTime()}").out
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // The screen only says the search failed; why is here.
+            Log.w(TAG, "Search failed", e)
+            throw e
+        }
         val entries = JSONObject(out).optJSONArray("entries") ?: return@withContext emptyList()
         List(entries.length()) { entries.optJSONObject(it) }.mapNotNull { e ->
             val url = e?.str("url") ?: return@mapNotNull null
@@ -588,7 +597,7 @@ private fun squareJpeg(bytes: ByteArray): ByteArray? = runCatching {
     val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
     val side = minOf(decoded.width, decoded.height)
     var square = Bitmap.createBitmap(decoded, (decoded.width - side) / 2, (decoded.height - side) / 2, side, side)
-    if (side > COVER_MAX_PX) square = Bitmap.createScaledBitmap(square, COVER_MAX_PX, COVER_MAX_PX, true)
+    if (side > COVER_MAX_PX) square = square.scale(COVER_MAX_PX, COVER_MAX_PX)
     ByteArrayOutputStream().also { square.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
 }.getOrNull()
 

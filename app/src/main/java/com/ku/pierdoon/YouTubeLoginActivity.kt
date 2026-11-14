@@ -7,6 +7,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.core.net.toUri
 import com.ku.pierdoon.data.download.Downloader
 
 /**
@@ -31,7 +32,7 @@ class YouTubeLoginActivity : ComponentActivity() {
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
-                    val host = android.net.Uri.parse(url).host.orEmpty()
+                    val host = url.toUri().host.orEmpty()
                     if (!host.endsWith("youtube.com")) return
                     val cookies = CookieManager.getInstance().getCookie(YOUTUBE).orEmpty()
                     if ("SAPISID=" !in cookies && "__Secure-3PAPISID=" !in cookies) return
