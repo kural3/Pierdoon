@@ -79,7 +79,11 @@ class EqualizerProcessor : BaseAudioProcessor() {
         out.flip()
     }
 
-    /** A seek or a new track: the filters' memory of the old samples would only ring. */
+    /**
+     * A seek or a new track: the filters' memory of the old samples would only ring. The
+     * deprecated overload on purpose: the newer one with stream metadata ends up calling it.
+     */
+    @Suppress("OVERRIDE_DEPRECATION")
     override fun onFlush() {
         equalizer?.reset()
         tape?.reset()

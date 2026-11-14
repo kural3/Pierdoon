@@ -111,7 +111,14 @@ object RemoteServer {
      */
     private val failedPairings = HashMap<String, PairingAttempts>()
 
-    private class PairingAttempts(var failed: Int = 0, var blockedUntil: Long = 0L)
+    private class PairingAttempts(var failed: Int = 0, var blockedUntil: Long = 0L, var lastFailedAt: Long = 0L)
+
+    /**
+     * Wrong codes from every address together: one guesser on the network can take many
+     * addresses, so past a few dozen a minute pairing pauses for everyone.
+     */
+    private var failedEverywhere = 0
+    private var everywhereBlockedUntil = 0L
     @Volatile private var libraryVersion = 0
 
     private val player: Player get() = PlaybackController.player
@@ -257,23 +264,26 @@ object RemoteServer {
         val now = System.currentTimeMillis()
         val from = ex.remoteAddress?.address?.hostAddress ?: "?"
         val ok = synchronized(this) {
-            // Addresses that are neither paused nor have wrong codes left to count are dropped.
-            failedPairings.values.removeIf { it.blockedUntil < now && it.failed % MAX_FAILED_PAIRINGS == 0 }
+            // Addresses that are not paused and haven't been wrong for a while start over.
+            failedPairings.values.removeIf { it.blockedUntil < now && now - it.lastFailedAt > FORGET_FAILED_MS }
             val attempts = failedPairings.getOrPut(from) { PairingAttempts() }
             when {
                 // Not even the right code gets in now: it would tell a guesser it was right.
-                now < attempts.blockedUntil -> null
+                now < attempts.blockedUntil || now < everywhereBlockedUntil -> null
                 code.isNotEmpty() && code == _status.value.pairingCode -> {
                     failedPairings.remove(from)
                     true
                 }
                 else -> {
-                    // Guessing a six-digit code takes more than a handful of tries: after five, a new
-                    // code and a pause, so trying them all would take months.
-                    if (++attempts.failed % MAX_FAILED_PAIRINGS == 0) {
-                        attempts.blockedUntil = now + PAIRING_PAUSE_MS
-                        _status.update { it.copy(pairingCode = newCode()) }
-                    }
+                    // Guessing a six-digit code takes more than a handful of tries: after five from
+                    // one address, or a few dozen from all of them, a new code and a pause, so
+                    // trying them all would take months however many addresses one has.
+                    attempts.lastFailedAt = now
+                    val perAddress = ++attempts.failed % MAX_FAILED_PAIRINGS == 0
+                    val everywhere = ++failedEverywhere % MAX_FAILED_EVERYWHERE == 0
+                    if (perAddress) attempts.blockedUntil = now + PAIRING_PAUSE_MS
+                    if (everywhere) everywhereBlockedUntil = now + PAIRING_PAUSE_EVERYWHERE_MS
+                    if (perAddress || everywhere) _status.update { it.copy(pairingCode = newCode()) }
                     false
                 }
             }
@@ -689,6 +699,11 @@ object RemoteServer {
     private const val KEEPALIVE_S = 15L
     private const val MAX_FAILED_PAIRINGS = 5
     private const val PAIRING_PAUSE_MS = 30_000L
+    /** At most this many wrong codes a [PAIRING_PAUSE_EVERYWHERE_MS], from all addresses together. */
+    private const val MAX_FAILED_EVERYWHERE = 20
+    private const val PAIRING_PAUSE_EVERYWHERE_MS = 60_000L
+    /** An address's wrong codes are forgotten after this long without another. */
+    private const val FORGET_FAILED_MS = 10 * 60_000L
     private const val MAX_NONCE_CHARS = 128
     private const val GZIP_MIN_BYTES = 4096
     private const val MAX_BODY_BYTES = 256 * 1024

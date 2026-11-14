@@ -597,7 +597,7 @@ private fun squareJpeg(bytes: ByteArray): ByteArray? = runCatching {
  * bare meta, that the tag writer can't read. With moov written after mdat, as the muxer does,
  * dropping them moves no sample offsets.
  */
-private fun dropMuxerExtras(file: File) = RandomAccessFile(file, "rw").use { f ->
+private fun dropMuxerExtras(file: File): Unit = RandomAccessFile(file, "rw").use { f ->
     var pos = 0L
     var moovAt = -1L
     var moovSize = 0L

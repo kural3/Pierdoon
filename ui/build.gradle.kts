@@ -29,6 +29,8 @@ kotlin {
     compilerOptions {
         optIn.add("androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
         optIn.add("androidx.compose.material3.ExperimentalMaterial3Api")
+        // expect/actual classes are still Beta in Kotlin; the module leans on them on purpose.
+        freeCompilerArgs.add("-Xexpect-actual-classes")
     }
 
     sourceSets {

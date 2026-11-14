@@ -35,8 +35,8 @@ Use the packet's source address with `port`. If nothing replies within a couple 
 ```
 
 - `200 {"token": "…64 hex…", "name": "DESKTOP-7O84MEM"}`. Keep the token; it doesn't expire. The PC shows a new code after each successful pairing.
-- `403` wrong code. After every five wrong codes from one address the PC switches to a new code and refuses pairing from that address for 30 seconds. Other phones can still pair meanwhile.
-- `429` pairing is paused for this address after wrong codes; try again in 30 seconds.
+- `403` wrong code. After every five wrong codes from one address the PC switches to a new code and refuses pairing from that address for 30 seconds; other phones can still pair meanwhile. After every twenty wrong codes from all addresses together it switches the code and refuses pairing from everyone for a minute.
+- `429` pairing is paused after wrong codes; try again in a minute.
 
 ### `POST /verify` (no auth, since API 3)
 

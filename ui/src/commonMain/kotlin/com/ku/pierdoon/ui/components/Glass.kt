@@ -132,7 +132,7 @@ fun MenuGlass(
     val backdrop = LocalBackdrop.current
     val enabled = backdrop != null && GlassSupported && LocalUiPrefs.current.glass
     var still by remember { mutableStateOf<ImageBitmap?>(null) }
-    if (enabled) LaunchedEffect(backdrop) { still = runCatching { backdrop!!.layer.toImageBitmap() }.getOrNull() }
+    if (enabled) LaunchedEffect(backdrop) { still = runCatching { backdrop.layer.toImageBitmap() }.getOrNull() }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val image = still
     Box(modifier.onGloballyPositioned { origin = it.positionInRoot() }.clip(shape)) {
@@ -142,7 +142,7 @@ fun MenuGlass(
                     .matchParentSize()
                     .blur(blurRadius, BlurredEdgeTreatment.Rectangle)
                     .drawBehind {
-                        val delta = backdrop!!.origin - (layerOrigin() + origin)
+                        val delta = backdrop.origin - (layerOrigin() + origin)
                         drawImage(image, topLeft = delta)
                     },
             )
