@@ -34,6 +34,7 @@ import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsCandidate
 import com.ku.pierdoon.data.metadata.CoverEdit
 import com.ku.pierdoon.data.metadata.MetadataSearch
+import com.ku.pierdoon.data.metadata.FileTags
 import com.ku.pierdoon.data.metadata.TagWriter
 import com.ku.pierdoon.data.metadata.TrackEdit
 import com.ku.pierdoon.data.metadata.SaveTarget
@@ -604,7 +605,7 @@ class MainViewModel : TrackEditor {
     }
 
     /** Whether the file's format takes tags at all (raw AAC, for one, doesn't). */
-    override suspend fun canWriteTags(song: Song): Boolean = TagWriter.canWrite(song.file.name) && song.file.canWrite()
+    override suspend fun canWriteTags(song: Song): Boolean = FileTags.canWrite(song.file.name) && song.file.canWrite()
 
     /**
      * Writes [edit] into the file's tags.

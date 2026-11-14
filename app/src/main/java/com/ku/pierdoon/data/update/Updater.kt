@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageInstaller
 import android.os.Build
-import androidx.compose.runtime.Immutable
 import androidx.core.content.edit
 import com.ku.pierdoon.BuildConfig
 import com.ku.pierdoon.data.USER_AGENT
@@ -16,19 +15,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * Updates straight from the GitHub releases page: the app is not in a store, so nothing else
@@ -43,7 +35,6 @@ import java.net.URL
  * receiver, outside any screen.
  */
 object Updater : AppUpdater {
-    private const val RELEASES = "https://api.github.com/repos/kural3/Pierdoon/releases?per_page=30"
     private const val CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
     private const val K_LAST_CHECK = "last_check"
     private const val K_SKIPPED = "skipped_version"
@@ -80,7 +71,7 @@ object Updater : AppUpdater {
         }
         _state.value = UpdateState.Checking
         val result = try {
-            val release = withContext(Dispatchers.IO) { fetchLatest() }
+            val release = withContext(Dispatchers.IO) { GitHubReleases.latest(".apk", "android-", USER_AGENT) }
             prefs.edit { putLong(K_LAST_CHECK, System.currentTimeMillis()) }
             if (release != null && isNewerVersion(release.version, currentVersion)) {
                 UpdateState.Available(release)
@@ -143,60 +134,11 @@ object Updater : AppUpdater {
         }
     }
 
-    private fun fetchLatest(): AppRelease? {
-        val conn = open(RELEASES, "application/vnd.github+json")
-        val releases = try {
-            JSONArray(conn.inputStream.bufferedReader().use { it.readText() })
-        } finally {
-            conn.disconnect()
-        }
-        for (i in 0 until releases.length()) {
-            val o = releases.getJSONObject(i)
-            if (o.optBoolean("draft") || o.optBoolean("prerelease")) continue
-            val assets = o.optJSONArray("assets") ?: continue
-            val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
-                .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) } ?: continue
-            return AppRelease(
-                version = o.optString("tag_name").removePrefix("android-").removePrefix("v"),
-                notes = o.optString("body"),
-                fileUrl = apk.getString("browser_download_url"),
-                fileSize = apk.optLong("size"),
-            )
-        }
-        return null
-    }
-
-    /** Cancellable between chunks: the "Cancel" button stops it within one read. */
     private suspend fun downloadApk(release: AppRelease, onProgress: (Float?) -> Unit): File {
         val dir = File(app.cacheDir, "update").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "Pierdoon-${release.version}.apk")
-        val conn = open(release.fileUrl, "application/octet-stream")
-        try {
-            val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.fileSize.takeIf { it > 0 }
-            var read = 0L
-            var lastReported = -1
-            conn.inputStream.use { input ->
-                file.outputStream().use { out ->
-                    val buf = ByteArray(64 * 1024)
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        read += n
-                        val percent = total?.let { (read * 100 / it).toInt() }
-                        if (percent != lastReported) {
-                            lastReported = percent ?: -1
-                            onProgress(total?.let { read.toFloat() / it })
-                        }
-                    }
-                }
-            }
-            if (total != null && read != total) throw IOException("Truncated download")
-        } finally {
-            conn.disconnect()
-        }
+        GitHubReleases.download(release, file, USER_AGENT, onProgress)
         return file
     }
 
@@ -225,19 +167,6 @@ object Updater : AppUpdater {
         apk.delete()
     }
 
-    private fun open(url: String, accept: String): HttpURLConnection {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 10_000
-        conn.readTimeout = 20_000
-        conn.instanceFollowRedirects = true
-        conn.setRequestProperty("Accept", accept)
-        conn.setRequestProperty("User-Agent", USER_AGENT)
-        if (conn.responseCode !in 200..299) {
-            conn.disconnect()
-            throw IOException("HTTP ${conn.responseCode}")
-        }
-        return conn
-    }
 }
 
 class InstallResultReceiver : BroadcastReceiver() {

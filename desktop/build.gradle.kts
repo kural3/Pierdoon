@@ -22,7 +22,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
     implementation(libs.json)
     // Writing tags into audio files ("save to file" when editing a track).
-    implementation("net.jthink:jaudiotagger:3.0.1")
+    implementation(libs.jaudiotagger)
     implementation("org.bytedeco:javacv:1.5.14") { isTransitive = false }
     implementation("org.bytedeco:javacpp:1.5.14")
     implementation("org.bytedeco:javacpp:1.5.14:$javacppPlatform")

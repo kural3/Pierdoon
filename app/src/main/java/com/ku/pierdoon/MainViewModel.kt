@@ -61,6 +61,7 @@ import com.ku.pierdoon.data.update.AppRelease
 import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.data.metadata.MetadataSearch
+import com.ku.pierdoon.data.metadata.FileTags
 import com.ku.pierdoon.data.metadata.TagWriter
 import com.ku.pierdoon.data.metadata.TrackEdit
 import com.ku.pierdoon.data.metadata.SaveTarget
@@ -630,7 +631,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
     /** Whether the file's format takes tags at all (raw AAC, for one, doesn't). */
     override suspend fun canWriteTags(song: Song): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-            TagWriter.canWrite(TagWriter.displayName(getApplication(), song))
+            FileTags.canWrite(TagWriter.displayName(getApplication(), song))
 
     /**
      * Writes [edit] into the file's tags; call once the user granted [fileWriteRequest].

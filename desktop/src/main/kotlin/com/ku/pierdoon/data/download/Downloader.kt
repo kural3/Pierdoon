@@ -9,7 +9,7 @@ import com.ku.pierdoon.data.TagOverrides
 import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.data.USER_AGENT
 import com.ku.pierdoon.data.metadata.MetadataSearch
-import com.ku.pierdoon.data.metadata.TagWriter
+import com.ku.pierdoon.data.metadata.FileTags
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.platform.AppDirs
 import com.ku.pierdoon.platform.Images
@@ -560,9 +560,9 @@ object Downloader : DownloadQueue {
         val cover = info.str("thumbnail")?.let { MetadataSearch.download(it) }?.let(::squareJpeg)
         // Tagged on a copy: a writer that gives up half-way mustn't take the audio with it.
         val tagged = File(work, "tagged.$ext")
-        val inFile = TagWriter.canWrite(audio.name) && runCatching {
+        val inFile = FileTags.canWrite(audio.name) && runCatching {
             audio.copyTo(tagged, overwrite = true)
-            TagWriter.tagFile(tagged, name.title, name.artist, album, cover)
+            FileTags.write(tagged, name.title, name.artist, album, cover)
         }.isSuccess
         if (inFile) audio = tagged
 
@@ -603,54 +603,6 @@ object Downloader : DownloadQueue {
     private val PROGRESS = Regex("""^\[download]\s+([\d.]+)%""")
     private val AUDIO = setOf("m4a", "mp3", "opus", "ogg", "flac", "wav", "aac", "webm", "mka")
 }
-
-private class DownloadException(val reason: FailReason, val detail: String?) : Exception(detail)
-
-/** yt-dlp picks the stream; "/bestaudio" covers sites that have only one kind (SoundCloud's mp3, for one). */
-private fun formatSelector(format: DownloadFormat) = when (format) {
-    DownloadFormat.M4a -> "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio"
-    DownloadFormat.Opus -> "bestaudio[acodec=opus]/bestaudio"
-}
-
-private fun JSONObject.str(key: String): String? =
-    if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
-
-/** The smallest picture still sharp in a list row; sites without sizes get their last (usually biggest) one. */
-private fun JSONObject.thumbnail(): String? {
-    val all = optJSONArray("thumbnails")?.let { a -> List(a.length()) { a.optJSONObject(it) }.filterNotNull() }.orEmpty()
-        .filter { it.str("url") != null }
-    val sized = all.filter { it.optInt("width") > 0 }.sortedBy { it.optInt("width") }
-    return (sized.firstOrNull { it.optInt("width") >= 160 } ?: sized.lastOrNull() ?: all.lastOrNull())?.str("url")
-        ?: str("thumbnail")
-}
-
-private fun JSONObject.trackName(): TrackName {
-    val artists = optJSONArray("artists")?.let { a -> List(a.length()) { a.optString(it) }.filter { it.isNotBlank() } }
-    return trackName(
-        title = str("title"),
-        track = str("track"),
-        artist = artists?.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: str("artist") ?: str("creator"),
-        uploader = str("uploader") ?: str("channel"),
-    )
-}
-
-/** The reason yt-dlp gives, roughly sorted into what the user can do about it. */
-private fun classify(message: String?): FailReason {
-    val m = message.orEmpty()
-    return when {
-        "Unsupported URL" in m || "is not a valid URL" in m -> FailReason.Unsupported
-        // Before "unavailable": the bot check also says "Sign in".
-        "not a bot" in m || "Sign in to confirm" in m -> FailReason.Bot
-        "DRM" in m -> FailReason.Drm
-        "Requested format is not available" in m -> FailReason.NoAudio
-        "Unable to download" in m || "Errno" in m || "timed out" in m || "getaddrinfo" in m -> FailReason.Network
-        "unavailable" in m || "Private video" in m || "removed" in m || "Sign in" in m -> FailReason.Unavailable
-        else -> FailReason.Other
-    }
-}
-
-private fun errorLine(message: String?): String? =
-    message?.lineSequence()?.lastOrNull { it.startsWith("ERROR:") }?.removePrefix("ERROR:")?.trim()
 
 /** Thumbnails are mostly 16:9 video frames; the centre square is what a cover looks like. */
 private fun squareJpeg(bytes: ByteArray): ByteArray? = runCatching {

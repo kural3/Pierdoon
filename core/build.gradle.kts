@@ -21,6 +21,8 @@ dependencies {
     // @Immutable and @Stable only, without the Compose runtime: both apps' compilers read them.
     implementation(libs.compose.runtime.annotation)
     implementation(libs.kotlinx.coroutines.core)
+    // Tags written into the file (FileTags); each app reads them its own way.
+    implementation(libs.jaudiotagger)
     // Android has org.json built in; the Windows app brings its own.
     compileOnly(libs.json)
     testImplementation(libs.json)

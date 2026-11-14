@@ -1,6 +1,5 @@
 package com.ku.pierdoon.data.update
 
-import androidx.compose.runtime.Immutable
 import com.ku.pierdoon.BuildConfig
 import com.ku.pierdoon.data.USER_AGENT
 import com.ku.pierdoon.platform.Prefs
@@ -9,20 +8,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import java.io.File
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
-import java.security.DigestInputStream
-import java.security.MessageDigest
 import kotlin.system.exitProcess
 
 /**
@@ -33,8 +24,6 @@ import kotlin.system.exitProcess
  * The installer is downloaded on request, started, and the app quits so it can be replaced.
  */
 object Updater : AppUpdater {
-    /** One repository for both apps (desktop-… tags): only releases with an .msi attached count. */
-    private const val RELEASES = "https://api.github.com/repos/kural3/Pierdoon/releases?per_page=30"
     private const val CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
     private const val K_LAST_CHECK = "last_check"
     private const val K_SKIPPED = "skipped_version"
@@ -66,7 +55,7 @@ object Updater : AppUpdater {
         }
         _state.value = UpdateState.Checking
         val result = try {
-            val release = withContext(Dispatchers.IO) { fetchLatest() }
+            val release = withContext(Dispatchers.IO) { GitHubReleases.latest(".msi", "desktop-", USER_AGENT) }
             prefs.edit { putLong(K_LAST_CHECK, System.currentTimeMillis()) }
             if (release != null && isNewerVersion(release.version, currentVersion)) {
                 UpdateState.Available(release)
@@ -119,94 +108,14 @@ object Updater : AppUpdater {
         download?.cancel()
     }
 
-    private fun fetchLatest(): AppRelease? {
-        val conn = open(RELEASES, "application/vnd.github+json")
-        val releases = try {
-            JSONArray(conn.inputStream.bufferedReader().use { it.readText() })
-        } finally {
-            conn.disconnect()
-        }
-        for (i in 0 until releases.length()) {
-            val o = releases.getJSONObject(i)
-            if (o.optBoolean("draft") || o.optBoolean("prerelease")) continue
-            val assets = o.optJSONArray("assets") ?: continue
-            val msi = (0 until assets.length()).map { assets.getJSONObject(it) }
-                .firstOrNull { it.optString("name").endsWith(".msi", ignoreCase = true) } ?: continue
-            return AppRelease(
-                version = o.optString("tag_name").removePrefix("desktop-").removePrefix("v"),
-                notes = o.optString("body"),
-                fileUrl = msi.getString("browser_download_url"),
-                fileSize = msi.optLong("size"),
-                sha256 = sha256Of(msi.optString("digest")),
-            )
-        }
-        return null
-    }
-
-    /**
-     * Cancellable between chunks: the "Cancel" button stops it within one read. Checked against
-     * the SHA-256 GitHub lists for it before it is ever started.
-     */
     private suspend fun downloadInstaller(release: AppRelease, onProgress: (Float?) -> Unit): File {
         // In %TEMP%, never under the install folder: the upgrade wipes that folder while the
         // installer still reads from it, which aborts it after the old version is gone.
         val dir = File(System.getProperty("java.io.tmpdir"), "Pier.doon-update").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "Pierdoon-${release.version}.msi")
-        val digest = MessageDigest.getInstance("SHA-256")
-        val conn = open(release.fileUrl, "application/octet-stream")
-        try {
-            val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.fileSize.takeIf { it > 0 }
-            var read = 0L
-            var lastReported: Int? = -1
-            DigestInputStream(conn.inputStream, digest).use { input ->
-                file.outputStream().use { out ->
-                    val buf = ByteArray(64 * 1024)
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        read += n
-                        val percent = total?.let { (read * 100 / it).toInt() }
-                        // Unknown size: reported once as null, not on every chunk.
-                        if (percent != lastReported) {
-                            lastReported = percent
-                            onProgress(total?.let { read.toFloat() / it })
-                        }
-                    }
-                }
-            }
-            if (total != null && read != total) throw IOException("Truncated download")
-            val actual = digest.digest().joinToString("") { "%02x".format(it) }
-            if (release.sha256 != null && actual != release.sha256) {
-                throw IOException("Installer checksum mismatch")
-            }
-        } catch (e: Exception) {
-            file.delete()
-            throw e
-        } finally {
-            conn.disconnect()
-        }
+        GitHubReleases.download(release, file, USER_AGENT, onProgress)
         return file
     }
 
-    private fun open(url: String, accept: String): HttpURLConnection {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 10_000
-        conn.readTimeout = 20_000
-        conn.instanceFollowRedirects = true
-        conn.setRequestProperty("Accept", accept)
-        conn.setRequestProperty("User-Agent", USER_AGENT)
-        if (conn.responseCode !in 200..299) {
-            conn.disconnect()
-            throw IOException("HTTP ${conn.responseCode}")
-        }
-        return conn
-    }
 }
-
-/** The hex out of "sha256:<hex>", as GitHub gives an asset's digest; null for anything else. */
-internal fun sha256Of(digest: String): String? =
-    digest.removePrefix("sha256:").lowercase()
-        .takeIf { digest.startsWith("sha256:") && it.length == 64 && it.all { c -> c in '0'..'9' || c in 'a'..'f' } }
