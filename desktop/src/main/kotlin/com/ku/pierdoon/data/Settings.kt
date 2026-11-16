@@ -19,10 +19,6 @@ enum class DeliciousStyle { Aura, Waves, Dust, Calm }
 /** How the PC track list lays songs out: one card of rows, or compact tiles in columns. */
 enum class TrackView { List, Tiles }
 
-/** Narrowest navigation rail: a column of icons. */
-const val NAV_MIN_WIDTH = 88f
-/** Widest: the pills just fit the longest label. */
-const val NAV_MAX_WIDTH = 232f
 
 /** The PC's defaults for what both apps have: album art colours, no click on presses. */
 private val PC_DEFAULTS = CommonSettings(colorSource = ColorSource.AlbumArt, haptics = false)

@@ -100,8 +100,8 @@ class LibrarySyncTest {
         assertNotNull(read)
         read!!
         assertEquals(ThemeMode.Dark, read.settings!!.theme)
-        assertEquals(6, read.settings!!.crossfadeSeconds)
-        assertEquals(AppFont.JetBrainsMono, read.settings!!.font)
+        assertEquals(6, read.settings.crossfadeSeconds)
+        assertEquals(AppFont.JetBrainsMono, read.settings.font)
         assertEquals(setOf(1L), read.library.favorites)
     }
 }

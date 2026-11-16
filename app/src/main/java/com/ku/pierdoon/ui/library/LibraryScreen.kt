@@ -33,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -203,7 +204,8 @@ fun LibraryScreen(
                         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                         onShuffleAll()
                     },
-                    expanded = tracks.atTop,
+                    // A phone on its side has the tabs right beside it: the icon alone keeps them clear.
+                    expanded = tracks.atTop && LocalConfiguration.current.screenHeightDp >= SHORT_SCREEN_DP,
                 )
             }
         },
@@ -231,3 +233,6 @@ fun LibraryScreen(
         }
     }
 }
+
+/** Below this the shuffle button shows only its icon. */
+private const val SHORT_SCREEN_DP = 480

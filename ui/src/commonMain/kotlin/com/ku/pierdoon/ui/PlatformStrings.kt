@@ -53,4 +53,7 @@ internal expect object PlatformStrings {
 
     /** What the glass blurs on each. */
     val glassDesc: StringResource
+
+    /** An empty playlist, and how tracks get into one: a long press, or a right click. */
+    val emptyPlaylist: StringResource
 }

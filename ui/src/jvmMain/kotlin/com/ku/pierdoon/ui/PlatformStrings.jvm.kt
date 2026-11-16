@@ -1,6 +1,7 @@
 package com.ku.pierdoon.ui
 
 import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.empty_playlist
 import com.ku.pierdoon.ui.resources.lyrics_wifi_only
 import com.ku.pierdoon.ui.resources.permission_body
 import com.ku.pierdoon.ui.resources.permission_grant
@@ -37,4 +38,5 @@ internal actual object PlatformStrings {
     actual val pureBlackDesc: StringResource = Res.string.settings_black_desc
     actual val wallpaperColorsDesc: StringResource = Res.string.settings_colors_wallpaper_desc
     actual val glassDesc: StringResource = Res.string.settings_glass_desc
+    actual val emptyPlaylist: StringResource = Res.string.empty_playlist
 }

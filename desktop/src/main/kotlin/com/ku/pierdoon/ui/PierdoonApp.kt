@@ -1,5 +1,7 @@
 package com.ku.pierdoon.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.shadow
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInHorizontally
@@ -10,23 +12,12 @@ import com.ku.pierdoon.ui.desktop.WindowChrome
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,10 +29,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,31 +39,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -82,17 +56,10 @@ import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.LibraryState
 import com.ku.pierdoon.MainViewModel
 import com.ku.pierdoon.data.ColorSource
-import com.ku.pierdoon.data.NAV_MAX_WIDTH
 import com.ku.pierdoon.data.NAV_MIN_WIDTH
 import com.ku.pierdoon.data.CoverStore
-import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.PlayHistory
-import com.ku.pierdoon.data.history.DailyMix
-import com.ku.pierdoon.data.history.ListeningStats
-import com.ku.pierdoon.data.history.StatsPeriod
-import com.ku.pierdoon.radio.RadioStart
 import com.ku.pierdoon.radio.RadioState
-import com.ku.pierdoon.radio.RadioTrack
 import com.ku.pierdoon.ui.player.PlayerRadio
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.Song
@@ -102,47 +69,23 @@ import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlaybackController
 import com.ku.pierdoon.ui.resources.*
 import com.ku.pierdoon.ui.resources.Res
-import com.ku.pierdoon.ui.components.Artwork
 import com.ku.pierdoon.ui.components.ArtworkCache
 import com.ku.pierdoon.ui.components.Backdrop
 import com.ku.pierdoon.ui.components.PlayerIcons
-import com.ku.pierdoon.ui.components.animatePressAsState
 import com.ku.pierdoon.ui.components.backdropSource
 import com.ku.pierdoon.ui.components.glass
 import com.ku.pierdoon.ui.components.rememberBackdrop
-import com.ku.pierdoon.ui.components.scaleBy
 import com.ku.pierdoon.ui.desktop.BackHandler
 import com.ku.pierdoon.ui.desktop.Files
 import com.ku.pierdoon.ui.desktop.Toast
 import com.ku.pierdoon.ui.desktop.ToastHost
 import com.ku.pierdoon.ui.desktop.trackPointer
-import com.ku.pierdoon.ui.download.DownloadScreen
-import com.ku.pierdoon.ui.edit.EditSongScreen
-import com.ku.pierdoon.ui.library.HeroTrack
-import com.ku.pierdoon.ui.library.BulkActionsSheet
-import com.ku.pierdoon.ui.library.BulkTarget
-import com.ku.pierdoon.ui.library.CollectionScreen
-import com.ku.pierdoon.ui.library.MixCollage
-import com.ku.pierdoon.ui.library.StatsScreen
-import com.ku.pierdoon.ui.library.ConfirmDeleteDialog
-import com.ku.pierdoon.ui.library.FavoritesCover
 import com.ku.pierdoon.ui.library.FillBox
-import com.ku.pierdoon.ui.library.HomeScreen
 import com.ku.pierdoon.ui.library.LibraryScreen
-import com.ku.pierdoon.ui.library.MenuEntry
-import com.ku.pierdoon.ui.library.PlaylistActionsSheet
-import com.ku.pierdoon.ui.library.PlaylistCover
-import com.ku.pierdoon.ui.library.PlaylistCoverSheet
-import com.ku.pierdoon.ui.library.PlaylistNameDialog
-import com.ku.pierdoon.ui.library.LibraryPlaylists
-import com.ku.pierdoon.ui.library.SearchScreen
-import com.ku.pierdoon.ui.library.SongActionTarget
-import com.ku.pierdoon.ui.library.SongActionsSheet
-import com.ku.pierdoon.ui.navigation.MotionSpecs
-import com.ku.pierdoon.ui.navigation.NavDirection
 import com.ku.pierdoon.ui.navigation.Navigator
+import com.ku.pierdoon.ui.navigation.NavRail
+import com.ku.pierdoon.ui.navigation.NavTab
 import com.ku.pierdoon.ui.navigation.Route
-import com.ku.pierdoon.ui.navigation.pageTransition
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
@@ -161,39 +104,18 @@ import com.ku.pierdoon.ui.player.QueuePanel
 import com.ku.pierdoon.ui.settings.SettingsScreen
 import com.ku.pierdoon.ui.phone.PhoneScreen
 import com.ku.pierdoon.ui.theme.AlbumThemeSeed
-import com.ku.pierdoon.ui.update.UpdateDialog
 import com.ku.pierdoon.data.Backup
-import com.ku.pierdoon.data.DuplicateGroup
 import com.ku.pierdoon.data.Duplicates
-import com.ku.pierdoon.data.SmartPlaylist
-import com.ku.pierdoon.data.history.YearReview
-import com.ku.pierdoon.ui.library.DuplicatesScreen
-import com.ku.pierdoon.ui.library.FoldersScreen
-import com.ku.pierdoon.ui.edit.BatchEditScreen
-import com.ku.pierdoon.ui.library.SmartPlaylistCover
-import com.ku.pierdoon.ui.library.SmartPlaylistEditor
-import com.ku.pierdoon.ui.library.YearReviewScreen
-import com.ku.pierdoon.ui.settings.RestoreBackupDialog
-import androidx.compose.runtime.produceState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
-private sealed interface PlaylistDialog {
-    data class Create(val songIds: List<Long>) : PlaylistDialog
-    data class Rename(val playlist: Playlist) : PlaylistDialog
-    data class Delete(val playlist: Playlist) : PlaylistDialog
-}
 
 /** Songs waiting for "move to the Recycle Bin?" to be answered. */
 private class PendingDelete(val songs: List<Song>, val done: () -> Unit)
 
-/** The smart playlist editor: a new one, or [playlist] to change. */
-private class SmartEditorTarget(val playlist: SmartPlaylist?)
 
 /** What the window shows on its right edge next to the library. */
 enum class SidePanel { Lyrics, Queue }
@@ -282,12 +204,8 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
         }
     }
 
-    var songAction by remember { mutableStateOf<SongActionTarget?>(null) }
-    var playlistAction by remember { mutableStateOf<Playlist?>(null) }
-    var coverSheetFor by remember { mutableStateOf<Long?>(null) }
-    var dialog by remember { mutableStateOf<PlaylistDialog?>(null) }
+    val sheets = rememberAppSheets()
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
-    var bulk by remember { mutableStateOf<BulkTarget?>(null) }
     val deleteSongs: (List<Song>, () -> Unit) -> Unit = { songs, done ->
         if (songs.isNotEmpty()) pendingDelete = PendingDelete(songs, done)
     }
@@ -325,14 +243,11 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                                 nav = nav,
                                 vm = vm,
                                 songs = (library as LibraryState.Ready).songs,
-                                currentSongId = player.nowPlaying?.songId,
                                 userData = userData,
                                 bottomInset = bottomInset,
                                 backEnabled = !expanded,
-                                onSongLongPress = { song, playlistId -> songAction = SongActionTarget(song, playlistId) },
-                                onBulk = { songs, playlistId, done -> bulk = BulkTarget(songs, playlistId, done) },
+                                sheets = sheets,
                                 onDeleteSongs = deleteSongs,
-                                onPlaylistLongPress = { playlistAction = it },
                                 onImportPlaylist = {
                                     Files.pickPlaylist(importTitle)?.let { source ->
                                         scope.launch {
@@ -348,10 +263,6 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                                         }
                                     }
                                 },
-                                onCreatePlaylist = { dialog = PlaylistDialog.Create(emptyList()) },
-                                onRenamePlaylist = { dialog = PlaylistDialog.Rename(it) },
-                                onDeletePlaylist = { dialog = PlaylistDialog.Delete(it) },
-                                onPlaylistCover = { coverSheetFor = it.id },
                             )
                         }
                     }
@@ -359,6 +270,8 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
             }
             NavRail(
                 nav = nav,
+                tabs = DesktopNavTabs,
+                splitAfter = Route.Phone,
                 width = settings.navWidth,
                 onResize = { w -> SettingsStore.update { it.copy(navWidth = w) } },
                 bottomInset = bottomInset,
@@ -397,7 +310,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                             onRemove = vm::removeQueueEntry,
                             onMove = vm::moveQueueEntry,
                             onSaveAsPlaylist = { name, songs -> vm.createPlaylist(name, songs.map { it.id }) },
-                            onLongPress = { songAction = SongActionTarget(it) },
+                            onLongPress = { sheets.openSong(it) },
                             modifier = modifier,
                         )
                     },
@@ -481,7 +394,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
                         onRemoveQueueEntry = vm::removeQueueEntry,
                         onMoveQueueEntry = vm::moveQueueEntry,
                         onSaveQueue = { name, songs -> vm.createPlaylist(name, songs.map { it.id }) },
-                        onSongLongPress = { songAction = SongActionTarget(it) },
+                        onSongLongPress = { sheets.openSong(it) },
                         onRetryLyrics = vm::retryLyrics,
                         lyricsOffsetMs = lyricsOffset,
                         onShiftLyrics = vm::shiftLyrics,
@@ -532,75 +445,25 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
             ToastHost(Modifier.align(Alignment.BottomCenter).padding(bottom = bottomInset + 16.dp))
         }
 
-    songAction?.let { target ->
-        SongActionsSheet(
-            target = target,
-            isFavorite = target.song.id in userData.favorites,
-            playlists = userData.playlists,
-            onDismiss = { songAction = null },
-            onPlayNext = { vm.playNext(target.song) },
-            onAddToQueue = { vm.addToQueue(target.song) },
-            onToggleFavorite = { vm.toggleFavorite(target.song.id) },
-            onAddToPlaylist = { id -> vm.addToPlaylist(id, target.song.id) },
-            onCreatePlaylist = { dialog = PlaylistDialog.Create(listOf(target.song.id)) },
-            onRemoveFromPlaylist = { target.playlistId?.let { vm.removeFromPlaylist(it, target.song.id) } },
-            onEdit = {
-                expanded = false
-                nav.push(Route.EditSong(target.song.id))
-            },
-            onDelete = { deleteSongs(listOf(target.song)) {} },
-            onRadio = if (settings.radioEnabled && !RadioTrack.isRadio(target.song.id)) {
-                { vm.startRadio(RadioStart.track(target.song)) }
-            } else {
-                null
-            },
-        )
-    }
-    bulk?.let { target ->
-        val ids = target.songs.map { it.id }
-        BulkActionsSheet(
-            target = target,
-            playlists = userData.playlists,
-            onDismiss = { bulk = null },
-            onPlay = { vm.playSongs(target.songs, 0) },
-            onPlayNext = { vm.playNext(target.songs) },
-            onAddToQueue = { vm.addToQueue(target.songs) },
-            onAddFavorites = { vm.addFavorites(ids) },
-            onAddToPlaylist = { id -> vm.addToPlaylist(id, ids) },
-            onCreatePlaylist = { dialog = PlaylistDialog.Create(ids) },
-            onRemoveFromPlaylist = { target.playlistId?.let { vm.removeFromPlaylist(it, ids.toSet()) } },
-            onDelete = { deleteSongs(target.songs, target.onDone) },
-            onEditTags = { nav.push(Route.EditSongs(target.songs.map { it.id })) },
-        )
-    }
-    playlistAction?.let { p ->
-        PlaylistActionsSheet(
-            playlist = p,
-            onDismiss = { playlistAction = null },
-            onRename = { dialog = PlaylistDialog.Rename(p) },
-            onCover = { coverSheetFor = p.id },
-            onDelete = { dialog = PlaylistDialog.Delete(p) },
-            onExport = {
-                Files.savePlaylist(exportTitle, p.name)?.let { target ->
-                    scope.launch {
-                        val ok = vm.exportPlaylist(p, target)
-                        Toast.show(if (ok) exportedText else exportFailedText)
-                    }
+    AppSheetsHost(
+        sheets = sheets,
+        vm = vm,
+        nav = nav,
+        userData = userData,
+        radioEnabled = settings.radioEnabled,
+        currentVersion = Updater.currentVersion,
+        deleteSongs = deleteSongs,
+        onExportPlaylist = { p ->
+            Files.savePlaylist(exportTitle, p.name)?.let { target ->
+                scope.launch {
+                    val ok = vm.exportPlaylist(p, target)
+                    Toast.show(if (ok) exportedText else exportFailedText)
                 }
-            },
-        )
-    }
-    // Read from the live list, so the sheet shows each change as it's made.
-    coverSheetFor?.let { id -> userData.playlists.firstOrNull { it.id == id } }?.let { p ->
-        PlaylistCoverSheet(
-            playlist = p,
-            firstSong = vm.resolve(p.songIds.take(1)).firstOrNull(),
-            onDismiss = { coverSheetFor = null },
-            onShape = { vm.setPlaylistShape(p.id, it) },
-            onPickImage = { vm.setPlaylistCover(p.id, it.file) },
-            onRemoveImage = { vm.removePlaylistCover(p.id) },
-        )
-    }
+            }
+        },
+        sendToComputer = null,
+        onLeavePlayer = { expanded = false },
+    )
     pendingDelete?.let { pd ->
         val deletedOne = stringResource(Res.string.deleted)
         val deletedMany = pluralStringResource(Res.plurals.deleted_count, pd.songs.size, pd.songs.size)
@@ -627,40 +490,6 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text(stringResource(Res.string.cancel)) } },
         )
-    }
-    if (updatePrompt) {
-        UpdateDialog(state = update, currentVersion = Updater.currentVersion, onInstall = vm::installUpdate, onDismiss = vm::dismissUpdate)
-    }
-    when (val d = dialog) {
-        is PlaylistDialog.Create -> PlaylistNameDialog(
-            title = stringResource(Res.string.new_playlist),
-            confirmLabel = stringResource(Res.string.create),
-            onDismiss = { dialog = null },
-            onConfirm = { name ->
-                vm.createPlaylist(name, d.songIds)
-                dialog = null
-            },
-        )
-        is PlaylistDialog.Rename -> PlaylistNameDialog(
-            title = stringResource(Res.string.rename),
-            confirmLabel = stringResource(Res.string.save),
-            initial = d.playlist.name,
-            onDismiss = { dialog = null },
-            onConfirm = { name ->
-                vm.renamePlaylist(d.playlist.id, name)
-                dialog = null
-            },
-        )
-        is PlaylistDialog.Delete -> ConfirmDeleteDialog(
-            name = d.playlist.name,
-            onDismiss = { dialog = null },
-            onConfirm = {
-                vm.deletePlaylist(d.playlist.id)
-                if (nav.current == Route.PlaylistDetail(d.playlist.id)) nav.pop()
-                dialog = null
-            },
-        )
-        null -> Unit
     }
     }
 }
@@ -711,6 +540,7 @@ private fun SidePanelContent(
     }
 }
 
+/** The pages; the library tab, settings and the phone's page are the computer's own. */
 @Composable
 private fun Screens(
     nav: Navigator,
@@ -718,636 +548,118 @@ private fun Screens(
     onOpenPlayer: () -> Unit,
     vm: MainViewModel,
     songs: List<Song>,
-    currentSongId: Long?,
     userData: UserData,
     bottomInset: Dp,
     backEnabled: Boolean,
-    onSongLongPress: (Song, Long?) -> Unit,
-    onBulk: (List<Song>, Long?, () -> Unit) -> Unit,
-    onDeleteSongs: ((List<Song>, () -> Unit) -> Unit)?,
-    onPlaylistLongPress: (Playlist) -> Unit,
+    sheets: AppSheets,
+    onDeleteSongs: (List<Song>, () -> Unit) -> Unit,
     onImportPlaylist: () -> Unit,
-    onCreatePlaylist: () -> Unit,
-    onRenamePlaylist: (Playlist) -> Unit,
-    onDeletePlaylist: (Playlist) -> Unit,
-    onPlaylistCover: (Playlist) -> Unit,
 ) {
-    val collections by vm.collections.collectAsState()
-    val player by vm.player.collectAsState()
     val settings by SettingsStore.settings.collectAsState()
-    val stateHolder = rememberSaveableStateHolder()
-    val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val motion = remember(spatialOffset, spatial, effects) { MotionSpecs(spatialOffset, spatial, effects) }
-    val resolveCover: (Playlist) -> Song? = { p -> vm.resolve(p.songIds.take(1)).firstOrNull() }
-    val onPlay: (List<Song>, Int) -> Unit = { list, i -> vm.playSongs(list, i) }
-    val onShuffle: (List<Song>) -> Unit = { list ->
-        if (list.isNotEmpty()) vm.playSongs(list, list.indices.random(), shuffle = true)
-    }
     val plays by PlayHistory.plays.collectAsState()
-    // Built from plays up to last midnight, so it's the same all day; looked at again on each page change.
-    val today = remember(nav.current) { DailyMix.dayNumber(System.currentTimeMillis()) }
-    val playsLoaded = plays != null
-    val dailyMix = remember(songs, userData.favorites, today, playsLoaded) {
-        if (!playsLoaded) emptyList() else DailyMix.build(songs, plays.orEmpty(), userData.favorites, System.currentTimeMillis())
-    }
-    val yearReview = remember(plays, today) { plays?.let { YearReview.seasonYear(it, System.currentTimeMillis()) } }
-    val smartTracks: (SmartPlaylist) -> List<Song> = { p ->
-        p.evaluate(songs, plays.orEmpty(), userData.favorites, System.currentTimeMillis())
-    }
-    // The smart playlist being made (id not in the list yet) or changed; null with the editor closed.
-    var smartEditor by remember { mutableStateOf<SmartEditorTarget?>(null) }
-    var restoring by remember { mutableStateOf<Backup?>(null) }
     val scope = rememberCoroutineScope()
     val backupTitle = stringResource(Res.string.backup_export)
     val restoreTitle = stringResource(Res.string.backup_import)
     val backupSaved = stringResource(Res.string.backup_saved)
     val backupFailed = stringResource(Res.string.backup_save_failed)
     val backupUnreadable = stringResource(Res.string.backup_read_failed)
-
-    // One page = its saved UI state + its content.
-    val pageBody: @Composable (Route) -> Unit = { route ->
-        stateHolder.SaveableStateProvider(route.key) {
-            when (route) {
-                Route.Home -> {
-                    val recent = remember(userData.recent, songs) { vm.resolve(userData.recent) }
-                    HomeScreen(
-                        recent = recent,
-                        collections = collections,
-                        playlists = userData.playlists,
-                        favoritesCount = userData.favorites.size,
-                        dailyMix = dailyMix,
-                        weekListenedMs = plays?.let { p ->
-                            // The same week as the statistics page: seven calendar days, tracks still in the library.
-                            val since = ListeningStats.periodStart(StatsPeriod.Week, System.currentTimeMillis())
-                            val ids = songs.mapTo(HashSet()) { it.id }
-                            p.sumOf { if (it.atMs >= since && it.songId in ids) it.listenedMs else 0L }
-                        },
-                        resolveCover = resolveCover,
-                        onPlay = onPlay,
-                        onShuffleAll = vm::shuffleAll,
-                        onOpen = nav::push,
-                        onSongLongPress = { onSongLongPress(it, null) },
-                        bottomInset = bottomInset,
-                        onMyWave = if (settings.radioEnabled && songs.isNotEmpty()) {
-                            { vm.startRadio(RadioStart.wave(dailyMix.ifEmpty { songs.shuffled().take(DailyMix.SIZE) })) }
-                        } else {
-                            null
-                        },
-                        yearReview = yearReview,
-                        hero = player.nowPlaying?.let { HeroTrack(it.songId, it.albumId, it.title, it.artist, playing = true) }
-                            ?: recent.firstOrNull()?.let { HeroTrack(it.id, it.albumId, it.title, it.artist, playing = false) },
-                        isPlaying = player.isPlaying,
-                        onOpenPlayer = onOpenPlayer,
-                        onTogglePlay = vm::togglePlay,
-                        radioOn = vm.radio.collectAsState().value != null,
-                    )
-                }
-                Route.Library -> LibraryScreen(
-                    songs = songs,
-                    collections = collections,
-                    currentSongId = currentSongId,
-                    onPlay = onPlay,
-                    onShuffleAll = vm::shuffleAll,
-                    onSongLongPress = { onSongLongPress(it, null) },
-                    onOpen = nav::push,
-                    sort = settings.songSort,
-                    sortDescending = settings.songSortDescending,
-                    onSort = { sort, desc -> SettingsStore.update { it.shared { copy(songSort = sort, songSortDescending = desc) } } },
-                    trackView = settings.trackView,
-                    onTrackView = { v -> SettingsStore.update { it.copy(trackView = v) } },
-                    onBulk = { picked, done -> onBulk(picked, null, done) },
-                    onDelete = onDeleteSongs,
-                    lists = LibraryPlaylists(
-                        playlists = userData.playlists,
-                        favoritesCount = userData.favorites.size,
-                        resolveCover = resolveCover,
-                        onCreate = onCreatePlaylist,
-                        onLongPress = onPlaylistLongPress,
-                        onImport = onImportPlaylist,
-                        smart = userData.smartPlaylists,
-                        smartCount = { smartTracks(it).size },
-                        onCreateSmart = { smartEditor = SmartEditorTarget(null) },
-                        onEditSmart = { smartEditor = SmartEditorTarget(it) },
-                    ),
-                    bottomInset = bottomInset,
-                )
-                Route.Search -> SearchScreen(
-                    songs = songs,
-                    collections = collections,
-                    currentSongId = currentSongId,
+    val options = remember {
+        PageOptions(
+            tabs = DesktopTabs,
+            settingsInPlace = true,
+            downloads = Downloader,
+            downloadsIsTab = true,
+            describeDuplicate = { it.path },
+            onClearHistory = PlayHistory::clear,
+        )
+    }
+    AppPages(
+        nav = nav,
+        vm = vm,
+        songs = songs,
+        userData = userData,
+        plays = plays,
+        settings = settings,
+        options = options,
+        bottomInset = bottomInset,
+        backEnabled = backEnabled,
+        onOpenPlayer = onOpenPlayer,
+        onSongLongPress = sheets::openSong,
+        onBulk = sheets::openBulk,
+        onDeleteSongs = onDeleteSongs,
+        onPlaylistLongPress = { sheets.playlistAction = it },
+        onImportPlaylist = onImportPlaylist,
+        onCreatePlaylist = { sheets.createPlaylist() },
+        onRenamePlaylist = sheets::renamePlaylist,
+        onDeletePlaylist = sheets::deletePlaylist,
+        onPlaylistCover = { sheets.coverSheetFor = it.id },
+        onRestore = { sheets.restoring = it },
+    ) { route, page ->
+        when (route) {
+            Route.Library -> LibraryScreen(
+                songs = page.songs,
+                collections = page.collections,
+                currentSongId = page.currentSongId,
+                onPlay = page.onPlay,
+                onShuffleAll = vm::shuffleAll,
+                onSongLongPress = page.onSongLongPress,
+                onOpen = nav::push,
+                sort = settings.songSort,
+                sortDescending = settings.songSortDescending,
+                onSort = ::setSongSort,
+                trackView = settings.trackView,
+                onTrackView = { v -> SettingsStore.update { it.copy(trackView = v) } },
+                onBulk = page.onBulk,
+                onDelete = page.onDelete,
+                lists = page.lists,
+                bottomInset = bottomInset,
+            )
+            Route.Phone -> PhoneScreen(settings = settings, bottomInset = bottomInset)
+            Route.Settings, is Route.SettingsPage -> {
+                val updateState by vm.update.collectAsState()
+                SettingsScreen(
+                    section = (route as? Route.SettingsPage)?.section,
+                    onOpen = { nav.push(Route.SettingsPage(it)) },
                     onBack = { nav.pop() },
-                    onPlay = onPlay,
-                    onSongLongPress = { onSongLongPress(it, null) },
-                    onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
-                    onOpenAlbum = { nav.push(Route.AlbumDetail(it)) },
-                    bottomInset = bottomInset,
-                )
-                Route.Downloads -> DownloadScreen(
-                    downloads = Downloader,
-                    onBack = null,
-                    onPlay = { id -> vm.song(id)?.let { vm.playSongs(listOf(it), 0) } },
-                    bottomInset = bottomInset,
-                )
-                Route.Phone -> PhoneScreen(settings = settings, bottomInset = bottomInset)
-                // The phone's pages; nothing leads there on the computer.
-                Route.Playlists, Route.Computer -> Unit
-                Route.Settings, is Route.SettingsPage -> {
-                    val updateState by vm.update.collectAsState()
-                    SettingsScreen(
-                        section = (route as? Route.SettingsPage)?.section,
-                        onOpen = { nav.push(Route.SettingsPage(it)) },
-                        onBack = { nav.pop() },
-                        settings = settings,
-                        onUpdate = SettingsStore::update,
-                        trackCount = songs.size,
-                        lyricsCacheSize = vm::lyricsCacheSize,
-                        onClearLyricsCache = vm::clearLyricsCache,
-                        onRescan = vm::rescanLibrary,
-                        onAddFolder = vm::addMusicFolder,
-                        onRemoveFolder = vm::removeMusicFolder,
-                        onExcludeFolder = vm::addExcludedFolder,
-                        onUnexcludeFolder = vm::removeExcludedFolder,
-                        onDownloadFolder = vm::setDownloadFolder,
-                        updateState = updateState,
-                        onCheckUpdates = vm::checkForUpdates,
-                        onShowUpdate = vm::showUpdate,
-                        onFindDuplicates = { nav.push(Route.Duplicates) },
-                        onExportBackup = {
-                            Files.saveBackup(backupTitle, Backup.suggestedName(System.currentTimeMillis()))?.let { target ->
-                                scope.launch { Toast.show(if (vm.exportBackup(target)) backupSaved else backupFailed) }
-                            }
-                        },
-                        onImportBackup = {
-                            Files.pickBackup(restoreTitle)?.let { source ->
-                                scope.launch { vm.readBackup(source)?.let { restoring = it } ?: Toast.show(backupUnreadable, Toast.LENGTH_LONG) }
-                            }
-                        },
-                        bottomInset = bottomInset,
-                    )
-                }
-                is Route.AlbumDetail -> {
-                    val album = collections.albums.firstOrNull { it.id == route.albumId }
-                    CollectionScreen(
-                        title = album?.title.orEmpty(),
-                        subtitle = album?.artist.orEmpty(),
-                        songs = album?.songs.orEmpty(),
-                        currentSongId = currentSongId,
-                        cover = { m ->
-                            if (album != null) {
-                                Artwork(album.coverSongId, album.coverAlbumId, m.clip(RoundedCornerShape(40.dp)), large = true, placeholderIconSize = 64.dp)
-                            }
-                        },
-                        onBack = { nav.pop() },
-                        onPlay = onPlay,
-                        onShuffle = onShuffle,
-                        onSongLongPress = { onSongLongPress(it, null) },
-                        onBulk = { picked, done -> onBulk(picked, null, done) },
-                        onDelete = onDeleteSongs,
-                        bottomInset = bottomInset,
-                    )
-                }
-                is Route.ArtistDetail -> {
-                    val artist = collections.artist(route.name)
-                    CollectionScreen(
-                        title = artist?.name ?: route.name,
-                        subtitle = "",
-                        songs = artist?.songs.orEmpty(),
-                        currentSongId = currentSongId,
-                        cover = { m ->
-                            if (artist != null) {
-                                Artwork(artist.coverSong.id, artist.coverSong.albumId, m.clip(CircleShape), large = true, placeholderIconSize = 64.dp)
-                            }
-                        },
-                        onBack = { nav.pop() },
-                        onPlay = onPlay,
-                        onShuffle = onShuffle,
-                        onSongLongPress = { onSongLongPress(it, null) },
-                        onBulk = { picked, done -> onBulk(picked, null, done) },
-                        onDelete = onDeleteSongs,
-                        bottomInset = bottomInset,
-                    )
-                }
-                is Route.PlaylistDetail -> {
-                    val playlist = userData.playlists.firstOrNull { it.id == route.playlistId }
-                    val tracks = remember(playlist, songs) { playlist?.let { vm.resolve(it.songIds) }.orEmpty() }
-                    CollectionScreen(
-                        title = playlist?.name.orEmpty(),
-                        subtitle = "",
-                        songs = tracks,
-                        currentSongId = currentSongId,
-                        cover = { m ->
-                            PlaylistCover(playlist, tracks.firstOrNull(), m, large = true, placeholderIconSize = 64.dp)
-                        },
-                        onBack = { nav.pop() },
-                        onPlay = onPlay,
-                        onShuffle = onShuffle,
-                        onSongLongPress = { onSongLongPress(it, playlist?.id) },
-                        onBulk = { picked, done -> onBulk(picked, playlist?.id, done) },
-                        onDelete = onDeleteSongs,
-                        bottomInset = bottomInset,
-                        emptyText = stringResource(Res.string.empty_playlist),
-                        menu = if (playlist != null) {
-                            listOf(
-                                MenuEntry(stringResource(Res.string.cover), PlayerIcons.Image) { onPlaylistCover(playlist) },
-                                MenuEntry(stringResource(Res.string.rename), PlayerIcons.Edit) { onRenamePlaylist(playlist) },
-                                MenuEntry(stringResource(Res.string.delete), PlayerIcons.Delete) { onDeletePlaylist(playlist) },
-                            )
-                        } else {
-                            emptyList()
-                        },
-                    )
-                }
-                is Route.EditSongs -> {
-                    val picked = remember(songs, route.songIds) { route.songIds.mapNotNull(vm::song) }
-                    if (picked.isNotEmpty()) {
-                        BatchEditScreen(songs = picked, vm = vm, onBack = { nav.pop() }, bottomInset = bottomInset)
-                    } else {
-                        LaunchedEffect(Unit) { nav.pop() }
-                    }
-                }
-                is Route.EditSong -> {
-                    val song = remember(songs, route.songId) { vm.song(route.songId) }
-                    if (song != null) {
-                        EditSongScreen(song = song, vm = vm, onBack = { nav.pop() }, bottomInset = bottomInset)
-                    } else {
-                        // The file is gone (deleted elsewhere): nothing left to edit.
-                        LaunchedEffect(Unit) { nav.pop() }
-                    }
-                }
-                Route.DailyMix -> CollectionScreen(
-                    title = stringResource(Res.string.daily_mix),
-                    subtitle = stringResource(Res.string.daily_mix_desc),
-                    songs = dailyMix,
-                    currentSongId = currentSongId,
-                    cover = { m -> MixCollage(dailyMix, m) },
-                    onBack = { nav.pop() },
-                    onPlay = onPlay,
-                    onShuffle = onShuffle,
-                    onSongLongPress = { onSongLongPress(it, null) },
-                    onBulk = { picked, done -> onBulk(picked, null, done) },
-                    onDelete = onDeleteSongs,
-                    bottomInset = bottomInset,
-                )
-                Route.Stats -> StatsScreen(
-                    plays = plays,
-                    songs = songs,
-                    currentSongId = currentSongId,
-                    onBack = { nav.pop() },
-                    onPlay = onPlay,
-                    onSongLongPress = { onSongLongPress(it, null) },
-                    onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
-                    onClear = PlayHistory::clear,
-                    onYearReview = { nav.push(Route.YearReview(it)) },
-                    bottomInset = bottomInset,
-                )
-                is Route.YearReview -> YearReviewScreen(
-                    year = route.year,
-                    plays = plays,
-                    songs = songs,
-                    onBack = { nav.pop() },
-                    onPlay = onPlay,
-                    onOpenArtist = { nav.push(Route.ArtistDetail(it)) },
-                    bottomInset = bottomInset,
-                )
-                Route.Folders -> FoldersScreen(
-                    folders = collections.folders,
-                    onBack = { nav.pop() },
-                    onOpen = { nav.push(Route.FolderDetail(it.path)) },
-                    bottomInset = bottomInset,
-                )
-                is Route.FolderDetail -> {
-                    val folder = collections.folders.firstOrNull { it.path == route.path }
-                    val tracks = folder?.songs.orEmpty()
-                    CollectionScreen(
-                        title = folder?.name.orEmpty(),
-                        subtitle = folder?.location.orEmpty(),
-                        songs = tracks,
-                        currentSongId = currentSongId,
-                        cover = { m -> MixCollage(tracks, m) },
-                        onBack = { nav.pop() },
-                        onPlay = onPlay,
-                        onShuffle = onShuffle,
-                        onSongLongPress = { onSongLongPress(it, null) },
-                        onBulk = { picked, done -> onBulk(picked, null, done) },
-                        onDelete = onDeleteSongs,
-                        bottomInset = bottomInset,
-                    )
-                }
-                Route.Duplicates -> {
-                    val groups by produceState<List<DuplicateGroup>?>(null, songs, userData, plays) {
-                        value = withContext(Dispatchers.Default) {
-                            val playCounts = plays.orEmpty().groupingBy { it.songId }.eachCount()
-                            val inPlaylists = userData.playlists.flatMap { it.songIds }.groupingBy { it }.eachCount()
-                            Duplicates.find(songs, userData.favorites, inPlaylists, playCounts)
+                    settings = settings,
+                    onUpdate = SettingsStore::update,
+                    trackCount = songs.size,
+                    lyricsCacheSize = vm::lyricsCacheSize,
+                    onClearLyricsCache = vm::clearLyricsCache,
+                    onRescan = vm::rescanLibrary,
+                    onAddFolder = vm::addMusicFolder,
+                    onRemoveFolder = vm::removeMusicFolder,
+                    onExcludeFolder = vm::addExcludedFolder,
+                    onUnexcludeFolder = vm::removeExcludedFolder,
+                    onDownloadFolder = vm::setDownloadFolder,
+                    updateState = updateState,
+                    onCheckUpdates = vm::checkForUpdates,
+                    onShowUpdate = vm::showUpdate,
+                    onFindDuplicates = { nav.push(Route.Duplicates) },
+                    onExportBackup = {
+                        Files.saveBackup(backupTitle, Backup.suggestedName(System.currentTimeMillis()))?.let { target ->
+                            scope.launch { Toast.show(if (vm.exportBackup(target)) backupSaved else backupFailed) }
                         }
-                    }
-                    DuplicatesScreen(
-                        groups = groups,
-                        currentSongId = currentSongId,
-                        describe = { it.path },
-                        onBack = { nav.pop() },
-                        onPlay = onPlay,
-                        onDelete = { picked, done -> onDeleteSongs?.invoke(picked, done) },
-                        bottomInset = bottomInset,
-                    )
-                }
-                is Route.SmartPlaylistDetail -> {
-                    val playlist = userData.smartPlaylists.firstOrNull { it.id == route.playlistId }
-                    val tracks = remember(playlist, songs, plays, userData.favorites, today) { playlist?.let(smartTracks).orEmpty() }
-                    CollectionScreen(
-                        title = playlist?.name.orEmpty(),
-                        subtitle = stringResource(Res.string.smart_badge),
-                        songs = tracks,
-                        currentSongId = currentSongId,
-                        cover = { m -> SmartPlaylistCover(m) },
-                        onBack = { nav.pop() },
-                        onPlay = onPlay,
-                        onShuffle = onShuffle,
-                        onSongLongPress = { onSongLongPress(it, null) },
-                        onBulk = { picked, done -> onBulk(picked, null, done) },
-                        onDelete = onDeleteSongs,
-                        bottomInset = bottomInset,
-                        emptyText = stringResource(Res.string.empty_playlist),
-                        menu = if (playlist != null) {
-                            listOf(
-                                MenuEntry(stringResource(Res.string.smart_edit_rules), PlayerIcons.Edit) { smartEditor = SmartEditorTarget(playlist) },
-                                MenuEntry(stringResource(Res.string.delete), PlayerIcons.Delete) {
-                                    vm.deleteSmartPlaylist(playlist.id)
-                                    nav.pop()
-                                },
-                            )
-                        } else {
-                            emptyList()
-                        },
-                    )
-                }
-                Route.Favorites -> {
-                    val tracks = remember(userData.favorites, songs) { vm.resolve(userData.favorites) }
-                    CollectionScreen(
-                        title = stringResource(Res.string.favorites),
-                        subtitle = "",
-                        songs = tracks,
-                        currentSongId = currentSongId,
-                        cover = { m -> FavoritesCover(m) },
-                        onBack = { nav.pop() },
-                        onPlay = onPlay,
-                        onShuffle = onShuffle,
-                        onSongLongPress = { onSongLongPress(it, null) },
-                        onBulk = { picked, done -> onBulk(picked, null, done) },
-                        onDelete = onDeleteSongs,
-                        bottomInset = bottomInset,
-                    )
-                }
+                    },
+                    onImportBackup = {
+                        Files.pickBackup(restoreTitle)?.let { source ->
+                            scope.launch { vm.readBackup(source)?.let { sheets.restoring = it } ?: Toast.show(backupUnreadable, Toast.LENGTH_LONG) }
+                        }
+                    },
+                    bottomInset = bottomInset,
+                )
             }
+            // The phone's pages; nothing leads there on the computer.
+            else -> Unit
         }
-    }
-
-    // Esc, Alt+Left or the mouse's back button pops the page; the springy back transition plays.
-    BackHandler(enabled = backEnabled && nav.previous != null) { nav.pop() }
-
-    val pageTransition = updateTransition(nav.current, label = "screens")
-    pageTransition.AnimatedContent(
-        contentKey = { it.key },
-        transitionSpec = {
-            val from = initialState
-            val to = targetState
-            val direction = when {
-                from in DesktopTabs && to in DesktopTabs -> NavDirection.Tab
-                // Settings and its pages change in place, as tabs do, rather than sliding.
-                from.isSettings() && to.isSettings() -> NavDirection.Tab
-                nav.forward -> NavDirection.Forward
-                else -> NavDirection.Back
-            }
-            pageTransition(direction, motion)
-        },
-        modifier = Modifier.fillMaxSize(),
-    ) { route ->
-        // Opaque page background: pages overlap while sliding over each other.
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) { pageBody(route) }
-    }
-
-    smartEditor?.let { target ->
-        SmartPlaylistEditor(
-            initial = target.playlist,
-            count = { smartTracks(it).size },
-            onDismiss = { smartEditor = null },
-            onSave = { p ->
-                vm.putSmartPlaylist(p)
-                smartEditor = null
-                if (target.playlist == null) nav.push(Route.SmartPlaylistDetail(p.id))
-            },
-            onDelete = target.playlist?.let { p ->
-                {
-                    vm.deleteSmartPlaylist(p.id)
-                    smartEditor = null
-                    if (nav.current == Route.SmartPlaylistDetail(p.id)) nav.pop()
-                }
-            },
-        )
-    }
-    restoring?.let { backup ->
-        RestoreBackupDialog(
-            backup = backup,
-            onDismiss = { restoring = null },
-            onConfirm = {
-                restoring = null
-                scope.launch {
-                    val (found, total) = vm.restoreBackup(backup)
-                    Toast.show(getString(Res.string.backup_restored, found, total), Toast.LENGTH_LONG)
-                }
-            },
-        )
     }
 }
 
 /** The computer's tabs, down the rail on the left. */
 internal val DesktopTabs: List<Route.Tab> = listOf(Route.Home, Route.Library, Route.Downloads, Route.Phone, Route.Settings)
 
-private fun Route.isSettings() = this == Route.Settings || this is Route.SettingsPage
-
-/**
- * The phone's tab bar turned on its side: a column of pills, the selected one filled. Its right
- * edge drags it between a column of icons ([NAV_MIN_WIDTH]) and pills that just fit their labels
- * ([NAV_MAX_WIDTH]); a double click on the edge jumps between the two.
- */
-@Composable
-private fun NavRail(
-    nav: Navigator,
-    width: Float,
-    onResize: (Float) -> Unit,
-    bottomInset: Dp,
-    backdrop: Backdrop,
-    modifier: Modifier = Modifier,
-) {
-    val colors = MaterialTheme.colorScheme
-    val density = LocalDensity.current
-    val currentWidth by rememberUpdatedState(width)
-    val resize by rememberUpdatedState(onResize)
-    var dragged by remember { mutableStateOf<Float?>(null) }
-    val shown by animateDpAsState(
-        targetValue = (dragged ?: width).dp,
-        animationSpec = if (dragged != null) snap() else MaterialTheme.motionScheme.defaultSpatialSpec(),
-        label = "railWidth",
-    )
-    val compact = shown < NAV_LABEL_WIDTH
-    val handle = remember { MutableInteractionSource() }
-    val hovered by handle.collectIsHoveredAsState()
-    val edge by animateColorAsState(
-        if (hovered || dragged != null) colors.outlineVariant else Color.Transparent,
-        MaterialTheme.motionScheme.defaultEffectsSpec(),
-        label = "railEdge",
-    )
-
-    val capsule = RoundedCornerShape(36.dp)
-    Box(modifier.fillMaxHeight().width(shown)) {
-        // A frosted capsule, like the phone's floating bar stood on end.
-        Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = bottomInset + 12.dp)
-                .shadow(8.dp, capsule)
-                .glass(
-                    backdrop = backdrop,
-                    shape = capsule,
-                    tint = colors.surfaceContainerHigh.copy(alpha = 0.72f),
-                    fallback = colors.surfaceContainerHigh,
-                    blurRadius = 40.dp,
-                )
-                .hairline(capsule)
-                .padding(8.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = if (compact) 0.dp else 12.dp, top = 8.dp, bottom = 20.dp),
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(14.dp)).background(colors.primaryContainer),
-                ) {
-                    Icon(PlayerIcons.Logo, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(26.dp))
-                }
-                if (!compact) {
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        stringResource(Res.string.app_name),
-                        style = MaterialTheme.typography.titleLargeEmphasized,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip,
-                    )
-                }
-            }
-            DesktopTabs.forEach { tab ->
-                RailItem(tab = tab, selected = nav.tab == tab, compact = compact) {
-                    nav.selectTab(tab)
-                }
-                if (tab == Route.Phone) Spacer(Modifier.weight(1f))
-            }
-        }
-        // The grab strip along the right edge; a thin line shows while it's hovered or dragged.
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .padding(bottom = bottomInset)
-                .width(10.dp)
-                .hoverable(handle)
-                .pointerHoverIcon(PointerIcon(java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)))
-                .pointerInput(Unit) {
-                    detectTapGestures(onDoubleTap = {
-                        resize(if (currentWidth > NAV_MIN_WIDTH) NAV_MIN_WIDTH else NAV_MAX_WIDTH)
-                    })
-                }
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { dragged = shown.value },
-                        onDragEnd = {
-                            val w = dragged ?: return@detectHorizontalDragGestures
-                            // A rail too narrow for its labels collapses to the icons.
-                            resize(if (w < NAV_LABEL_WIDTH.value) NAV_MIN_WIDTH else w)
-                            dragged = null
-                        },
-                        onDragCancel = { dragged = null },
-                    ) { change, dx ->
-                        change.consume()
-                        dragged = ((dragged ?: shown.value) + dx / density.density).coerceIn(NAV_MIN_WIDTH, NAV_MAX_WIDTH)
-                    }
-                },
-        ) {
-            Box(Modifier.width(2.dp).fillMaxHeight(0.3f).clip(CircleShape).background(edge))
-        }
-    }
-}
-
-@Composable
-private fun RailItem(tab: Route.Tab, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
-    val haptics = LocalHapticFeedback.current
-    val colors = MaterialTheme.colorScheme
-    val source = remember { MutableInteractionSource() }
-    val scale = animatePressAsState(source, 0.94f)
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
-    val container by animateColorAsState(if (selected) colors.secondaryContainer else Color.Transparent, effects, label = "railBg")
-    val content by animateColorAsState(
-        if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant, effects, label = "railFg"
-    )
-    val label = stringResource(tab.label())
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        // Icons only: a round button rather than a squashed pill.
-        horizontalArrangement = if (compact) Arrangement.Center else Arrangement.Start,
-        modifier = Modifier
-            .then(if (compact) Modifier.size(56.dp) else Modifier.fillMaxWidth().height(52.dp))
-            .scaleBy(scale)
-            .clip(RoundedCornerShape(50))
-            .background(container)
-            .clickable(interactionSource = source, indication = null, role = Role.Tab) {
-                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                onClick()
-            }
-            .semantics { this.selected = selected }
-            .padding(horizontal = if (compact) 0.dp else 16.dp),
-    ) {
-        Icon(tab.icon(), contentDescription = if (compact) label else null, tint = content, modifier = Modifier.size(24.dp))
-        if (!compact) {
-            Spacer(Modifier.width(14.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = content,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
 
 private val SIDE_PANEL_WIDTH = 380.dp
-/** Narrower than this the rail hides its labels. */
-private val NAV_LABEL_WIDTH = 160.dp
-
-private fun Route.Tab.icon() = when (this) {
-    Route.Home -> PlayerIcons.Home
-    Route.Library -> PlayerIcons.Library
-    Route.Downloads -> PlayerIcons.Download
-    Route.Phone -> PlayerIcons.Smartphone
-    Route.Settings -> PlayerIcons.Settings
-    Route.Playlists -> error("not a tab on the computer")
-}
-
-private fun Route.Tab.label() = when (this) {
-    Route.Home -> Res.string.nav_home
-    Route.Library -> Res.string.nav_library
-    Route.Downloads -> Res.string.nav_downloads
-    Route.Phone -> Res.string.nav_phone
-    Route.Settings -> Res.string.nav_settings
-    Route.Playlists -> error("not a tab on the computer")
-}
-
 /** Keeps the last track around so exit animations don't render an empty player. */
 @Composable
 private fun rememberLastNonNull(value: NowPlaying?): NowPlaying? {
@@ -1367,3 +679,12 @@ private fun playerRadio(radio: RadioState?, songId: Long, vm: MainViewModel): Pl
         onStop = vm::stopRadio,
     )
 }
+
+/** The computer's tabs as the rail draws them; the ones after the phone's sit at its bottom. */
+private val DesktopNavTabs: List<NavTab> = listOf(
+    NavTab(Route.Home, PlayerIcons.Home, Res.string.nav_home),
+    NavTab(Route.Library, PlayerIcons.Library, Res.string.nav_library),
+    NavTab(Route.Downloads, PlayerIcons.Download, Res.string.nav_downloads),
+    NavTab(Route.Phone, PlayerIcons.Smartphone, Res.string.nav_phone),
+    NavTab(Route.Settings, PlayerIcons.Settings, Res.string.nav_settings),
+)

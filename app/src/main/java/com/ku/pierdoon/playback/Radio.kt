@@ -41,7 +41,7 @@ import java.util.concurrent.ConcurrentHashMap
  * A downloaded track's file goes together with its place in the queue: never one without the
  * other. The one playing is left to finish and goes once the player has moved off it.
  */
-object Radio {
+object Radio : RadioControl {
     private lateinit var app: Context
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var player: Player? = null
@@ -61,7 +61,7 @@ object Radio {
 
     private val _state = MutableStateFlow<RadioState?>(null)
     /** The radio playing now, or null. */
-    val state: StateFlow<RadioState?> = _state.asStateFlow()
+    override val state: StateFlow<RadioState?> = _state.asStateFlow()
 
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -124,7 +124,7 @@ object Radio {
     fun libraryId(id: Long): Long? = keptIds[id]
 
     /** Starts a radio from [start], over whatever was playing. */
-    fun start(library: List<Song>, request: RadioStart) {
+    override fun start(library: List<Song>, request: RadioStart) {
         val p = player ?: return
         stop()
         val playing = p.currentMediaItem?.mediaId?.takeIf { p.isPlaying }
@@ -165,7 +165,7 @@ object Radio {
         }
     }
 
-    fun stop() {
+    override fun stop() {
         val s = session ?: return
         session = null
         startJob?.cancel()
@@ -178,13 +178,13 @@ object Radio {
     }
 
     /** Saves a new track into the library and the favourites. */
-    fun keep(songId: Long) {
+    override fun keep(songId: Long) {
         val s = session ?: return
         scope.launch { s.keep(songId)?.let { keptIds[songId] = it } }
     }
 
     /** Never this one again, and less like it; skips it if it's playing. */
-    fun dislike(songId: Long) {
+    override fun dislike(songId: Long) {
         val s = session ?: return
         s.dislike(songId)
         val p = player ?: return

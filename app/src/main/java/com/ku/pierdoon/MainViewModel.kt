@@ -1,208 +1,101 @@
 package com.ku.pierdoon
 
-import com.ku.pierdoon.data.lyrics.LyricsRepository
-import com.ku.pierdoon.data.lyrics.LyricsOffsets
-import com.ku.pierdoon.ui.components.PickedImage
-import com.ku.pierdoon.ui.edit.TrackEditor
-import kotlinx.coroutines.flow.Flow
-import com.ku.pierdoon.data.metadata.MetadataCandidate
-import com.ku.pierdoon.data.USER_AGENT
-import com.ku.pierdoon.data.Backup
-import com.ku.pierdoon.data.LibrarySnapshot
-import com.ku.pierdoon.data.LibrarySync
-import com.ku.pierdoon.data.PlayHistory
-import com.ku.pierdoon.data.SmartPlaylist
-import com.ku.pierdoon.data.history.Play
-import com.ku.pierdoon.remote.PcRemote
-import com.ku.pierdoon.remote.PcSync
-import com.ku.pierdoon.data.M3uMatch
-import com.ku.pierdoon.data.M3uMatcher
-import com.ku.pierdoon.data.MusicFolder
-import com.ku.pierdoon.playback.tapeSides
-import com.ku.pierdoon.data.Playlist
-import com.ku.pierdoon.data.decodeM3u
-import com.ku.pierdoon.data.parseM3u
-import com.ku.pierdoon.data.writeM3u
-import android.provider.OpenableColumns
-import kotlinx.coroutines.flow.drop
-import com.ku.pierdoon.data.ALBUM_ID
-import com.ku.pierdoon.data.QUEUE_KEY
-import com.ku.pierdoon.data.artworkUri
-import com.ku.pierdoon.data.uri
-import com.ku.pierdoon.data.toMediaItem
 import android.app.Application
 import android.content.ComponentName
-import android.content.ContentUris
-import android.database.ContentObserver
 import android.content.IntentSender
+import android.database.ContentObserver
 import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
-import com.ku.pierdoon.data.CoverStore
-import com.ku.pierdoon.data.MusicCollections
-import com.ku.pierdoon.data.TagOverride
-import com.ku.pierdoon.data.TagOverrides
-import com.ku.pierdoon.data.metadata.CoverEdit
-import com.ku.pierdoon.data.update.AppRelease
-import com.ku.pierdoon.data.update.UpdateState
-import com.ku.pierdoon.data.update.Updater
-import com.ku.pierdoon.data.metadata.MetadataSearch
-import com.ku.pierdoon.data.metadata.FileTags
-import com.ku.pierdoon.data.metadata.TagWriter
-import com.ku.pierdoon.data.metadata.TrackEdit
-import com.ku.pierdoon.data.metadata.SaveTarget
-import com.ku.pierdoon.data.writeScaledJpeg
-import com.ku.pierdoon.ui.components.ArtworkCache
-import java.io.File
+import com.ku.pierdoon.data.Backup
+import com.ku.pierdoon.data.CommonSettings
+import com.ku.pierdoon.data.M3uMatch
+import com.ku.pierdoon.data.MusicFolder
 import com.ku.pierdoon.data.MusicRepository
+import com.ku.pierdoon.data.PlayHistory
+import com.ku.pierdoon.data.Playlist
 import com.ku.pierdoon.data.SettingsStore
-import com.ku.pierdoon.data.UserData
-import com.ku.pierdoon.data.UserLibrary
 import com.ku.pierdoon.data.Song
-import com.ku.pierdoon.data.lyrics.Lyrics
-import com.ku.pierdoon.data.lyrics.LyricsCandidate
-import com.ku.pierdoon.playback.NowPlaying
+import com.ku.pierdoon.data.USER_AGENT
+import com.ku.pierdoon.data.history.Play
+import com.ku.pierdoon.data.lyrics.LyricsOffsets
+import com.ku.pierdoon.data.metadata.FileTags
+import com.ku.pierdoon.data.metadata.MetadataSearch
+import com.ku.pierdoon.data.metadata.TagWriter
+import com.ku.pierdoon.data.update.Updater
+import com.ku.pierdoon.data.uri
+import com.ku.pierdoon.playback.EvenVolume
+import com.ku.pierdoon.playback.MediaQueuePlayer
 import com.ku.pierdoon.playback.PlaybackService
 import com.ku.pierdoon.playback.Radio
-import com.ku.pierdoon.radio.RadioStart
-import com.ku.pierdoon.radio.RadioState
-import com.ku.pierdoon.radio.RadioTrack
-import com.ku.pierdoon.playback.PlayerState
-import com.ku.pierdoon.playback.QueueEntry
-import com.ku.pierdoon.playback.QueueState
 import com.ku.pierdoon.playback.TapeMotion
-import com.ku.pierdoon.playback.nextRepeatMode
+import com.ku.pierdoon.remote.PcRemote
+import com.ku.pierdoon.remote.PcSync
+import com.ku.pierdoon.ui.components.ArtworkCache
+import com.ku.pierdoon.ui.components.PickedImage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import com.ku.pierdoon.playback.EvenVolume
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
-sealed interface LibraryState {
-    data object Loading : LibraryState
-    data class Ready(val songs: List<Song>) : LibraryState
+/**
+ * Keeps the phone's [MainViewModel] across rotations, as long as the activity's screen lives;
+ * the model itself is the one both apps share ([AppModel]).
+ */
+class MainViewModelHolder(app: Application) : AndroidViewModel(app) {
+    val model = MainViewModel(app)
+    override fun onCleared() = model.dispose()
 }
 
-class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
+/** The phone's side of [AppModel]: MediaStore for the library, Media3 for playback. */
+class MainViewModel(private val app: Application) : AppModel(
+    scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    files = app.filesDir,
+    cache = app.cacheDir,
+    userAgent = USER_AGENT,
+    lyricsOffsets = LyricsOffsets(app),
+    updater = Updater,
+    metadata = MetadataSearch,
+    radioControl = Radio,
+    settings = SettingsStore.settings,
+    platform = "android",
+    appVersion = BuildConfig.VERSION_NAME,
+) {
 
     private val repository = MusicRepository(app)
 
-    private val _library = MutableStateFlow<LibraryState>(LibraryState.Loading)
-    val library: StateFlow<LibraryState> = _library.asStateFlow()
-
-    private val _collections = MutableStateFlow(MusicCollections())
-    val collections: StateFlow<MusicCollections> = _collections.asStateFlow()
-
-    private val userLibrary = UserLibrary.get(app.filesDir)
-    private val tagOverrides = TagOverrides.get(app.filesDir)
-    val userData: StateFlow<UserData> = userLibrary.data
-
-    private val _player = MutableStateFlow(PlayerState())
-    val player: StateFlow<PlayerState> = _player.asStateFlow()
-
-    /** Rebuilt only when the queue itself changes, not on every play/pause or seek. */
-    private val _queue = MutableStateFlow(QueueState())
-    val queue: StateFlow<QueueState> = _queue.asStateFlow()
+    private var mediaPlayer: MediaQueuePlayer? = null
+    override val queuePlayer: MediaQueuePlayer? get() = mediaPlayer
 
     private var controller: MediaController? = null
     private val controllerFuture: ListenableFuture<MediaController> =
         MediaController.Builder(app, SessionToken(app, ComponentName(app, PlaybackService::class.java)))
             .buildAsync()
 
-    /** Bumped on every player event, so paused UI can wait instead of polling. */
-    private val eventTick = MutableStateFlow(0)
-
-    /**
-     * Playback position, polled only while someone collects it (the UI is started)
-     * and only while audio is actually playing. Paused or backgrounded = zero wakeups.
-     */
-    val position: StateFlow<PositionSnapshot> = flow {
-        var shown = 0L
-        while (true) {
-            val tick = eventTick.value
-            val c = controller
-            val playing = c?.isPlaying == true
-            // While the deck works, what plays runs silently and is put where it belongs after.
-            // Meanwhile a track spun to stands at its start, and one the cassette is being turned
-            // over or rewound from stands where it stopped: the bar doesn't run and jump back.
-            val motion = TapeMotion.current.value
-            shown = when (motion) {
-                TapeMotion.Still -> c?.currentPosition ?: 0L
-                TapeMotion.Forward, TapeMotion.Back -> 0L
-                else -> shown
-            }
-            emit(PositionSnapshot(shown, SystemClock.elapsedRealtime(), playing && motion == TapeMotion.Still, c?.playbackParameters?.speed ?: 1f))
-            if (playing) delay(POSITION_TICK_MS) else eventTick.first { it != tick }
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PositionSnapshot())
-
-    private var songsById: Map<Long, Song> = emptyMap()
-
-    private val lyricsModel = LyricsModel(
-        scope = viewModelScope,
-        repository = LyricsRepository(app.cacheDir, USER_AGENT, app.filesDir),
-        offsets = LyricsOffsets(app),
-        nowPlaying = _player.map { it.nowPlaying },
-        current = { _player.value.let { it.nowPlaying to it.durationMs } },
-        song = { songsById[it] },
-        networkAllowed = ::networkAllowed,
-        stopTimeoutMs = STOP_TIMEOUT_MS,
-    )
-
-    /** Fetched lazily: only while the lyrics panel is open, once per track. */
-    val lyrics: StateFlow<LyricsState> get() = lyricsModel.lyrics
-
-    /** Hand-set sync correction of the current track's lyrics; positive = lines show later. */
-    val lyricsOffset: StateFlow<Long> get() = lyricsModel.offset
-
-    fun shiftLyrics(deltaMs: Long) = lyricsModel.shift(deltaMs)
-    fun resetLyricsOffset() = lyricsModel.resetOffset()
-
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
-            syncState(player)
-            if (events.containsAny(*QUEUE_EVENTS)) syncQueue(player)
-            eventTick.update { it + 1 }
-        }
-    }
-
-    init {
-        // With even volume on, the whole library gets measured, a track at a time.
-        viewModelScope.launch {
-            combine(SettingsStore.settings.map { it.normalizeVolume }.distinctUntilChanged(), _library) { on, lib -> on to lib }
-                .collect { (on, lib) ->
-                    if (on && lib is LibraryState.Ready) EvenVolume.loudness(getApplication()).scanLibrary(lib.songs)
-                }
+            onPlayerEvents(queueChanged = events.containsAny(*QUEUE_EVENTS))
         }
     }
 
@@ -210,43 +103,49 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
         controllerFuture.addListener({
             val c = runCatching { controllerFuture.get() }.getOrNull() ?: return@addListener
             controller = c
+            mediaPlayer = MediaQueuePlayer(c)
             c.addListener(listener)
-            syncState(c)
-            syncQueue(c)
-            eventTick.update { it + 1 }
+            onPlayerEvents(queueChanged = true)
         }, ContextCompat.getMainExecutor(app))
+
+        PcSync.library = { (library.value as? LibraryState.Ready)?.songs }
+        // Each time the phone connects to the computer, a sync if it's been a while.
+        scope.launch {
+            combine(PcRemote.connection, library) { c, l ->
+                c == PcRemote.Connection.Connected && l is LibraryState.Ready
+            }.distinctUntilChanged().collect { ready -> if (ready) PcSync.onConnected(app) }
+        }
     }
 
-    // Quietly on launch, unless switched off.
-    private val updates = UpdatePrompt(viewModelScope, Updater, autoCheck = SettingsStore.settings.value.checkUpdates)
-    val update: StateFlow<UpdateState> get() = updates.state
-    /** Whether the "new version" dialog is up. */
-    val updatePrompt: StateFlow<Boolean> get() = updates.shown
+    override suspend fun loadSongs(): List<Song> = repository.loadSongs()
+    override suspend fun readFileTags(song: Song): Song? = repository.fileTags(song.id)
 
-    fun checkForUpdates() = updates.check()
-    fun showUpdate() = updates.show()
-    fun installUpdate(release: AppRelease) = updates.install(release)
-    fun dismissUpdate() = updates.dismiss()
+    override suspend fun songPaths(): (Song) -> String {
+        val paths = repository.paths()
+        return { paths[it.id].orEmpty() }
+    }
 
-    private var loadJob: Job? = null
+    override fun scanLoudness(songs: List<Song>) = EvenVolume.loudness(app).scanLibrary(songs)
 
-    fun loadLibrary(force: Boolean = false) {
-        if (!force && _library.value is LibraryState.Ready) return
-        watchMediaStore()
-        // A newer load supersedes one still running.
-        loadJob?.cancel()
-        loadJob = viewModelScope.launch {
-            val songs = runCatching { repository.loadSongs() }.getOrElse { emptyList() }
-            // Unrelated MediaStore changes (another app's ringtone, say) leave the UI alone.
-            if ((_library.value as? LibraryState.Ready)?.songs == songs) return@launch
-            songsById = songs.associateBy { it.id }
-            _collections.value = withContext(Dispatchers.Default) { MusicCollections.from(songs) }
-            _library.value = LibraryState.Ready(songs)
-            controller?.let {
-                refreshQueueItems(it)
-                syncQueue(it)
-            }
-        }
+    override fun networkAllowed(): Boolean {
+        if (!SettingsStore.settings.value.lyricsWifiOnly) return true
+        val cm = app.getSystemService(ConnectivityManager::class.java)
+        return cm?.isActiveNetworkMetered == false
+    }
+
+    override suspend fun allPlays(): List<Play> = PlayHistory.get(app).plays.first { it != null }.orEmpty()
+    override suspend fun mergePlays(plays: List<Play>) = PlayHistory.get(app).merge(plays)
+    override fun commonSettings(): CommonSettings = SettingsStore.settings.value.common
+    override fun invalidateArtwork(song: Song) = ArtworkCache.invalidate(song.id, song.albumId)
+    override fun onLoadStarted() = watchMediaStore()
+
+    // While the deck works, what plays runs silently and is put where it belongs after.
+    // Meanwhile a track spun to stands at its start, and one the cassette is being turned
+    // over or rewound from stands where it stopped: the bar doesn't run and jump back.
+    override fun shownPosition(actual: Long, shown: Long): Pair<Long, Boolean> = when (TapeMotion.current.value) {
+        TapeMotion.Still -> actual to true
+        TapeMotion.Forward, TapeMotion.Back -> 0L to false
+        else -> shown to false
     }
 
     /**
@@ -267,554 +166,107 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
     private fun watchMediaStore() {
         if (watching) return
         watching = true
-        getApplication<Application>().contentResolver.registerContentObserver(
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, true, mediaStoreObserver,
-        )
-        viewModelScope.launch {
+        app.contentResolver.registerContentObserver(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, true, mediaStoreObserver)
+        scope.launch {
             mediaStoreChanged.debounce(MEDIA_STORE_DEBOUNCE_MS).collect { loadLibrary(force = true) }
         }
         // Leaving a folder out, or taking it back, changes which tracks there are.
-        viewModelScope.launch {
+        scope.launch {
             SettingsStore.settings.map { it.excludedFolders }.distinctUntilChanged().drop(1).collect { loadLibrary(force = true) }
         }
     }
 
-    fun playSongs(songs: List<Song>, startIndex: Int, shuffle: Boolean = false) {
-        val c = controller ?: return
-        c.shuffleModeEnabled = shuffle
-        c.setMediaItems(songs.map { it.toMediaItem() }, startIndex, C.TIME_UNSET)
-        c.prepare()
-        c.play()
+    /** Every folder with music in it, left-out ones too, for Settings → Библиотека. */
+    suspend fun musicFolders(): List<MusicFolder> = repository.folders()
+
+    /** Swiping back: always the track before, never a restart of this one as the button does past 3 s. */
+    fun previousTrack() {
+        mediaPlayer?.previousTrack()
     }
 
-    fun shuffleAll() {
-        val songs = (_library.value as? LibraryState.Ready)?.songs ?: return
-        if (songs.isNotEmpty()) playSongs(songs, songs.indices.random(), shuffle = true)
-    }
-
-    fun togglePlay() {
-        val c = controller ?: return
-        if (c.isPlaying) c.pause() else {
-            if (c.playbackState == Player.STATE_IDLE) c.prepare()
-            if (c.playbackState == Player.STATE_ENDED) c.seekToDefaultPosition()
-            c.play()
-        }
-    }
-
-    /** Resolves stored ids against the current library, silently skipping deleted files. */
-    fun resolve(ids: Collection<Long>): List<Song> = ids.mapNotNull { songsById[it] }
-
-    fun playNext(song: Song) {
-        val c = controller ?: return
-        if (c.mediaItemCount == 0) return playSongs(listOf(song), 0)
-        c.addMediaItem(c.currentMediaItemIndex + 1, song.toMediaItem())
-    }
-
-    fun addToQueue(song: Song) {
-        val c = controller ?: return
-        if (c.mediaItemCount == 0) return playSongs(listOf(song), 0)
-        c.addMediaItem(song.toMediaItem())
-    }
-
-    /** Several tracks right after the current one, in the order given. */
-    fun playNext(songs: List<Song>) {
-        val c = controller ?: return
-        if (songs.isEmpty()) return
-        if (c.mediaItemCount == 0) return playSongs(songs, 0)
-        c.addMediaItems(c.currentMediaItemIndex + 1, songs.map { it.toMediaItem() })
-    }
-
-    fun addToQueue(songs: List<Song>) {
-        val c = controller ?: return
-        if (songs.isEmpty()) return
-        if (c.mediaItemCount == 0) return playSongs(songs, 0)
-        c.addMediaItems(songs.map { it.toMediaItem() })
-    }
-
-    fun addFavorites(songIds: List<Long>) = userLibrary.addFavorites(songIds)
-    fun addToPlaylist(id: Long, songIds: List<Long>) = userLibrary.addToPlaylist(id, songIds)
-    fun removeFromPlaylist(id: Long, songIds: Set<Long>) = userLibrary.removeFromPlaylist(id, songIds)
-
-    /** For a radio track not in the library yet, the heart keeps it: downloaded into it, as a favourite. */
-    fun toggleFavorite(songId: Long) {
-        if (RadioTrack.isRadio(songId)) Radio.keep(songId) else userLibrary.toggleFavorite(songId)
-    }
-
-    /** The radio playing now (beta), or null. */
-    val radio: StateFlow<RadioState?> = Radio.state
-
-    fun startRadio(start: RadioStart) {
-        val songs = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
-        Radio.start(songs, start)
-    }
-
-    fun startArtistRadio(name: String) {
-        val songs = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
-        Radio.start(songs, RadioStart.artist(name, songs))
-    }
-
-    fun dislikeRadio(songId: Long) = Radio.dislike(songId)
-
-    fun stopRadio() = Radio.stop()
-    fun createPlaylist(name: String, initialSongs: List<Long> = emptyList()) =
-        userLibrary.createPlaylist(name, initialSongs)
-    fun renamePlaylist(id: Long, name: String) = userLibrary.renamePlaylist(id, name)
-    fun deletePlaylist(id: Long) {
-        userLibrary.deletePlaylist(id)
-        CoverStore.removePlaylistCover(id)
-    }
-    fun setPlaylistShape(id: Long, shape: String?) = userLibrary.setPlaylistShape(id, shape)
-    fun setPlaylistCover(id: Long, image: Uri) {
-        viewModelScope.launch {
-            val file = importCover(image) ?: return@launch
-            withContext(Dispatchers.IO) { CoverStore.setPlaylistCover(id, file) }
-            file.delete()
-        }
-    }
-    fun removePlaylistCover(id: Long) = CoverStore.removePlaylistCover(id)
 
     /** Makes a playlist of a file's tracks found in the library; null if the file can't be read. */
-    suspend fun importPlaylist(source: Uri): M3uMatch? = withContext(Dispatchers.IO) {
-        val app = getApplication<Application>()
-        val bytes = runCatching { app.contentResolver.openInputStream(source)?.use { it.readBytes() } }.getOrNull()
-            ?: return@withContext null
-        val songs = (_library.value as? LibraryState.Ready)?.songs.orEmpty()
-        val paths = repository.paths()
-        val file = parseM3u(decodeM3u(bytes))
-        val match = M3uMatcher(songs, { paths[it.id].orEmpty() }).match(file)
-        if (match.songIds.isNotEmpty()) {
-            userLibrary.createPlaylist(file.name ?: displayName(source) ?: app.getString(R.string.nav_playlists), match.songIds)
-        }
-        match
+    suspend fun importPlaylist(source: Uri): M3uMatch? {
+        val bytes = readUri(source) ?: return null
+        return importM3u(bytes, baseDir = null) { displayName(source) ?: app.getString(R.string.nav_playlists) }
     }
 
     /** Writes [playlist] to a file the user picked; false if it couldn't be. */
-    suspend fun exportPlaylist(playlist: Playlist, target: Uri): Boolean = withContext(Dispatchers.IO) {
-        val paths = repository.paths()
-        val text = writeM3u(playlist.name, resolve(playlist.songIds)) { paths[it.id].orEmpty() }
-        runCatching {
-            getApplication<Application>().contentResolver.openOutputStream(target, "wt")?.use { it.write(text.toByteArray()) } != null
-        }.getOrDefault(false)
+    suspend fun exportPlaylist(playlist: Playlist, target: Uri): Boolean = writeUri(target, m3uText(playlist).toByteArray())
+
+    /** Writes a backup of the settings, playlists, favourites and history to a file the user picked. */
+    suspend fun exportBackup(target: Uri): Boolean = writeUri(target, backupBytes())
+
+    /** The backup in a file the user picked, or null if it isn't one. */
+    suspend fun readBackup(source: Uri): Backup? = decodeBackup(readUri(source))
+
+    /** Favourites, playlists and history, both ways with the paired computer. */
+    fun syncWithComputer() {
+        scope.launch { PcSync.sync(app) }
+    }
+
+    private suspend fun readUri(uri: Uri): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { app.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+    }
+
+    private suspend fun writeUri(uri: Uri, bytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        runCatching { app.contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) } != null }.getOrDefault(false)
     }
 
     private fun displayName(uri: Uri): String? = runCatching {
-        getApplication<Application>().contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        app.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) c.getString(0)?.substringBeforeLast('.')?.ifBlank { null } else null
         }
     }.getOrNull()
 
-    fun putSmartPlaylist(playlist: SmartPlaylist) = userLibrary.putSmartPlaylist(playlist)
-    fun deleteSmartPlaylist(id: Long) = userLibrary.deleteSmartPlaylist(id)
-
-    // Backups and syncing with the computer ---------------------------------------------------------
-
-    private fun librarySongs(): List<Song>? = (_library.value as? LibraryState.Ready)?.songs
-
-    private suspend fun allPlays(): List<Play> =
-        PlayHistory.get(getApplication()).plays.first { it != null }.orEmpty()
-
-    /** Writes a backup of the settings, playlists, favourites and history to a file the user picked. */
-    suspend fun exportBackup(target: Uri): Boolean = withContext(Dispatchers.IO) {
-        val backup = Backup(
-            createdAtMs = System.currentTimeMillis(),
-            platform = "android",
-            appVersion = BuildConfig.VERSION_NAME,
-            settings = SettingsStore.settings.value.common,
-            library = LibrarySnapshot.of(librarySongs().orEmpty(), userData.value, allPlays()),
-        )
-        runCatching {
-            getApplication<Application>().contentResolver.openOutputStream(target, "wt")?.use { it.write(backup.encode()) } != null
-        }.getOrDefault(false)
-    }
-
-    /** The backup in a file the user picked, or null if it isn't one. */
-    suspend fun readBackup(source: Uri): Backup? = withContext(Dispatchers.IO) {
-        runCatching { getApplication<Application>().contentResolver.openInputStream(source)?.use { it.readBytes() } }.getOrNull()
-            ?.let { Backup.decode(it, SettingsStore.settings.value.common) }
-    }
-
-    /**
-     * Takes [backup]'s settings and adds what's missing of its playlists, favourites and history.
-     * @return how many of the tracks it names were found here, and how many it names.
-     */
-    suspend fun restoreBackup(backup: Backup): Pair<Int, Int> {
-        val songs = librarySongs().orEmpty()
-        val plays = allPlays()
-        val outcome = withContext(Dispatchers.Default) {
-            LibrarySync.merge(LibrarySnapshot.of(songs, userData.value, plays, allTracks = true), backup.library, base = null)
-        }
-        userLibrary.apply(outcome.local)
-        PlayHistory.get(getApplication()).merge(outcome.local.plays)
-        backup.settings?.let { s -> SettingsStore.update { it.copy(common = s) } }
-        return outcome.matched to backup.library.tracks.size
-    }
-
-    /** Favourites, playlists and history, both ways with the paired computer. */
-    fun syncWithComputer() {
-        viewModelScope.launch { PcSync.sync(getApplication()) }
-    }
-
-    init {
-        PcSync.library = ::librarySongs
-        // Each time the phone connects to the computer, a sync if it's been a while.
-        viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(PcRemote.connection, _library) { c, l ->
-                c == PcRemote.Connection.Connected && l is LibraryState.Ready
-            }.distinctUntilChanged().collect { ready -> if (ready) PcSync.onConnected(getApplication()) }
-        }
-    }
-
-    fun addToPlaylist(id: Long, songId: Long) = userLibrary.addToPlaylist(id, songId)
-    fun removeFromPlaylist(id: Long, songId: Long) = userLibrary.removeFromPlaylist(id, songId)
-
-    fun playQueueEntry(key: String) {
-        val c = controller ?: return
-        val index = c.indexOfQueueKey(key) ?: return
-        c.seekToDefaultPosition(index)
-        c.play()
-    }
-
-    fun removeQueueEntry(key: String) {
-        val c = controller ?: return
-        c.indexOfQueueKey(key)?.let(c::removeMediaItem)
-    }
-
-    /** Moves an upcoming entry to [position] among the upcoming ones (0 = right after the current). */
-    fun moveQueueEntry(key: String, position: Int) {
-        val c = controller ?: return
-        val from = c.indexOfQueueKey(key) ?: return
-        val to = (c.currentMediaItemIndex + 1 + position).coerceIn(0, c.mediaItemCount - 1)
-        if (from != to) c.moveMediaItem(from, to)
-    }
-
-    fun next() { controller?.seekToNext() }
-    fun previous() { controller?.seekToPrevious() }
-    /** Swiping back: always the track before, never a restart of this one as the button does past 3 s. */
-    fun previousTrack() { controller?.seekToPreviousMediaItem() }
-    fun seekTo(positionMs: Long) { controller?.seekTo(positionMs) }
-
-    private fun networkAllowed(): Boolean {
-        if (!SettingsStore.settings.value.lyricsWifiOnly) return true
-        val cm = getApplication<Application>().getSystemService(ConnectivityManager::class.java)
-        return cm?.isActiveNetworkMetered == false
-    }
-
-    suspend fun lyricsCacheSize(): Long = lyricsModel.cacheSize()
-    fun clearLyricsCache() = lyricsModel.clearCache()
-    fun rescanLibrary() = loadLibrary(force = true)
-
-    /** Every folder with music in it, left-out ones too, for Settings → Библиотека. */
-    suspend fun musicFolders(): List<MusicFolder> = repository.folders()
-
-    fun setLyricsVisible(visible: Boolean) = lyricsModel.setVisible(visible)
-    fun retryLyrics() = lyricsModel.retry()
-
-    /** Where a lyrics search starts: the current track's artist and title. */
-    fun lyricsSearchText(): String = lyricsModel.searchText()
-
-    suspend fun searchLyrics(text: String): List<LyricsCandidate> = lyricsModel.search(text)
-
-    /** Puts lyrics picked by hand on the current track, for good. */
-    fun pickLyrics(lyrics: Lyrics) = lyricsModel.pick(lyrics)
-
-    fun currentSongId(): Long? = _player.value.nowPlaying?.songId
-
-    suspend fun ownLyrics(songId: Long): String? = lyricsModel.own(songId)
-
-    /** Lyrics the user wrote in the editor: they stay over anything found, until removed. */
-    fun saveOwnLyrics(songId: Long, text: String) = lyricsModel.saveOwn(songId, text)
-
-    fun removeOwnLyrics(songId: Long) = lyricsModel.removeOwn(songId)
-
-    fun toggleShuffle() {
-        controller?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled }
-    }
-
-    fun cycleRepeat() {
-        val c = controller ?: return
-        c.repeatMode = nextRepeatMode(c.repeatMode)
-    }
-
     // Track editing ------------------------------------------------------------------------
-
-    fun song(id: Long): Song? = songsById[id]
-
-    /** The track as its file has it, to tell in-app edits apart from what's really there. */
-    suspend fun fileTags(id: Long): Song? = repository.fileTags(id)
-
-    override fun hasInAppEdits(songId: Long): Boolean = tagOverrides.has(songId) || CoverStore.songVersion(songId) != null
-
-    override fun searchMetadata(query: String, durationMs: Long): Flow<List<MetadataCandidate>> = MetadataSearch.search(query, durationMs)
 
     /** A picture from the gallery as a cover-sized JPEG; null if it couldn't be read as an image. */
     override suspend fun importCover(image: PickedImage): File? = importCover(image.uri)
 
-    suspend fun importCover(uri: Uri): File? = withContext(Dispatchers.IO) {
-        val raw = coverPickFile("img")
-        runCatching {
-            getApplication<Application>().contentResolver.openInputStream(uri)
-                ?.use { input -> raw.outputStream().use { input.copyTo(it) } }
-        }
-        toCoverJpeg(raw)
-    }
-
-    override suspend fun downloadCover(url: String): File? {
-        val bytes = MetadataSearch.download(url) ?: return null
-        return withContext(Dispatchers.IO) {
-            val raw = coverPickFile("img")
-            raw.writeBytes(bytes)
-            toCoverJpeg(raw)
-        }
-    }
-
-    private fun toCoverJpeg(raw: File): File? {
-        val out = coverPickFile("jpg")
-        val ok = writeScaledJpeg(raw, out)
-        raw.delete()
-        return out.takeIf { ok }
-    }
-
-    private fun coverPickFile(ext: String): File {
-        val dir = File(getApplication<Application>().cacheDir, COVER_PICKS).apply { mkdirs() }
-        return File(dir, "pick_${SystemClock.elapsedRealtimeNanos()}.$ext")
-    }
-
-    /** Saves [edit] as app records: the file stays untouched. Empty fields fall back to the file's tags. */
-    override suspend fun saveInApp(song: Song, edit: TrackEdit) {
-        storeInApp(song, edit)
-        refreshAfterEdit()
-    }
-
-    override suspend fun saveAll(edits: List<Pair<Song, TrackEdit>>, target: SaveTarget, onProgress: (Int) -> Unit): Int {
-        var saved = 0
-        edits.forEachIndexed { i, (song, edit) ->
-            if (target == SaveTarget.App) {
-                storeInApp(song, edit)
-                saved++
-            } else if (writeToFile(song, edit)) {
-                saved++
-            }
-            onProgress(i + 1)
-        }
-        // The library is read again once, not after every track.
-        if (saved > 0) refreshAfterEdit()
-        return saved
-    }
-
-    private suspend fun storeInApp(song: Song, edit: TrackEdit) {
-        val file = repository.fileTags(song.id)
-        withContext(Dispatchers.IO) {
-            tagOverrides.set(
-                song.id,
-                TagOverride(
-                    title = edit.title.trim().takeIf { it.isNotEmpty() && it != file?.title },
-                    artist = edit.artist.trim().takeIf { it.isNotEmpty() && it != file?.artist },
-                    album = edit.album.trim().takeIf { it.isNotEmpty() && it != file?.album },
-                ),
-            )
-            when (val cover = edit.cover) {
-                CoverEdit.Keep -> Unit
-                CoverEdit.Remove -> CoverStore.removeSongCover(song.id)
-                is CoverEdit.Replace -> CoverStore.setSongCover(song.id, cover.file)
-            }
-        }
+    suspend fun importCover(uri: Uri): File? = coverFrom { raw ->
+        app.contentResolver.openInputStream(uri)?.use { input -> raw.outputStream().use { input.copyTo(it) } }
     }
 
     /** Android 11+ asks the user before an app may change someone else's file; null below that. */
     override fun fileWriteRequest(songs: List<Song>): IntentSender? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && songs.isNotEmpty()) {
-            MediaStore.createWriteRequest(getApplication<Application>().contentResolver, songs.map { it.uri }).intentSender
+            MediaStore.createWriteRequest(app.contentResolver, songs.map { it.uri }).intentSender
         } else {
             null
         }
 
     /** Whether the file's format takes tags at all (raw AAC, for one, doesn't). */
     override suspend fun canWriteTags(song: Song): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-            FileTags.canWrite(TagWriter.displayName(getApplication(), song))
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && FileTags.canWrite(TagWriter.displayName(app, song))
 
-    /**
-     * Writes [edit] into the file's tags; call once the user granted [fileWriteRequest].
-     * The app's own edits of this track are folded in and then dropped: the file is the truth now.
-     */
-    override suspend fun saveToFile(song: Song, edit: TrackEdit): Boolean =
-        writeToFile(song, edit).also { if (it) refreshAfterEdit() }
-
-    private suspend fun writeToFile(song: Song, edit: TrackEdit): Boolean {
-        val app = getApplication<Application>()
+    /** Call once the user granted [fileWriteRequest]. */
+    override suspend fun writeTags(
+        song: Song, title: String, artist: String, album: String, cover: ByteArray?, removeCover: Boolean,
+    ): Boolean {
         val name = TagWriter.displayName(app, song) ?: return false
-        val cover = withContext(Dispatchers.IO) {
-            when (val c = edit.cover) {
-                // A cover picked "in the app" earlier goes into the file rather than being lost.
-                CoverEdit.Keep -> CoverStore.songFile(song.id)?.let { runCatching { it.readBytes() }.getOrNull() }
-                CoverEdit.Remove -> null
-                is CoverEdit.Replace -> runCatching { c.file.readBytes() }.getOrNull()
-            }
-        }
-        // The player holds the file open while it plays; rewriting it underneath breaks playback.
-        val c = controller?.takeIf { it.currentMediaItem?.mediaId == song.id.toString() }
-        val resume = c?.let { Triple(it.currentMediaItemIndex, it.currentPosition, it.playWhenReady) }
-        c?.stop()
-        val ok = TagWriter.write(
-            app, song, name,
-            title = edit.title.trim(),
-            artist = edit.artist.trim(),
-            album = edit.album.trim(),
-            cover = cover,
-            removeCover = edit.cover == CoverEdit.Remove,
-        )
-        if (ok) {
-            tagOverrides.set(song.id, null)
-            CoverStore.removeSongCover(song.id)
-            ArtworkCache.invalidate(song.id, song.albumId)
-        }
-        if (c != null && resume != null) {
-            val (index, positionMs, playWhenReady) = resume
-            c.seekTo(index, positionMs)
-            c.prepare()
-            c.playWhenReady = playWhenReady
-        }
-        return ok
+        return TagWriter.write(app, song, name, title = title, artist = artist, album = album, cover = cover, removeCover = removeCover)
     }
 
-    /**
-     * Android 11+ asks the user before an app may delete someone else's file (the system dialog
-     * is the confirmation); null below that, where deleting would need write access to storage.
-     */
-    /** One system consent for all of [songs]; null below Android 11, where apps can't ask for it. */
+    /** One system consent for all of [songs], which is the confirmation; null below Android 11, where apps can't ask for it. */
     fun deleteRequest(songs: List<Song>): IntentSender? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && songs.isNotEmpty()) {
-            MediaStore.createDeleteRequest(getApplication<Application>().contentResolver, songs.map { it.uri }).intentSender
+            MediaStore.createDeleteRequest(app.contentResolver, songs.map { it.uri }).intentSender
         } else {
             null
         }
 
-    /** The user agreed and the system deleted the file: forget everything the app kept about it. */
-    fun onSongDeleted(songId: Long) {
-        controller?.let { c ->
-            val mediaId = songId.toString()
-            for (i in c.mediaItemCount - 1 downTo 0) {
-                if (c.getMediaItemAt(i).mediaId == mediaId) c.removeMediaItem(i)
-            }
-        }
-        userLibrary.forgetSong(songId)
-        lyricsModel.dropOffset(songId)
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                tagOverrides.set(songId, null)
-                CoverStore.removeSongCover(songId)
-            }
-            lyricsModel.forget(songId)
-        }
-        loadLibrary(force = true)
-    }
-
-    /** Drops the app's edits of a track: tags and cover come from the file again. */
-    override suspend fun resetEdits(song: Song) {
-        withContext(Dispatchers.IO) {
-            tagOverrides.set(song.id, null)
-            CoverStore.removeSongCover(song.id)
-        }
-        refreshAfterEdit()
-    }
-
-    private suspend fun refreshAfterEdit() {
-        loadLibrary(force = true)
-        loadJob?.join()
-        // A cover-only change leaves the song list equal, so the load above may skip the queue.
-        controller?.let(::refreshQueueItems)
-    }
-
-    /** Queued entries carry the tags they were queued with; edited tracks get their new ones. */
-    private fun refreshQueueItems(p: Player) {
-        for (i in 0 until p.mediaItemCount) {
-            val item = p.getMediaItemAt(i)
-            val song = songsById[item.mediaId.toLongOrNull()] ?: continue
-            val md = item.mediaMetadata
-            if (md.title?.toString() == song.title && md.artist?.toString() == song.artist &&
-                md.albumTitle?.toString() == song.album && md.artworkUri == song.artworkUri
-            ) continue
-            val key = md.extras?.getLong(QUEUE_KEY, 0L)?.takeIf { it != 0L }
-            // Same file, new metadata: Media3 swaps it in without interrupting playback.
-            p.replaceMediaItem(i, if (key != null) song.toMediaItem(key) else song.toMediaItem())
-        }
-    }
-
-    private fun syncState(p: Player) {
-        val item = p.currentMediaItem
-        _player.update {
-            PlayerState(
-                connected = true,
-                nowPlaying = item?.let { mi ->
-                    val md = mi.mediaMetadata
-                    NowPlaying(
-                        songId = mi.mediaId.toLongOrNull() ?: -1L,
-                        albumId = md.albumId(),
-                        title = md.title?.toString().orEmpty(),
-                        artist = md.artist?.toString().orEmpty(),
-                    )
-                },
-                isPlaying = p.isPlaying,
-                isBuffering = p.playbackState == Player.STATE_BUFFERING,
-                durationMs = p.duration.takeIf { it != C.TIME_UNSET } ?: 0L,
-                shuffle = p.shuffleModeEnabled,
-                repeatMode = p.repeatMode,
-            )
-        }
-    }
-
-    private fun syncQueue(p: Player) {
-        val timeline = p.currentTimeline
-        if (timeline.isEmpty) {
-            _queue.value = QueueState()
-            return
-        }
-        // Walk the play order (shuffle included) from the current track. A shuffled queue on
-        // "repeat all" goes round, so it lists every other track; in list order it stops at the
-        // end, which keeps drag positions meaning "right after the current track".
-        val wrap = p.shuffleModeEnabled && p.repeatMode == Player.REPEAT_MODE_ALL
-        val order = ArrayList<Int>()
-        var i = p.currentMediaItemIndex
-        while (i != C.INDEX_UNSET && order.size < timeline.windowCount) {
-            order += i
-            i = timeline.getNextWindowIndex(
-                i, if (wrap) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF, p.shuffleModeEnabled,
-            )
-        }
-        val seen = HashSet<String>()
-        val entries = order.map { index ->
-            val item = p.getMediaItemAt(index)
-            // LazyColumn needs unique keys; an item without one (or a clash) falls back to its slot.
-            val key = queueKeyOf(item, index).let { if (seen.add(it)) it else "slot:$index" }
-            QueueEntry(key, songsById[item.mediaId.toLongOrNull()] ?: item.toSong())
-        }
-        val tapeOrder = ArrayList<Int>(timeline.windowCount)
-        var t = timeline.getFirstWindowIndex(p.shuffleModeEnabled)
-        while (t != C.INDEX_UNSET) {
-            tapeOrder += t
-            t = timeline.getNextWindowIndex(t, Player.REPEAT_MODE_OFF, p.shuffleModeEnabled)
-        }
-        val tape = tapeSides(tapeOrder.map { p.getMediaItemAt(it).mediaMetadata.durationMs ?: 0L }, tapeOrder.indexOf(p.currentMediaItemIndex))
-        val sideStarts = buildMap {
-            tapeOrder.firstOrNull()?.let { put(queueKeyOf(p.getMediaItemAt(it), it), "A") }
-            tapeOrder.getOrNull(tape.sideBStart)?.let { put(queueKeyOf(p.getMediaItemAt(it), it), "B") }
-        }
-        _queue.value = QueueState(entries.first(), entries.drop(1), !p.shuffleModeEnabled, tape, sideStarts)
-    }
-
-    override fun onCleared() {
-        File(getApplication<Application>().cacheDir, COVER_PICKS).listFiles()?.forEach { it.delete() }
-        if (watching) getApplication<Application>().contentResolver.unregisterContentObserver(mediaStoreObserver)
+    override fun dispose() {
+        super.dispose()
+        if (watching) app.contentResolver.unregisterContentObserver(mediaStoreObserver)
         controller?.removeListener(listener)
         MediaController.releaseFuture(controllerFuture)
         controller = null
+        mediaPlayer = null
     }
 
     private companion object {
-        const val POSITION_TICK_MS = 500L
-        const val STOP_TIMEOUT_MS = 1_000L
         const val MEDIA_STORE_DEBOUNCE_MS = 1_500L
-        const val COVER_PICKS = "cover-picks"
         val QUEUE_EVENTS = intArrayOf(
             Player.EVENT_TIMELINE_CHANGED,
             Player.EVENT_MEDIA_ITEM_TRANSITION,
@@ -823,27 +275,3 @@ class MainViewModel(app: Application) : AndroidViewModel(app), TrackEditor {
         )
     }
 }
-
-private fun queueKeyOf(item: MediaItem, index: Int): String =
-    item.mediaMetadata.extras?.getLong(QUEUE_KEY, 0L)?.takeIf { it != 0L }?.let { "q:$it" } ?: "slot:$index"
-
-private fun Player.indexOfQueueKey(key: String): Int? =
-    (0 until mediaItemCount).firstOrNull { queueKeyOf(getMediaItemAt(it), it) == key }
-
-/** A queued file that has left the library still shows with what its metadata knows. */
-private fun MediaItem.toSong(): Song {
-    val md = mediaMetadata
-    return Song(
-        id = mediaId.toLongOrNull() ?: -1L,
-        title = md.title?.toString().orEmpty(),
-        artist = md.artist?.toString().orEmpty(),
-        album = md.albumTitle?.toString().orEmpty(),
-        albumId = md.albumId(),
-        durationMs = 0L,
-    )
-}
-
-/** Album of a queued item: from the extra, or (items queued before it existed) the art URI. */
-private fun MediaMetadata.albumId(): Long =
-    extras?.getLong(ALBUM_ID, -1L)?.takeIf { it != -1L }
-        ?: artworkUri?.let { runCatching { ContentUris.parseId(it) }.getOrNull() } ?: -1L
