@@ -53,6 +53,7 @@
     <string name="settings_interface">Интерфейс</string>
     <string name="font_system">Стандартный</string>
     <string name="font_system_mono">Моноширинный системный</string>
+    <string name="font_google_sans">Google Sans</string>
     <string name="font_jetbrains_mono">JetBrains Mono</string>
     <string name="font_ibm_plex_mono">IBM Plex Mono</string>
     <string name="font_sample">Съешь ещё этих мягких булок · 0123</string>
@@ -73,10 +74,15 @@
     <string name="eq_preset_vocal">Вокал</string>
     <string name="eq_preset_rock">Рок</string>
     <string name="eq_preset_electronic">Электроника</string>
+    <string name="eq_preset_bass_boost">Мощный бас</string>
+    <string name="eq_preset_deep_vocal">Глубокий вокал</string>
+    <string name="eq_preset_loud">Громко</string>
     <string name="eq_preset_custom">Своё</string>
     <string name="settings_silence">Пропуск тишины</string>
     <string name="settings_silence_desc">Пропускать беззвучные фрагменты</string>
     <string name="settings_lyrics">Тексты песен</string>
+    <string name="settings_lyrics_karaoke">Подсветка пропетого</string>
+    <string name="settings_lyrics_karaoke_desc">Строка, которую сейчас поют, заполняется светом по ходу песни</string>
     <string name="settings_sync_controls">Подстройка синхронизации</string>
     <string name="settings_sync_controls_desc">Кнопки в тексте песни, чтобы сдвинуть его раньше или позже, если он не совпадает с музыкой</string>
     <string name="settings_clear_cache">Очистить кэш текстов</string>
@@ -92,6 +98,9 @@
     <string name="greeting_day">Добрый день</string>
     <string name="greeting_evening">Добрый вечер</string>
     <string name="greeting_night">Доброй ночи</string>
+    <string name="greeting_quote">«%1$s»</string>
+    <string name="greeting_quote_source">%1$s — %2$s</string>
+    <string name="greeting_no_lyrics">Здесь будут строчки из ваших песен: сначала откройте текст хотя бы нескольких</string>
     <string name="recently_played">Недавно прослушанные</string>
     <string name="recently_added">Недавно добавленные</string>
     <string name="your_playlists">Ваши плейлисты</string>

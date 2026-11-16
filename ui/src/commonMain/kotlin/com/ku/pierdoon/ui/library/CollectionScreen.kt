@@ -79,6 +79,7 @@ fun CollectionScreen(
                 SongRow(
                     song = song,
                     isCurrent = song.id == currentSongId,
+                    card = songCardShape(index, songs.size),
                     onClick = { if (selecting) selection.toggle(song.id) else onPlay(songs, index) },
                     onLongClick = { if (selecting) selection.toggle(song.id) else onSongLongPress(song) },
                     selected = if (selecting) song.id in selection.ids else null,

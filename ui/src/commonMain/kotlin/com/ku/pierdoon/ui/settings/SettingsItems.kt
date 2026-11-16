@@ -93,13 +93,17 @@ import com.ku.pierdoon.ui.resources.settings_colors_pick
 import com.ku.pierdoon.ui.resources.crossfade_off
 import com.ku.pierdoon.ui.resources.crossfade_seconds
 import com.ku.pierdoon.ui.resources.eq_preset_bass
+import com.ku.pierdoon.ui.resources.eq_preset_bass_boost
 import com.ku.pierdoon.ui.resources.eq_preset_custom
+import com.ku.pierdoon.ui.resources.eq_preset_deep_vocal
 import com.ku.pierdoon.ui.resources.eq_preset_electronic
 import com.ku.pierdoon.ui.resources.eq_preset_flat
+import com.ku.pierdoon.ui.resources.eq_preset_loud
 import com.ku.pierdoon.ui.resources.eq_preset_rock
 import com.ku.pierdoon.ui.resources.eq_preset_vocal
 import com.ku.pierdoon.ui.resources.font_custom
 import com.ku.pierdoon.ui.resources.font_custom_pick
+import com.ku.pierdoon.ui.resources.font_google_sans
 import com.ku.pierdoon.ui.resources.font_ibm_plex_mono
 import com.ku.pierdoon.ui.resources.font_jetbrains_mono
 import com.ku.pierdoon.ui.resources.font_system
@@ -575,6 +579,7 @@ fun FontItem(
 
 @Composable
 fun fontLabel(font: AppFont, customName: String?): String = when (font) {
+    AppFont.GoogleSans -> stringResource(Res.string.font_google_sans)
     AppFont.System -> stringResource(Res.string.font_system)
     AppFont.SystemMono -> stringResource(Res.string.font_system_mono)
     AppFont.JetBrainsMono -> stringResource(Res.string.font_jetbrains_mono)
@@ -799,8 +804,11 @@ fun EqualizerItem(
 fun EqPreset.label(): StringResource = when (this) {
     EqPreset.Flat -> Res.string.eq_preset_flat
     EqPreset.Bass -> Res.string.eq_preset_bass
+    EqPreset.BassBoost -> Res.string.eq_preset_bass_boost
     EqPreset.Vocal -> Res.string.eq_preset_vocal
+    EqPreset.DeepVocal -> Res.string.eq_preset_deep_vocal
     EqPreset.Rock -> Res.string.eq_preset_rock
     EqPreset.Electronic -> Res.string.eq_preset_electronic
+    EqPreset.Loud -> Res.string.eq_preset_loud
     EqPreset.Custom -> Res.string.eq_preset_custom
 }

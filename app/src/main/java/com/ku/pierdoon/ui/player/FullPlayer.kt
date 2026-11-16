@@ -307,6 +307,8 @@ fun FullPlayer(
                                 onNext = onNext,
                                 onPrevious = onPreviousTrack,
                                 tape = queue.tape.takeIf { cassetteMode },
+                                // A different flower on every pause, as on the computer.
+                                flowers = true,
                                 modifier = Modifier
                                     .widthIn(max = minOf(maxWidth, maxHeight))
                                     .fillMaxWidth()

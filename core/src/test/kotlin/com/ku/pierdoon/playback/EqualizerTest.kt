@@ -60,21 +60,62 @@ class EqualizerTest {
     }
 
     @Test
-    fun boostIsMadeRoomFor() {
+    fun boostIsMadeHalfTheRoomFor() {
         val eq = Equalizer(rate, 1)
         eq.setGains(gains(125 to EQ_MAX_DB))
-        // The boosted band comes out as loud as it went in; the rest is turned down instead.
-        assertEquals(1.0, gainAt(eq, 125.0), 0.03)
+        // 12 dB up: the band comes out 6 dB louder, the rest 6 dB quieter, not 12.
+        assertEquals(2.0, gainAt(eq, 125.0), 0.06)
         eq.reset()
-        assertEquals(0.25, gainAt(eq, 8000.0), 0.03)
+        assertEquals(0.5, gainAt(eq, 8000.0), 0.03)
+    }
+
+    @Test
+    fun presetsDoNotTurnTheMusicDown() {
+        // Issue #8: with the whole peak made room for, "Bass" left the mids at about -8.5 dB.
+        listOf(EqPreset.Bass, EqPreset.Rock, EqPreset.Electronic).forEach { p ->
+            val eq = Equalizer(rate, 1)
+            eq.setGains(p.gains)
+            assertTrue("$p at 1 kHz", gainAt(eq, 1000.0) > 0.55)
+        }
+        val loud = Equalizer(rate, 1)
+        loud.setGains(EqPreset.Loud.gains)
+        assertTrue(gainAt(loud, 3000.0) > 1.0)
     }
 
     @Test
     fun overlappingBoostsDoNotClip() {
         // 31, 62 and 125 Hz all raised: around 62 Hz they add up to more than any one band.
+        listOf(EqPreset.Bass, EqPreset.BassBoost).forEach { p ->
+            val eq = Equalizer(rate, 1)
+            eq.setGains(p.gains)
+            assertTrue("$p", peakAt(eq, 50.0, amplitude = 32_000) < Short.MAX_VALUE)
+        }
+    }
+
+    @Test
+    fun loudBassIsTurnedDownNotCutFlat() {
         val eq = Equalizer(rate, 1)
-        eq.setGains(EqPreset.Bass.gains)
-        assertTrue(peakAt(eq, 50.0, amplitude = 30_000) < Short.MAX_VALUE)
+        eq.setGains(EqPreset.BassBoost.gains)
+        eq.beginBlock()
+        val out = IntArray(rate) { n -> eq.process((32_000 * sin(2 * PI * 50.0 * n / rate)).roundToInt(), 0) }
+        val settled = out.drop(rate / 4).map(::abs)
+        val peak = settled.max()
+        // A sine spends about 9 % of its time within 1 % of its peak; a wave cut flat, far more.
+        val nearPeak = settled.count { it >= peak * 0.99 }.toDouble() / settled.size
+        assertTrue("near peak $nearPeak", nearPeak < 0.12)
+    }
+
+    @Test
+    fun limiterLeavesOrdinaryLevelsAlone() {
+        // A cut makes no room: what's under the ceiling passes as it is, what's over is turned down.
+        val eq = Equalizer(rate, 1)
+        eq.setGains(gains(125 to -6f))
+        assertEquals(1.0, gainAt(eq, 8000.0, amplitude = 20_000), 0.02)
+        eq.reset()
+        // 1 kHz: at 48 kHz its samples hit the top of the wave (8 kHz ones reach only 87 % of it).
+        val peak = peakAt(eq, 1000.0, amplitude = 32_767)
+        // Turned down to the ceiling, about 1 dB under full scale, not cut flat at it.
+        assertTrue(peak in 29_000..29_500)
     }
 
     @Test

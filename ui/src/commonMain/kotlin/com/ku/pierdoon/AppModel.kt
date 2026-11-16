@@ -224,6 +224,9 @@ abstract class AppModel(
 
     fun lyricsOffsetFor(songId: Long): Long = lyricsModel.offsetFor(songId)
 
+    /** A random line from the lyrics already on this device, for the home screen's greeting. */
+    suspend fun randomLyricQuote(): LyricQuote? = lyricsModel.randomQuote(songsById.keys)
+
     suspend fun lyricsCacheSize(): Long = lyricsModel.cacheSize()
     fun clearLyricsCache() = lyricsModel.clearCache()
 
@@ -305,8 +308,13 @@ abstract class AppModel(
 
     // Playback ----------------------------------------------------------------------------------------
 
-    fun playSongs(songs: List<Song>, startIndex: Int, shuffle: Boolean = false) {
-        queuePlayer?.play(songs, startIndex, shuffle)
+    /**
+     * Replaces the queue with [songs] from [startIndex]. [shuffle] null keeps shuffle as it is:
+     * picking a track doesn't switch it off (issue #6); a shuffled queue then starts from that track.
+     */
+    fun playSongs(songs: List<Song>, startIndex: Int, shuffle: Boolean? = null) {
+        val p = queuePlayer ?: return
+        p.play(songs, startIndex, shuffle ?: p.shuffle)
     }
 
     fun shuffleAll() {

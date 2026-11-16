@@ -3,6 +3,7 @@ package com.ku.pierdoon.playback
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -20,9 +21,14 @@ val EQ_FLAT: List<Float> = List(EQ_BANDS.size) { 0f }
 enum class EqPreset(gains: List<Int>?) {
     Flat(List(EQ_BANDS.size) { 0 }),
     Bass(listOf(6, 5, 4, 2, 0, 0, 0, 0, 0, 0)),
+    BassBoost(listOf(9, 8, 6, 3, 1, 0, 0, 0, 0, 0)),
     Vocal(listOf(-2, -2, -1, 0, 2, 4, 4, 2, 0, -1)),
+    /** Body of the voice (low mids) over its edge; sibilance a little down. */
+    DeepVocal(listOf(-2, -1, 1, 3, 3, 2, 1, 0, -1, -2)),
     Rock(listOf(4, 3, 2, 0, -1, -1, 1, 2, 3, 4)),
     Electronic(listOf(5, 4, 1, 0, -2, 1, 0, 2, 4, 5)),
+    /** Raised nearly evenly, most where the ear is keenest (2–4 kHz): louder, the limiter keeping it clean. */
+    Loud(listOf(3, 3, 2, 1, 1, 2, 3, 3, 2, 2)),
     Custom(null);
 
     /** Null for [Custom], whose gains are the user's own. */
@@ -40,8 +46,10 @@ fun formatEqGains(gains: List<Float>): String = gains.joinToString(",") { ((it *
 
 /**
  * A graphic equalizer for interleaved 16-bit PCM: one peaking filter per band (the "Audio EQ
- * Cookbook" biquad), run on each channel, after a pre-gain that lowers the whole signal by the
- * curve's highest point so a raised band doesn't clip.
+ * Cookbook" biquad), run on each channel, after a pre-gain that lowers the whole signal by half
+ * the curve's highest point. Lowering it by all of it would keep every raised band from clipping
+ * but make any boost sound like turning the volume down; instead the rare peak that still goes
+ * over is caught by a limiter just under full scale.
  *
  * [setGains] may be called from any thread; the audio thread picks the change up at its next
  * [beginBlock]. Everything else belongs to the audio thread. A change keeps the filters' memory,
@@ -57,6 +65,13 @@ class Equalizer(private val sampleRate: Int, private val channels: Int) {
     private var preGain = 1.0
     /** Per channel, per band: x1, x2, y1, y2. */
     private var memory = DoubleArray(0)
+
+    /** The limiter's gain per channel, and how many more samples it stays down before rising. */
+    private val limiterGain = DoubleArray(channels) { 1.0 }
+    private val limiterHold = IntArray(channels)
+    private val holdSamples = (sampleRate * HOLD_S).toInt()
+    /** How far towards 1 the gain rises each sample once the hold is over. */
+    private val release = 1 - exp(-1.0 / (sampleRate * RELEASE_S))
 
     /** Null switches it off: samples pass through untouched. */
     fun setGains(gains: List<Float>?) {
@@ -89,12 +104,34 @@ class Equalizer(private val sampleRate: Int, private val channels: Int) {
             m += 4
             c += 5
         }
-        return x.roundToInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+        return limit(x, channel).roundToInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+    }
+
+    /**
+     * A peak limiter: a sample that would go past [CEILING] turns the gain down to just fit it, held
+     * there a while and then let back up slowly, so a loud passage is made quieter as a whole
+     * rather than having its waves' tops cut flat. Levels under the ceiling pass untouched.
+     */
+    private fun limit(x: Double, channel: Int): Double {
+        var g = limiterGain[channel]
+        val m = abs(x)
+        if (m * g > CEILING) {
+            g = CEILING / m
+            limiterHold[channel] = holdSamples
+        } else if (limiterHold[channel] > 0) {
+            limiterHold[channel]--
+        } else if (g < 1.0) {
+            g = minOf(1.0, g + (1.0 - g) * release)
+        }
+        limiterGain[channel] = g
+        return x * g
     }
 
     /** Forgets the filters' memory: after a seek the old samples have nothing to do with the new. */
     fun reset() {
         memory.fill(0.0)
+        limiterGain.fill(1.0)
+        limiterHold.fill(0)
     }
 
     private fun rebuild(gains: List<Float>?) {
@@ -115,7 +152,8 @@ class Equalizer(private val sampleRate: Int, private val channels: Int) {
             peak = maxOf(peak, response(2 * PI * f / sampleRate))
             f *= 2.0.pow(1.0 / 12)
         }
-        preGain = 1 / peak
+        // Half the peak in dB: the square root of it as a linear gain.
+        preGain = 1 / sqrt(peak)
     }
 
     /** How much the filters as a whole amplify at [w] radians per sample (a linear gain). */
@@ -148,5 +186,12 @@ class Equalizer(private val sampleRate: Int, private val channels: Int) {
     private companion object {
         /** About one octave wide, so neighbouring bands blend into a smooth curve. */
         const val Q = 1.41
+
+        /** The loudest the limiter lets through: about 1 dB under full scale. */
+        const val CEILING = 32767.0 * 0.9
+
+        /** Longer than a wave of the lowest band (31 Hz), so a held bass note isn't pumped. */
+        const val HOLD_S = 0.05
+        const val RELEASE_S = 0.2
     }
 }

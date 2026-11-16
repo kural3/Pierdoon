@@ -508,7 +508,7 @@ object RemoteServer {
                 "repeat" -> model.cycleRepeat()
                 "shuffleAll" -> model.shuffleAll()
                 "playSongs" -> songs().takeIf { it.isNotEmpty() }?.let {
-                    model.playSongs(it, c.optInt("index").coerceIn(0, it.lastIndex), c.optBoolean("shuffle"))
+                    model.playSongs(it, c.optInt("index").coerceIn(0, it.lastIndex), if (c.has("shuffle")) c.optBoolean("shuffle") else null)
                 } ?: return@onUi false
                 "playNext" -> model.playNext(songs())
                 "addToQueue" -> model.addToQueue(songs())

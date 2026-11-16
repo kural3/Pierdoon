@@ -85,6 +85,7 @@ fun AppTheme(
                 glass = settings.glass && !settings.nothingStyle,
                 progressStyle = settings.progressStyle,
                 lyricsSyncControls = settings.lyricsSyncControls,
+                lyricsKaraoke = settings.lyricsKaraoke,
                 nothing = settings.nothingStyle,
             ),
             LocalHapticFeedback provides (haptics ?: NoHaptics),

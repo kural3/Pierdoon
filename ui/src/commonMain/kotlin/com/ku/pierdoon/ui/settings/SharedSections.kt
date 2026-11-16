@@ -147,6 +147,15 @@ fun LazyListScope.lyricsSection(
                 { shape ->
                     SwitchItem(
                         shape = shape,
+                        title = stringResource(Res.string.settings_lyrics_karaoke),
+                        subtitle = stringResource(Res.string.settings_lyrics_karaoke_desc),
+                        checked = settings.lyricsKaraoke,
+                        onChange = { v -> onUpdate { copy(lyricsKaraoke = v) } },
+                    )
+                },
+                { shape ->
+                    SwitchItem(
+                        shape = shape,
                         title = stringResource(Res.string.settings_sync_controls),
                         subtitle = stringResource(Res.string.settings_sync_controls_desc),
                         checked = settings.lyricsSyncControls,

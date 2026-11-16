@@ -36,12 +36,16 @@ import androidx.compose.ui.layout.Layout
 import kotlin.math.roundToInt
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -64,10 +68,24 @@ import com.ku.pierdoon.ui.components.morphClip
 import com.ku.pierdoon.ui.components.scaleBy
 import com.ku.pierdoon.ui.formatDuration
 
-private val RowMorph by lazy { Morph(MaterialShapes.Square, MaterialShapes.Cookie9Sided) }
 
 /** Space reserved below lists for the floating bottom chrome (mini player + nav bar). */
 fun listBottomPadding(bottomInset: Dp, extra: Dp = 16.dp) = bottomInset + extra
+
+/**
+ * A row's shape in a list drawn as one card, as in the settings: round outer corners, tight
+ * ones between the rows, which sit a hair apart on the card's colour.
+ */
+fun songCardShape(index: Int, count: Int): Shape {
+    val outer = 24.dp
+    val inner = 6.dp
+    return RoundedCornerShape(
+        topStart = if (index == 0) outer else inner,
+        topEnd = if (index == 0) outer else inner,
+        bottomStart = if (index == count - 1) outer else inner,
+        bottomEnd = if (index == count - 1) outer else inner,
+    )
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -81,6 +99,8 @@ fun SongRow(
     trailing: (@Composable () -> Unit)? = null,
     /** Non-null in selection mode: whether this row is ticked. */
     selected: Boolean? = null,
+    /** Its place in a list drawn as one card ([songCardShape]); null for a row on its own. */
+    card: Shape? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val colors = MaterialTheme.colorScheme
@@ -90,11 +110,17 @@ fun SongRow(
         targetValue = when {
             selected == true -> colors.primaryContainer
             isCurrent -> colors.secondaryContainer
+            card != null -> colors.surfaceContainer
             else -> Color.Transparent
         },
         animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "rowContainer",
     )
+    // The playing track's cover blooms into a flower, another each time (as on the computer);
+    // picked while the cover is still square, so the swap never shows.
+    var flower by remember { mutableStateOf(CoverFlowers.random()) }
+    LaunchedEffect(isCurrent) { if (isCurrent) flower = CoverFlowers.random() }
+    val rowMorph = remember(flower) { Morph(MaterialShapes.Square, flower) }
     val morph = animateFloatAsState(
         targetValue = if (isCurrent) 1f else 0f,
         animationSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
@@ -105,9 +131,9 @@ fun SongRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .padding(horizontal = if (card != null) 16.dp else 12.dp, vertical = if (card != null) 1.dp else 2.dp)
             .scaleBy(scale)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(card ?: RoundedCornerShape(20.dp))
             .background(container)
             .onSecondaryClick(onLongClick)
             .combinedClickable(
@@ -131,7 +157,7 @@ fun SongRow(
             Artwork(
                 songId = song.id,
                 albumId = song.albumId,
-                modifier = Modifier.size(52.dp).morphClip(RowMorph, morph),
+                modifier = Modifier.size(52.dp).morphClip(rowMorph, morph),
             )
             androidx.compose.animation.AnimatedVisibility(
                 visible = selected == true,

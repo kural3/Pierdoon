@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import com.ku.pierdoon.data.AppFont
 import com.ku.pierdoon.ui.resources.Res
+import com.ku.pierdoon.ui.resources.google_sans
 import com.ku.pierdoon.ui.resources.ibm_plex_mono_bold
 import com.ku.pierdoon.ui.resources.ibm_plex_mono_regular
 import com.ku.pierdoon.ui.resources.ibm_plex_mono_semibold
@@ -32,6 +33,16 @@ private fun jetBrainsMono(): FontFamily {
     return remember(fonts) { FontFamily(fonts) }
 }
 
+/** Google Sans, the default: one variable file for every weight the app uses (it spans 400 to 700). */
+@OptIn(ExperimentalTextApi::class)
+@Composable
+private fun googleSans(): FontFamily {
+    val fonts = listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { w ->
+        Font(Res.font.google_sans, w, variationSettings = FontVariation.Settings(FontVariation.weight(w.weight)))
+    }
+    return remember(fonts) { FontFamily(fonts) }
+}
+
 @Composable
 private fun ibmPlexMono(): FontFamily {
     val fonts = listOf(
@@ -46,6 +57,7 @@ private fun ibmPlexMono(): FontFamily {
 /** The family [font] stands for; null for the platform's own (Roboto or the phone maker's, Segoe UI). */
 @Composable
 fun fontFamilyFor(font: AppFont, customFontPath: String?): FontFamily? = when (font) {
+    AppFont.GoogleSans -> googleSans()
     AppFont.System -> null
     AppFont.SystemMono -> FontFamily.Monospace
     AppFont.JetBrainsMono -> jetBrainsMono()

@@ -53,6 +53,7 @@
     <string name="settings_interface">Interface</string>
     <string name="font_system">Default</string>
     <string name="font_system_mono">System monospace</string>
+    <string name="font_google_sans">Google Sans</string>
     <string name="font_jetbrains_mono">JetBrains Mono</string>
     <string name="font_ibm_plex_mono">IBM Plex Mono</string>
     <string name="font_sample">The quick brown fox jumps · 0123</string>
@@ -73,10 +74,15 @@
     <string name="eq_preset_vocal">Vocal</string>
     <string name="eq_preset_rock">Rock</string>
     <string name="eq_preset_electronic">Electronic</string>
+    <string name="eq_preset_bass_boost">Bass boost</string>
+    <string name="eq_preset_deep_vocal">Deep vocal</string>
+    <string name="eq_preset_loud">Loud</string>
     <string name="eq_preset_custom">Custom</string>
     <string name="settings_silence">Skip silence</string>
     <string name="settings_silence_desc">Skip the silent parts of tracks</string>
     <string name="settings_lyrics">Lyrics</string>
+    <string name="settings_lyrics_karaoke">Sung line lights up</string>
+    <string name="settings_lyrics_karaoke_desc">The line being sung fills with light as it goes</string>
     <string name="settings_sync_controls">Sync adjustment</string>
     <string name="settings_sync_controls_desc">Buttons in the lyrics to move them earlier or later when they don't match the music</string>
     <string name="settings_clear_cache">Clear lyrics cache</string>
@@ -92,6 +98,9 @@
     <string name="greeting_day">Good afternoon</string>
     <string name="greeting_evening">Good evening</string>
     <string name="greeting_night">Good night</string>
+    <string name="greeting_quote">“%1$s”</string>
+    <string name="greeting_quote_source">%1$s — %2$s</string>
+    <string name="greeting_no_lyrics">Lines from your songs will show here: open the lyrics of a few first</string>
     <string name="recently_played">Recently played</string>
     <string name="recently_added">Recently added</string>
     <string name="your_playlists">Your playlists</string>

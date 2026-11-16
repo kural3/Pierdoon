@@ -73,7 +73,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -81,7 +80,6 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -649,9 +647,7 @@ private fun CenterText(
                     )
                 } else {
                     val line = synced.lines[i]
-                    // Until the next line, but not through a long instrumental after it.
-                    val longest = SING_BASE_MS + SING_PER_CHAR_MS * line.text.length
-                    val end = min(synced.lines.getOrNull(i + 1)?.timeMs ?: Long.MAX_VALUE, line.timeMs + longest)
+                    val end = synced.sungUntil(i)
                     SungLine(
                         // A wordless gap between lines: a quiet mark rather than nothing at all.
                         line.text.ifBlank { "♪" },
@@ -706,33 +702,7 @@ private fun SungLine(
             val l = layout ?: return@drawWithContent
             frame()
             val f = ((now() - startMs).toFloat() / (endMs - startMs).coerceAtLeast(1)).coerceIn(0f, 1f)
-            val widths = (0 until l.lineCount).map { l.getLineRight(it) - l.getLineLeft(it) }
-            var left = f * widths.sum()
-            val feather = SING_FEATHER.toPx()
-            for (line in 0 until l.lineCount) {
-                if (left <= 0f) break
-                val x0 = l.getLineLeft(line)
-                val edge = x0 + min(left, widths[line])
-                // Tails and accents reach past the line's box: the first line is open above, the last
-                // below, and the ones between reach a little into their neighbours.
-                val overhang = GLYPH_OVERHANG * (l.getLineBottom(line) - l.getLineTop(line))
-                val top = if (line == 0) -size.height else l.getLineTop(line) - overhang
-                val bottom = if (line == l.lineCount - 1) size.height * 2 else l.getLineBottom(line) + overhang
-                val solid = edge - feather / 2
-                clipRect(left = x0 - feather, top = top, right = solid, bottom = bottom) {
-                    drawText(l, color = Color.White, shadow = Shadow.None)
-                }
-                // A soft edge, so the light seems to flow on rather than be cut. In slices: a
-                // gradient brush on text draws nothing on the desktop.
-                val slice = feather / FEATHER_SLICES
-                for (s in 0 until FEATHER_SLICES) {
-                    val from = solid + s * slice
-                    clipRect(left = from, top = top, right = from + slice, bottom = bottom) {
-                        drawText(l, color = Color.White, alpha = 1f - (s + 0.5f) / FEATHER_SLICES, shadow = Shadow.None)
-                    }
-                }
-                left -= widths[line]
-            }
+            drawSungFill(l, f, Color.White)
         },
     )
 }
@@ -780,11 +750,6 @@ private const val DUST = 140
 // The current line: how bright it is before it's sung, how soft the edge of the light is, and
 // the longest it may take to sing (beyond that it's an instrumental, not a slow line).
 private const val UNSUNG_ALPHA = 0.38f
-private val SING_FEATHER = 28.dp
-private const val FEATHER_SLICES = 8
-private const val GLYPH_OVERHANG = 0.2f
-private const val SING_BASE_MS = 1_500L
-private const val SING_PER_CHAR_MS = 350L
 
 /** The styles in one capsule of glass; the chosen one filled with the light's colour. */
 @Composable

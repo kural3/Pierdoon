@@ -1,5 +1,30 @@
 package com.ku.pierdoon.ui.library
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.IntOffset
+import com.ku.pierdoon.LyricQuote
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.ku.pierdoon.ui.components.ScrollableRow
 import com.ku.pierdoon.ui.components.hairline
 import com.ku.pierdoon.ui.library.TWO_PANE_WIDTH
@@ -92,6 +117,8 @@ fun HomeScreen(
     radioOn: Boolean = false,
     /** A button beside the greeting (the phone's, to the paired computer); null for none. */
     greetingAction: (@Composable () -> Unit)? = null,
+    /** A random line of a song, for a tap on the greeting; null leaves the greeting as it is. */
+    onQuote: (suspend () -> LyricQuote?)? = null,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val wide = maxWidth >= TWO_PANE_WIDTH
@@ -138,10 +165,9 @@ fun HomeScreen(
                     .statusBarsPadding()
                     .padding(start = 24.dp, end = if (greetingAction != null) 12.dp else 24.dp, top = 32.dp, bottom = 20.dp),
             ) {
-                Text(
-                    text = stringResource(greetingRes()),
-                    style = MaterialTheme.typography.displaySmallEmphasized,
-                    color = MaterialTheme.colorScheme.onSurface,
+                Greeting(
+                    greeting = stringResource(greetingRes()),
+                    onQuote = onQuote,
                     modifier = Modifier.weight(1f),
                 )
                 greetingAction?.invoke()
@@ -236,6 +262,147 @@ fun HomeScreen(
     }
     }
 }
+
+/** What the greeting shows: the time of day's, a line of a song, or that there are no lines yet. */
+private sealed interface GreetingText {
+    data object Hello : GreetingText
+    data class Quote(val quote: LyricQuote) : GreetingText
+    data object NoLyrics : GreetingText
+}
+
+/**
+ * "Good morning" and the like, a colour sweeping across it now and then. A tap puts a random line
+ * of a song in its place, with whose it is; each tap another.
+ */
+@Composable
+private fun Greeting(greeting: String, onQuote: (suspend () -> LyricQuote?)?, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    var shown by remember { mutableStateOf<GreetingText>(GreetingText.Hello) }
+    // Bumped by each tap: the colour runs over the new text a few times, then rests.
+    var taps by remember { mutableIntStateOf(0) }
+    val sweep = rememberSweep(taps)
+    val sweepColors = listOf(colors.primary, colors.tertiary, colors.secondary)
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+
+    // "No lyrics yet" is only a moment's note.
+    LaunchedEffect(shown) {
+        if (shown == GreetingText.NoLyrics) {
+            delay(NO_LYRICS_NOTE_MS)
+            shown = GreetingText.Hello
+        }
+    }
+    AnimatedContent(
+        targetState = shown,
+        transitionSpec = {
+            (fadeIn(effects) + slideInVertically(spatial) { it / 3 }) togetherWith
+                (fadeOut(effects) + slideOutVertically(spatial) { -it / 3 })
+        },
+        contentAlignment = Alignment.CenterStart,
+        label = "greeting",
+        modifier = modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            enabled = onQuote != null,
+        ) {
+            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+            scope.launch {
+                shown = onQuote?.invoke()?.let(GreetingText::Quote) ?: GreetingText.NoLyrics
+                taps++
+            }
+        },
+    ) { text ->
+        when (text) {
+            GreetingText.Hello -> Text(
+                text = greeting,
+                style = MaterialTheme.typography.displaySmallEmphasized,
+                color = colors.onSurface,
+                modifier = Modifier.colorSweep({ sweep.value }, sweepColors),
+            )
+            is GreetingText.Quote -> Column {
+                Text(
+                    text = stringResource(Res.string.greeting_quote, text.quote.line),
+                    style = MaterialTheme.typography.headlineSmallEmphasized,
+                    color = colors.onSurface,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.colorSweep({ sweep.value }, sweepColors),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(Res.string.greeting_quote_source, text.quote.artist, text.quote.title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            GreetingText.NoLyrics -> Text(
+                text = stringResource(Res.string.greeting_no_lyrics),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Where a sweep of colour across the greeting is, 0 to 1; outside that range none is drawn.
+ * [SWEEPS] pass, a short rest between them, each time the home screen opens and each time [key]
+ * changes; then nothing runs, so a screen left open costs nothing.
+ */
+@Composable
+private fun rememberSweep(key: Any): State<Float> {
+    val sweep = remember { Animatable(-1f) }
+    LaunchedEffect(key) {
+        // A sweep cut short by a tap doesn't stay frozen where it stopped.
+        sweep.snapTo(-1f)
+        delay(SWEEP_FIRST_DELAY_MS)
+        repeat(SWEEPS) {
+            sweep.snapTo(0f)
+            // An even pace: a wave flowing through rather than a flash that slows down.
+            sweep.animateTo(1f, tween(SWEEP_MS, easing = LinearEasing))
+            sweep.snapTo(-1f)
+            delay(SWEEP_PAUSE_MS)
+        }
+    }
+    return sweep.asState()
+}
+
+/** Paints a band of [colors] over the text (only where it has ink) at [progress] across it. */
+private fun Modifier.colorSweep(progress: () -> Float, colors: List<Color>): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val p = progress()
+        if (p !in 0f..1f) return@drawWithContent
+        // A wide band whose edges fade in and out slowly, so the colour seems to flow over the letters.
+        val band = size.width * 0.8f
+        val centre = -band + (size.width + 2 * band) * p
+        val stops = buildList {
+            add(Color.Transparent)
+            add(colors.first().copy(alpha = 0.35f))
+            addAll(colors)
+            add(colors.last().copy(alpha = 0.35f))
+            add(Color.Transparent)
+        }
+        drawRect(
+            brush = Brush.linearGradient(
+                stops,
+                start = Offset(centre - band, 0f),
+                end = Offset(centre + band, size.height * 0.4f),
+            ),
+            blendMode = BlendMode.SrcAtop,
+        )
+    }
+
+private const val SWEEP_FIRST_DELAY_MS = 800L
+private const val SWEEP_MS = 4_200
+private const val SWEEP_PAUSE_MS = 1_500L
+private const val SWEEPS = 3
+private const val NO_LYRICS_NOTE_MS = 3_500L
 
 private fun greetingRes(): StringResource = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
     in 5..11 -> Res.string.greeting_morning

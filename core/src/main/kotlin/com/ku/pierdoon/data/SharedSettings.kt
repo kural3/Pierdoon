@@ -18,7 +18,7 @@ enum class ColorSource { Wallpaper, AlbumArt, Custom }
 enum class ProgressStyle { Wavy, Line, Dots, Thick }
 
 /** Typeface for the whole app; [Custom] is a font file the user brought (see [SharedSettings.customFontFile]). */
-enum class AppFont { System, SystemMono, JetBrainsMono, IbmPlexMono, Custom }
+enum class AppFont { GoogleSans, System, SystemMono, JetBrainsMono, IbmPlexMono, Custom }
 
 const val DEFAULT_SEED: Int = 0xFF6750A4.toInt()
 
@@ -50,6 +50,8 @@ interface SharedSettings {
     val lyricsWifiOnly: Boolean
     /** Buttons that shift synced lyrics earlier or later; most tracks never need them. */
     val lyricsSyncControls: Boolean
+    /** The line being sung fills with light as it goes, word by word as far as the timing allows. */
+    val lyricsKaraoke: Boolean
     val skipSilence: Boolean
     /** Loud tracks turned down and quiet ones up, toward one loudness (EBU R128). */
     val normalizeVolume: Boolean
@@ -95,11 +97,12 @@ data class CommonSettings(
     override val glass: Boolean = true,
     override val progressStyle: ProgressStyle = ProgressStyle.Wavy,
     override val nothingStyle: Boolean = false,
-    override val font: AppFont = AppFont.System,
+    override val font: AppFont = AppFont.GoogleSans,
     override val customFontFile: String? = null,
     override val customFontName: String? = null,
     override val lyricsWifiOnly: Boolean = false,
     override val lyricsSyncControls: Boolean = false,
+    override val lyricsKaraoke: Boolean = true,
     override val skipSilence: Boolean = false,
     override val normalizeVolume: Boolean = false,
     override val crossfadeSeconds: Int = 0,
@@ -130,11 +133,14 @@ data class CommonSettings(
         putBoolean(K_GLASS, glass)
         putString(K_PROGRESS, progressStyle.name)
         putBoolean(K_NOTHING, nothingStyle)
+        putString(K_FONT_CHOICE, font.name)
+        // For an older version reading this file (a backup, the other app): it knows the old key only.
         putString(K_FONT, font.name)
         putString(K_CUSTOM_FONT_FILE, customFontFile)
         putString(K_CUSTOM_FONT_NAME, customFontName)
         putBoolean(K_WIFI, lyricsWifiOnly)
         putBoolean(K_SYNC_CONTROLS, lyricsSyncControls)
+        putBoolean(K_KARAOKE, lyricsKaraoke)
         putBoolean(K_SILENCE, skipSilence)
         putBoolean(K_NORMALIZE, normalizeVolume)
         putInt(K_CROSSFADE, crossfadeSeconds)
@@ -170,11 +176,15 @@ data class CommonSettings(
                 progressStyle = getString(K_PROGRESS, null)?.let { enumOr(it, d.progressStyle) }
                     ?: if (getBoolean(K_WAVY, true)) d.progressStyle else ProgressStyle.Line,
                 nothingStyle = getBoolean(K_NOTHING, d.nothingStyle),
-                font = enumOr(getString(K_FONT, null), d.font),
+                // Google Sans became the default in place of the system font: whoever still had
+                // that (chosen or not) moves to it once; a font picked since is kept under the new key.
+                font = getString(K_FONT_CHOICE, null)?.let { enumOr(it, d.font) }
+                    ?: enumOr(getString(K_FONT, null), d.font).let { if (it == AppFont.System) d.font else it },
                 customFontFile = getString(K_CUSTOM_FONT_FILE, d.customFontFile),
                 customFontName = getString(K_CUSTOM_FONT_NAME, d.customFontName),
                 lyricsWifiOnly = getBoolean(K_WIFI, d.lyricsWifiOnly),
                 lyricsSyncControls = getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
+                lyricsKaraoke = getBoolean(K_KARAOKE, d.lyricsKaraoke),
                 skipSilence = getBoolean(K_SILENCE, d.skipSilence),
                 normalizeVolume = getBoolean(K_NORMALIZE, d.normalizeVolume),
                 crossfadeSeconds = getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
@@ -212,10 +222,12 @@ data class CommonSettings(
         private const val K_PROGRESS = "progress_style"
         private const val K_NOTHING = "nothing_style"
         private const val K_FONT = "font"
+        private const val K_FONT_CHOICE = "font_choice"
         private const val K_CUSTOM_FONT_FILE = "custom_font_file"
         private const val K_CUSTOM_FONT_NAME = "custom_font_name"
         private const val K_WIFI = "lyrics_wifi_only"
         private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
+        private const val K_KARAOKE = "lyrics_karaoke"
         private const val K_SILENCE = "skip_silence"
         private const val K_NORMALIZE = "normalize_volume"
         private const val K_CROSSFADE = "crossfade_seconds"

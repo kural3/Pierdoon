@@ -45,6 +45,17 @@ class LyricsRepository(cacheDir: File, private val userAgent: String, filesDir: 
 
     fun peek(songId: Long): Lyrics? = memory.get(songId)
 
+    /** The tracks whose lyrics are on this device (found before or written by hand), by name alone. */
+    suspend fun storedIds(): Set<Long> = withContext(Dispatchers.IO) {
+        val ids = HashSet<Long>()
+        fun collect(folder: File?, ext: String) = folder?.list()?.forEach { name ->
+            if (name.endsWith(ext)) name.removeSuffix(ext).toLongOrNull()?.let(ids::add)
+        }
+        collect(dir, ".json")
+        collect(ownDir, ".lrc")
+        ids
+    }
+
     /** @throws IOException when the network is unavailable (or not allowed) and nothing is cached. */
     suspend fun get(query: LyricsQuery, allowNetwork: Boolean = true): Lyrics {
         memory.get(query.songId)?.let { return it }

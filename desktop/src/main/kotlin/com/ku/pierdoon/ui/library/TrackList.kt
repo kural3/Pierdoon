@@ -94,7 +94,7 @@ fun TrackList(
         ) {
             itemsIndexed(songs, key = { _, s -> s.id }) { index, song ->
                 CardRow(
-                    song = song, shape = cardShape(index, songs.size),
+                    song = song, shape = songCardShape(index, songs.size),
                     isCurrent = song.id == currentSongId, selected = selectedIds?.contains(song.id),
                     onClick = { click(index, song) }, onLongClick = { longClick(song) },
                 )
@@ -207,18 +207,6 @@ private fun MarkedCover(song: Song, isCurrent: Boolean, selected: Boolean?, corn
 }
 
 // ---- List: one card of rows ----
-
-/** Rows joined into one card: round outer corners, tight ones between, as in the settings. */
-private fun cardShape(index: Int, count: Int): Shape {
-    val outer = 24.dp
-    val inner = 6.dp
-    return RoundedCornerShape(
-        topStart = if (index == 0) outer else inner,
-        topEnd = if (index == 0) outer else inner,
-        bottomStart = if (index == count - 1) outer else inner,
-        bottomEnd = if (index == count - 1) outer else inner,
-    )
-}
 
 @Composable
 private fun CardRow(

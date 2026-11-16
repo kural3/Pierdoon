@@ -33,6 +33,28 @@ sealed interface Lyrics {
     data object NotFound : Lyrics
 }
 
+/**
+ * Lines that read well quoted on their own: with words in them, not too short or long, and not
+ * a "[Chorus]" heading or an "(oh-oh)" aside. Each once, in their order.
+ */
+fun Lyrics.quotableLines(): List<String> {
+    val lines = when (this) {
+        is Lyrics.Synced -> lines.map { it.text }
+        is Lyrics.Plain -> lines
+        else -> return emptyList()
+    }
+    return lines.asSequence()
+        .map { it.trim() }
+        .filter { it.length in QUOTE_MIN_CHARS..QUOTE_MAX_CHARS && it.count(Char::isLetter) >= QUOTE_MIN_LETTERS }
+        .filterNot { (it.startsWith('[') && it.endsWith(']')) || (it.startsWith('(') && it.endsWith(')')) }
+        .distinct()
+        .toList()
+}
+
+private const val QUOTE_MIN_CHARS = 8
+private const val QUOTE_MAX_CHARS = 90
+private const val QUOTE_MIN_LETTERS = 6
+
 /** Where plain lyrics came from; synced ones are always LRCLIB's. */
 enum class LyricsSource { Lrclib, Genius }
 

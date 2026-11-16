@@ -41,6 +41,7 @@ fun SongsList(
             SongRow(
                 song = song,
                 isCurrent = song.id == currentSongId,
+                card = songCardShape(index, songs.size),
                 onClick = { if (selecting != null) selecting.toggle(song.id) else onPlay(songs, index) },
                 onLongClick = { if (selecting != null) selecting.toggle(song.id) else onSongLongPress(song) },
                 selected = selecting?.let { song.id in it.ids },

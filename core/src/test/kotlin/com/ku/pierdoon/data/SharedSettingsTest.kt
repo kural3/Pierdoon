@@ -38,6 +38,7 @@ class SharedSettingsTest {
             customFontName = "Inter",
             lyricsWifiOnly = true,
             lyricsSyncControls = true,
+            lyricsKaraoke = false,
             skipSilence = true,
             crossfadeSeconds = 5,
             playbackSpeed = 1.25f,
@@ -69,7 +70,7 @@ class SharedSettingsTest {
         assertEquals(
             setOf(
                 "theme", "color_source", "seed_color", "pure_black", "haptics", "smooth_animations", "glass",
-                "progress_style", "nothing_style", "font", "custom_font_file", "custom_font_name", "lyrics_wifi_only", "lyrics_sync_controls", "skip_silence",
+                "progress_style", "nothing_style", "font", "font_choice", "custom_font_file", "custom_font_name", "lyrics_wifi_only", "lyrics_sync_controls", "lyrics_karaoke", "lyrics_karaoke", "skip_silence",
                 "normalize_volume",
                 "crossfade_seconds", "playback_speed", "crossfade_albums", "cassette_mode", "radio", "radio_novelty", "radio_buffer", "equalizer",
                 "equalizer_gains", "equalizer_preset", "edit_target", "check_updates", "download_format",
@@ -98,5 +99,19 @@ class SharedSettingsTest {
         assertEquals(ProgressStyle.Line, CommonSettings.read(off, CommonSettings()).progressStyle)
         val on = MapFile().apply { values["wavy_progress"] = "true" }
         assertEquals(ProgressStyle.Wavy, CommonSettings.read(on, CommonSettings()).progressStyle)
+    }
+
+    @Test
+    fun systemFontBecomesGoogleSansOnceAndAChoiceSinceStays() {
+        val defaults = CommonSettings()
+        fun read(vararg kv: Pair<String, String>) = CommonSettings.read(MapFile().apply { values += kv }, defaults).font
+        // Before Google Sans: the system font (the old default) moves to it, other fonts stay.
+        assertEquals(AppFont.GoogleSans, read("font" to "System"))
+        assertEquals(AppFont.GoogleSans, read())
+        assertEquals(AppFont.JetBrainsMono, read("font" to "JetBrainsMono"))
+        // The system font picked since then is kept.
+        val file = MapFile()
+        defaults.copy(font = AppFont.System).write(file)
+        assertEquals(AppFont.System, CommonSettings.read(file, defaults).font)
     }
 }

@@ -20,7 +20,6 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.AppModel
 import com.ku.pierdoon.data.Backup
@@ -61,7 +60,6 @@ import com.ku.pierdoon.ui.library.SmartPlaylistCover
 import com.ku.pierdoon.ui.library.SmartPlaylistEditor
 import com.ku.pierdoon.ui.library.StatsScreen
 import com.ku.pierdoon.ui.library.YearReviewScreen
-import com.ku.pierdoon.ui.navigation.MotionSpecs
 import com.ku.pierdoon.ui.navigation.NavDirection
 import com.ku.pierdoon.ui.navigation.Navigator
 import com.ku.pierdoon.ui.navigation.Route
@@ -150,10 +148,6 @@ fun AppPages(
     val radio by vm.radio.collectAsState()
     val currentSongId = player.nowPlaying?.songId
     val stateHolder = rememberSaveableStateHolder()
-    val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val motion = remember(spatialOffset, spatial, effects) { MotionSpecs(spatialOffset, spatial, effects) }
     val resolveCover: (Playlist) -> Song? = { p -> vm.resolve(p.songIds.take(1)).firstOrNull() }
     val onPlay: (List<Song>, Int) -> Unit = { list, i -> vm.playSongs(list, i) }
     val onShuffle: (List<Song>) -> Unit = { list ->
@@ -233,6 +227,7 @@ fun AppPages(
                     val recent = remember(userData.recent, songs) { vm.resolve(userData.recent) }
                     HomeScreen(
                         greetingAction = options.homeAction,
+                        onQuote = vm::randomLyricQuote,
                         recent = recent,
                         collections = collections,
                         playlists = userData.playlists,
@@ -454,12 +449,15 @@ fun AppPages(
             val from = initialState
             val to = targetState
             val direction = when {
-                from in options.tabs && to in options.tabs -> NavDirection.Tab
-                options.settingsInPlace && from.isSettings() && to.isSettings() -> NavDirection.Tab
+                // Tabs slide the way the bar runs: to a tab further along from the right.
+                from in options.tabs && to in options.tabs ->
+                    if (options.tabs.indexOf(to) > options.tabs.indexOf(from)) NavDirection.TabForward else NavDirection.TabBack
+                options.settingsInPlace && from.isSettings() && to.isSettings() ->
+                    if (to == Route.Settings) NavDirection.TabBack else NavDirection.TabForward
                 nav.forward -> NavDirection.Forward
                 else -> NavDirection.Back
             }
-            pageTransition(direction, motion)
+            pageTransition(direction)
         },
         modifier = Modifier.fillMaxSize(),
     ) { route ->

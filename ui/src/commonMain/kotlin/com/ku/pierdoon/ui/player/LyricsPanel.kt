@@ -6,6 +6,11 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import com.ku.pierdoon.ui.elapsedRealtime
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.drawText
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -98,6 +103,9 @@ private suspend fun LazyListState.centerOn(index: Int, spec: AnimationSpec<Float
 /** Lines change slightly ahead of the beat, which reads as "in sync" to the ear. */
 private const val LEAD_MS = 150L
 
+/** The part of the sung line not reached yet; about as faint as the lines still to come. */
+private const val UNSUNG_ALPHA = 0.38f
+
 @Composable
 fun LyricsPanel(
     state: LyricsState,
@@ -186,6 +194,25 @@ private fun SyncedLyrics(
         }
     }
 
+    // The line being sung fills with light. One animation, of the current line only, and only
+    // while the music plays: a pause or a seek restarts it from where the track is.
+    val karaoke = LocalUiPrefs.current.lyricsKaraoke
+    val fill = remember(lyrics) { Animatable(0f) }
+    LaunchedEffect(lyrics, offsetMs, current, karaoke) {
+        if (!karaoke || current < 0) return@LaunchedEffect
+        val start = lyrics.lines[current].timeMs
+        val span = (lyrics.sungUntil(current) - start).coerceAtLeast(1L)
+        snapshotFlow { currentPosition() }.collectLatest { snap ->
+            val now = snap.estimate(elapsedRealtime()) + LEAD_MS - offsetMs
+            val f = ((now - start).toFloat() / span).coerceIn(0f, 1f)
+            fill.snapTo(f)
+            if (snap.playing && f < 1f) {
+                val ms = ((1f - f) * span / snap.speed.coerceAtLeast(0.1f)).toInt()
+                fill.animateTo(1f, tween(ms, easing = LinearEasing))
+            }
+        }
+    }
+
     // Auto-scroll keeps the active line centred, but yields to the user's finger.
     var userScrolledAt by remember { mutableLongStateOf(0L) }
     val connection = remember {
@@ -233,6 +260,7 @@ private fun SyncedLyrics(
                     text = line.text.ifBlank { "♪" },
                     active = index == current,
                     past = index < current,
+                    fill = if (karaoke && index == current) fill::value else null,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
                         userScrolledAt = 0L
@@ -309,8 +337,11 @@ private fun formatOffset(ms: Long): String {
     return (if (ms > 0) "+" else "−") + seconds
 }
 
+/** A lyric line; [fill], for the line being sung, is how much of it is sung (0 to 1), drawn as light over the rest. */
 @Composable
-private fun LyricLineItem(text: String, active: Boolean, past: Boolean, onClick: () -> Unit) {
+private fun LyricLineItem(text: String, active: Boolean, past: Boolean, fill: (() -> Float)?, onClick: () -> Unit) {
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val color = MaterialTheme.colorScheme.onSurface
     val emphasis by animateFloatAsState(
         targetValue = if (active) 1f else 0f,
         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
@@ -320,7 +351,8 @@ private fun LyricLineItem(text: String, active: Boolean, past: Boolean, onClick:
     Text(
         text = text,
         style = MaterialTheme.typography.headlineSmallEmphasized,
-        color = MaterialTheme.colorScheme.onSurface,
+        color = color,
+        onTextLayout = { layout = it },
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -333,6 +365,12 @@ private fun LyricLineItem(text: String, active: Boolean, past: Boolean, onClick:
                 scaleX = s
                 scaleY = s
                 transformOrigin = TransformOrigin(0f, 0.5f)
+            }
+            .drawWithContent {
+                val l = layout
+                if (fill == null || l == null) return@drawWithContent drawContent()
+                drawText(l, color = color, alpha = UNSUNG_ALPHA)
+                drawSungFill(l, fill(), color)
             },
     )
 }

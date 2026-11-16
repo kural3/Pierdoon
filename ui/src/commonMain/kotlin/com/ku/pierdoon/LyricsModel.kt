@@ -1,5 +1,6 @@
 package com.ku.pierdoon
 
+import androidx.compose.runtime.Immutable
 import com.ku.pierdoon.data.Song
 import com.ku.pierdoon.data.lyrics.Lyrics
 import com.ku.pierdoon.data.lyrics.LyricsCandidate
@@ -7,10 +8,12 @@ import com.ku.pierdoon.data.lyrics.LyricsOffsets
 import com.ku.pierdoon.data.lyrics.LyricsQuery
 import com.ku.pierdoon.data.lyrics.LyricsRepository
 import com.ku.pierdoon.data.lyrics.NetworkNotAllowedException
+import com.ku.pierdoon.data.lyrics.quotableLines
 import com.ku.pierdoon.playback.NowPlaying
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The lyrics side of both apps' view models: the playing track's lyrics, fetched only while the
@@ -125,6 +129,54 @@ class LyricsModel(
         }
     }
 
+    /** The tracks the last few quotes came from, newest last: the next one comes from another. */
+    private val recentQuotes = ArrayDeque<Long>()
+    private var prefetch: Job? = null
+
+    /**
+     * A line of the lyrics of a random track of [library]. It comes from lyrics already on this
+     * device when there are any from a track not quoted lately; otherwise a few tracks' lyrics are
+     * fetched for it (where the network may be used). Each call also fetches a few more in the
+     * background, so the lines keep coming from new songs. Null when no lyrics with words are found.
+     */
+    suspend fun randomQuote(library: Collection<Long>): LyricQuote? {
+        val stored = repository.storedIds()
+        val unfetched = library.filter { it !in stored }
+        if (networkAllowed() && prefetch?.isActive != true && unfetched.isNotEmpty()) {
+            prefetch = scope.launch { unfetched.shuffled().take(QUOTE_PREFETCH).forEach { lyricsFor(it) } }
+        }
+        val fresh = stored.filter { it !in recentQuotes && song(it) != null }.shuffled()
+        val quote = quoteFrom(fresh.take(QUOTE_TRIES), allowNetwork = false)
+            ?: (if (networkAllowed()) quoteFrom(unfetched.shuffled().take(QUOTE_FETCHES), allowNetwork = true) else null)
+            // Nothing new anywhere: an older one again rather than nothing.
+            ?: quoteFrom(recentQuotes.toList().shuffled(), allowNetwork = false)
+            ?: return null
+        recentQuotes.remove(quote.songId)
+        recentQuotes.addLast(quote.songId)
+        while (recentQuotes.size > QUOTE_RECENT) recentQuotes.removeFirst()
+        return quote
+    }
+
+    private suspend fun quoteFrom(ids: List<Long>, allowNetwork: Boolean): LyricQuote? {
+        for (id in ids) {
+            val s = song(id) ?: continue
+            val lyrics = if (allowNetwork) {
+                withTimeoutOrNull(QUOTE_FETCH_TIMEOUT_MS) { lyricsFor(id) }
+            } else {
+                try {
+                    repository.get(LyricsQuery(s.id, s.title, s.artist, s.album, s.durationMs), allowNetwork = false)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+            } ?: continue
+            val line = lyrics.quotableLines().randomOrNull() ?: continue
+            return LyricQuote(s.id, line, s.title, s.artist)
+        }
+        return null
+    }
+
     /** Where a lyrics search starts: the current track's artist and title. */
     fun searchText(): String {
         val np = current().first ?: return ""
@@ -168,3 +220,16 @@ class LyricsModel(
 
     suspend fun forget(songId: Long) = repository.forget(songId)
 }
+
+/** How many tracks with stored lyrics a quote is looked for in, and how many are fetched for one. */
+private const val QUOTE_TRIES = 40
+private const val QUOTE_FETCHES = 3
+private const val QUOTE_FETCH_TIMEOUT_MS = 4_000L
+
+/** Tracks whose lyrics are fetched in the background on each quote, and how many quoted ones are skipped. */
+private const val QUOTE_PREFETCH = 3
+private const val QUOTE_RECENT = 5
+
+/** A line of a song, for the home screen's greeting. */
+@Immutable
+data class LyricQuote(val songId: Long, val line: String, val title: String, val artist: String)

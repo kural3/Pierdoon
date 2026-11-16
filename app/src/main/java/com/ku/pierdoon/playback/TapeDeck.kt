@@ -10,6 +10,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -62,6 +63,24 @@ class TapeDeck(
         }
 
         override fun seekToPreviousMediaItem() = previous(player.previousMediaItemIndex) { super.seekToPreviousMediaItem() }
+
+        // A shuffle switched on, or a new queue played shuffled, starts from the track playing,
+        // as on the computer; Media3's own puts it anywhere, so with repeat off some tracks would
+        // never come (issue #6 keeps shuffle on when a track is picked, so this matters).
+        override fun setShuffleModeEnabled(shuffleModeEnabled: Boolean) {
+            if (shuffleModeEnabled && !player.shuffleModeEnabled) player.shuffleFromCurrent()
+            super.setShuffleModeEnabled(shuffleModeEnabled)
+        }
+
+        override fun setMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long) {
+            super.setMediaItems(mediaItems, startIndex, startPositionMs)
+            if (player.shuffleModeEnabled) player.shuffleFromCurrent()
+        }
+
+        override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
+            super.setMediaItems(mediaItems, resetPosition)
+            if (player.shuffleModeEnabled) player.shuffleFromCurrent()
+        }
     }
 
     private val flipSound by lazy { cassetteChangeSound() }
@@ -306,4 +325,14 @@ class TapeDeck(
             Player.EVENT_REPEAT_MODE_CHANGED,
         )
     }
+}
+
+/** A new shuffled order with the current track first and the rest at random after it. */
+@OptIn(UnstableApi::class)
+private fun ExoPlayer.shuffleFromCurrent() {
+    val count = mediaItemCount
+    if (count < 2) return
+    val current = currentMediaItemIndex
+    val rest = (0 until count).filter { it != current }.shuffled()
+    setShuffleOrder(DefaultShuffleOrder(intArrayOf(current) + rest.toIntArray(), System.nanoTime()))
 }
