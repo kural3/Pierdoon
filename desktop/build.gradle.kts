@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.ku.pierdoon"
-version = "3.0.0"
+version = "3.0.1"
 
 // FFmpeg (decoding every format, remuxing downloads) is pulled in for Windows x64 only:
 // the -platform artifacts would bring every OS and CPU along, some 300 MB.
@@ -95,6 +95,18 @@ compose.desktop {
 tasks.test {
     useJUnit()
 }
+
+// A package built on the plain JDK ships Windows' own title bar instead of ours (3.0 went out
+// that way when jbr.dir fell out of local.properties), so packaging refuses to run without it.
+tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDistributable") || it.name.startsWith("createRuntimeImage") }
+    .configureEach {
+        val missing = jbrDir == null // a plain value: the configuration cache can't keep the script itself
+        doFirst {
+            if (missing) throw GradleException(
+                "No JetBrains Runtime: set jbr.dir in local.properties to its folder, or the window loses its own title bar.",
+            )
+        }
+    }
 
 // Renders the app off screen and saves screenshots, driven by a script of steps (see Shots.kt).
 // ./gradlew shots -PshotsScript=<file> -PshotsHome=<copy of the app data> -PshotsOut=<folder>
