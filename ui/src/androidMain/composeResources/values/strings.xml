@@ -66,6 +66,9 @@
     <string name="pc_library_loading">Loading library…</string>
     <string name="pc_search">Search the computer's library</string>
     <string name="pc_nothing_found">Nothing found</string>
+    <string name="pc_tab_sync">Link</string>
+    <string name="pc_tab_download">Download</string>
+    <string name="pc_tab_library">Library</string>
     <string name="pc_volume">Computer volume</string>
     <string name="player_device_phone">Phone</string>
     <string name="player_device_switch">Choose where to play</string>

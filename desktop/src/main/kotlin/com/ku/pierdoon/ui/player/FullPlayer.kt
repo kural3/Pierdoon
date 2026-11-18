@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.player
 
+import com.ku.pierdoon.ui.components.FormatBadge
 import androidx.compose.runtime.collectAsState
 
 import androidx.compose.runtime.rememberUpdatedState
@@ -333,6 +334,9 @@ fun FullPlayer(
                                     maxLines = 1,
                                     modifier = Modifier.weight(1f, fill = false).basicMarquee(iterations = 2),
                                 )
+                                queue.current?.song?.takeIf { it.id == nowPlaying.songId }?.let {
+                                    FormatBadge(it, Modifier.padding(start = 10.dp), large = true)
+                                }
                             }
                         }
                         ArtistLink(

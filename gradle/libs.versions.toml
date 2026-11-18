@@ -46,6 +46,7 @@ androidx-media3-session = { group = "androidx.media3", name = "media3-session", 
 jaudiotagger = { group = "net.jthink", name = "jaudiotagger", version.ref = "jaudiotagger" }
 compose-runtime-annotation = { group = "androidx.compose.runtime", name = "runtime-annotation", version = "1.12.1" }
 youtubedl = { group = "io.github.junkfood02.youtubedl-android", name = "library", version.ref = "youtubedl" }
+youtubedl-ffmpeg = { group = "io.github.junkfood02.youtubedl-android", name = "ffmpeg", version.ref = "youtubedl" }
 # Compose Multiplatform, for the shared ui module (on Android these resolve to the androidx ones).
 compose-mp-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
 compose-mp-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }

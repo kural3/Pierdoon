@@ -233,14 +233,14 @@ private val SectionShapes = listOf(
 fun sectionIconShape(index: Int): Shape = SectionShapes[index % SectionShapes.size].toShape()
 
 /**
- * The top of the settings list: the app's mark, name and version, and a chip with how updates
- * stand; tapping the chip opens the updates page.
+ * The top of the settings list: the app's mark, name and version, and a chip saying how
+ * updates stand that opens the page about them.
  */
 @Composable
 fun SettingsHero(
     name: String,
     version: String,
-    status: String,
+    status: String?,
     onStatusClick: () -> Unit,
     modifier: Modifier = Modifier,
     /** The logo opens "About". */
@@ -280,6 +280,7 @@ fun SettingsHero(
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.headlineSmallEmphasized, color = colors.onPrimaryContainer, maxLines = 1)
             Text(version, style = MaterialTheme.typography.bodyMedium, color = colors.onPrimaryContainer.copy(alpha = 0.75f), maxLines = 1)
+            if (status != null) {
             Spacer(Modifier.height(8.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -301,6 +302,7 @@ fun SettingsHero(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
             }
         }
     }

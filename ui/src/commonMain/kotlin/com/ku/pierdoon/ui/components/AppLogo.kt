@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -133,11 +134,14 @@ private class PathCache {
 
 /**
  * The icon as a thick coin in space: drag it to turn it any way, let go and it spins on and
- * settles facing you; a tap gives it a full turn. Left alone it sways a little.
+ * settles facing you; a tap gives it a full turn. Left alone it sways a little. Pulled far
+ * down and held there, it trembles harder and harder; after [HOLD_SECONDS] it calls
+ * [onPulledDown] (once per drag). Let go sooner and nothing happens.
  */
 @Composable
-fun SpinningLogo(modifier: Modifier = Modifier) {
+fun SpinningLogo(modifier: Modifier = Modifier, onPulledDown: () -> Unit = {}) {
     val haptics = LocalHapticFeedback.current
+    val pulledDown by rememberUpdatedState(onPulledDown)
     val scope = rememberCoroutineScope()
     val yaw = remember { Animatable(0f) }
     val pitch = remember { Animatable(0f) }
@@ -145,6 +149,7 @@ fun SpinningLogo(modifier: Modifier = Modifier) {
     var time by remember { mutableFloatStateOf(0f) }
     val cache = remember { PathCache() }
     val sparkles = remember { Sparkles() }
+    val hold = remember { Hold() }
     LaunchedEffect(Unit) {
         var start = 0L
         var last = 0f
@@ -155,12 +160,27 @@ fun SpinningLogo(modifier: Modifier = Modifier) {
             time = (now - start) / 1e9f
             val dt = (time - last).coerceIn(0f, 0.1f)
             last = time
-            // Stars come off the rim as fast as it turns: none at rest, a slow trickle on a spin.
+            // Held down: ticks that come faster and faster, then the thanks.
+            val held = hold.progress(time)
+            if (held > 0f) {
+                if (time - hold.lastTick > 0.45f - 0.33f * held) {
+                    hold.lastTick = time
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+                if (held >= 1f) {
+                    hold.since = -1f
+                    hold.fired = true
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    pulledDown()
+                }
+            }
+            // Stars come off the rim as fast as it turns: none at rest, a slow trickle on a spin,
+            // and more and more while it trembles.
             val dYaw = yaw.value - lastYaw
             val dPitch = pitch.value - lastPitch
             lastYaw = yaw.value
             lastPitch = pitch.value
-            sparkles.step(dt, kotlin.math.abs(dYaw) + kotlin.math.abs(dPitch), if (dYaw >= 0) 1f else -1f)
+            sparkles.step(dt, kotlin.math.abs(dYaw) + kotlin.math.abs(dPitch) + held * held * 14f, if (dYaw >= 0) 1f else -1f)
         }
     }
     // The idle sway eases in once the logo has come to rest, and out as soon as it's touched.
@@ -185,26 +205,43 @@ fun SpinningLogo(modifier: Modifier = Modifier) {
         modifier
             .pointerInput(Unit) {
                 val tracker = VelocityTracker()
+                // How far down this drag has gone, net of going back up.
+                var pull = 0f
                 detectDragGestures(
                     onDragStart = {
                         dragging = true
+                        pull = 0f
+                        hold.since = -1f
+                        hold.fired = false
                         tracker.resetTracking()
                         scope.launch { yaw.stop() }
                         scope.launch { pitch.stop() }
                     },
                     onDragEnd = {
                         dragging = false
+                        hold.since = -1f
                         val v = tracker.calculateVelocity()
                         val k = DEGREES_PER_WIDTH / size.width
                         settle(v.x * k, -v.y * k)
                     },
                     onDragCancel = {
                         dragging = false
+                        hold.since = -1f
                         settle(0f, 0f)
                     },
                 ) { change, drag ->
                     change.consume()
                     tracker.addPosition(change.uptimeMillis, change.position)
+                    pull = max(0f, pull + drag.y)
+                    // Far enough down: the hold starts; back up: it starts over.
+                    val far = pull > size.height * PULL_DOWN_HEIGHTS
+                    if (far && hold.since < 0f && !hold.fired) {
+                        hold.since = time
+                        hold.lastTick = time
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    } else if (!far) {
+                        hold.since = -1f
+                    }
                     val k = DEGREES_PER_WIDTH / size.width
                     scope.launch {
                         yaw.snapTo(yaw.value + drag.x * k)
@@ -224,9 +261,28 @@ fun SpinningLogo(modifier: Modifier = Modifier) {
     ) {
         val y = yaw.value + sway * 14f * sin(time * 0.9f)
         val p = pitch.value + sway * 7f * sin(time * 0.7f + 1f)
-        drawCoin(y, p, cache)
+        // The tremble: small and slow at first, wild near the end.
+        val held = hold.progress(time)
+        val amp = if (held > 0f) size.width * (0.006f + 0.03f * held * held) else 0f
+        val speed = 38f + 30f * held
+        withTransform({
+            translate(amp * sin(time * speed), amp * 0.7f * sin(time * speed * 1.13f + 1f))
+            rotate(held * held * 6f * sin(time * speed * 0.9f + 2f))
+        }) {
+            drawCoin(y, p, cache)
+        }
         drawSparkles(sparkles, time)
     }
+}
+
+/** The pull-down hold: when it started (-1: not held) and whether this drag already fired. */
+private class Hold {
+    var since = -1f
+    var fired = false
+    var lastTick = 0f
+
+    /** 0 → 1 over the hold; 0 when not held. */
+    fun progress(time: Float): Float = if (since < 0f) 0f else ((time - since) / HOLD_SECONDS).coerceIn(0f, 1f)
 }
 
 /** Little four-pointed stars drifting off the coin's rim while it turns. */
@@ -309,6 +365,10 @@ private fun DrawScope.drawSparkles(sparkles: Sparkles, time: Float) {
     }
 }
 
+/** How far down, in the logo's heights, one drag must pull to start the hold. */
+private const val PULL_DOWN_HEIGHTS = 0.7f
+/** How long the logo must be held down there before the thanks come. */
+private const val HOLD_SECONDS = 5f
 private const val DEGREES_PER_WIDTH = 220f
 private const val MAX_PITCH = 70f
 /** Half the coin's thickness, in units of its size. */

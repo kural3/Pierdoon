@@ -7,10 +7,76 @@ import org.json.JSONObject
 /** A download that failed for a [reason] the user can act on, with yt-dlp's own words in [detail]. */
 class DownloadException(val reason: FailReason, val detail: String?) : Exception(detail)
 
-/** yt-dlp picks the stream; "/bestaudio" covers sites that have only one kind (SoundCloud's mp3, for one). */
-fun formatSelector(format: DownloadFormat) = when (format) {
-    DownloadFormat.M4a -> "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio"
-    DownloadFormat.Opus -> "bestaudio[acodec=opus]/bestaudio"
+/**
+ * yt-dlp picks the stream; "/bestaudio" covers sites that have only one kind (SoundCloud's mp3, for
+ * one). Under a [maxKbps] cap (0: none) the streams within it come first, then any, so a site with
+ * nothing that small still gives something.
+ */
+fun formatSelector(format: DownloadFormat, maxKbps: Int = 0): String {
+    val picks = when (format) {
+        DownloadFormat.M4a -> listOf("bestaudio[ext=m4a]", "bestaudio[acodec^=mp4a]", "bestaudio")
+        DownloadFormat.Opus -> listOf("bestaudio[acodec=opus]", "bestaudio")
+        // Lossless where there is any; otherwise the best there is, never a conversion.
+        DownloadFormat.Flac -> listOf("bestaudio[acodec=flac]", "bestaudio[ext=flac]", "bestaudio[acodec^=alac]", "bestaudio[ext=wav]", "bestaudio")
+        DownloadFormat.Best, DownloadFormat.Mp3 -> listOf("bestaudio")
+    }
+    val capped = if (maxKbps > 0) picks.map { "$it[abr<=$maxKbps]" } else emptyList()
+    return (capped + picks).joinToString("/")
+}
+
+/** The `-f` for [task]: the stream picked for it, or what its format and the [maxKbps] cap choose. */
+fun selectorFor(task: DownloadTask, maxKbps: Int): String =
+    task.streamId?.let { "$it/bestaudio" } ?: formatSelector(task.format, maxKbps)
+
+/** yt-dlp's post-processing with FFmpeg: [format]'s conversion, or the audio as served in its own container. */
+fun conversionArgs(format: DownloadFormat): List<String> = when (format) {
+    DownloadFormat.Mp3 -> listOf("-x", "--audio-format", "mp3", "--audio-quality", "0")
+    else -> listOf("-x", "--audio-format", "best")
+}
+
+/** What came down: the stream's codec ("Opus") and average bitrate, as far as the site says. */
+fun JSONObject.audioQuality(): AudioQuality? {
+    val codec = codecName(str("acodec"))
+    val kbps = kbps()
+    if (codec == null && kbps == null) return null
+    return AudioQuality(codec, kbps)
+}
+
+/**
+ * The audio-only streams in a link's `-J` output, lossless ones first, then by bitrate; empty for
+ * a playlist or a site that lists none (it still has its one stream, which a download takes as "best").
+ * A site that gives no bitrate (archive.org) has it worked out from the size and the length.
+ */
+fun JSONObject.audioStreams(): List<AudioStream> {
+    val formats = optJSONArray("formats") ?: return emptyList()
+    val seconds = optDouble("duration").takeIf { !it.isNaN() && it > 0 }
+    return List(formats.length()) { formats.optJSONObject(it) }.filterNotNull()
+        .filter { it.str("vcodec").let { v -> v == null || v == "none" } && it.str("acodec") != "none" && it.str("format_id") != null }
+        // HLS and DRM copies of the same audio would only repeat it.
+        .filter { it.str("protocol")?.startsWith("m3u8") != true && !it.optBoolean("has_drm") }
+        .map { f ->
+            val bytes = f.optLong("filesize").takeIf { it > 0 } ?: f.optLong("filesize_approx").takeIf { it > 0 }
+            val kbps = f.kbps() ?: if (bytes != null && seconds != null) (bytes * 8 / seconds / 1000).toInt() else null
+            AudioStream(f.str("format_id")!!, codecName(f.str("acodec")) ?: codecName(f.str("ext")), kbps, bytes)
+        }
+        .sortedWith(compareByDescending<AudioStream> { it.lossless }.thenByDescending { it.kbps ?: 0 })
+}
+
+private fun JSONObject.kbps(): Int? =
+    (optDouble("abr").takeIf { !it.isNaN() && it > 0 } ?: optDouble("tbr").takeIf { !it.isNaN() && it > 0 })?.toInt()
+
+/** "mp4a.40.2" as people know it: "AAC". */
+private fun codecName(acodec: String?): String? = when (val c = acodec?.substringBefore('.')?.lowercase()?.takeIf { it != "none" }) {
+    null -> null
+    "mp4a", "aac" -> "AAC"
+    "opus" -> "Opus"
+    "vorbis" -> "Vorbis"
+    "mp3" -> "MP3"
+    "flac" -> "FLAC"
+    "alac" -> "ALAC"
+    "wav" -> "WAV"
+    "aif", "aiff" -> "AIFF"
+    else -> if (c.startsWith("pcm")) "PCM" else c.uppercase()
 }
 
 fun JSONObject.str(key: String): String? =

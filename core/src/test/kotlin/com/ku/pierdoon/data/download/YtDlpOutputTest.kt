@@ -38,4 +38,28 @@ class YtDlpOutputTest {
         assertNull(info.str("artist"))
         assertEquals("Song", info.str("track"))
     }
+
+    @Test
+    fun losslessStreamsComeFirstWithBitrateFromTheirSize() {
+        // archive.org: no bitrate, no vcodec, only a size and the length.
+        val info = JSONObject(
+            """{"duration": 100, "formats": [
+                {"format_id": "0", "ext": "mp3", "acodec": "mp3", "filesize": 2000000},
+                {"format_id": "1", "ext": "flac", "acodec": "flac", "filesize": 10000000}
+            ]}"""
+        )
+        val streams = info.audioStreams()
+        assertEquals(listOf("1", "0"), streams.map { it.id })
+        assertEquals(true, streams[0].lossless)
+        assertEquals(800, streams[0].kbps)
+        assertEquals(160, streams[1].kbps)
+    }
+
+    @Test
+    fun flacIsNeverAConversion() {
+        assertEquals(false, DownloadFormat.Flac.converts)
+        assertEquals(listOf("-x", "--audio-format", "best"), conversionArgs(DownloadFormat.Flac))
+        assertEquals(true, formatSelector(DownloadFormat.Flac).startsWith("bestaudio[acodec=flac]"))
+        assertEquals(true, formatSelector(DownloadFormat.Flac).endsWith("/bestaudio"))
+    }
 }

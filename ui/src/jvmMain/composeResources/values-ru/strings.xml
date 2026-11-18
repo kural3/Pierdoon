@@ -8,7 +8,7 @@
     <string name="settings_black_desc">В тёмной теме: глубокий чёрный вместо серого</string>
     <string name="settings_glass_desc">Размытие под плеером и панелями</string>
     <string name="settings_floating_nav">Компактная боковая панель</string>
-    <string name="settings_floating_nav_desc">Только значки, без подписей. Ширину можно менять, потянув за край панели</string>
+    <string name="settings_floating_nav_desc">Только значки, без подписей</string>
     <string name="settings_haptics">Звук нажатий</string>
     <string name="settings_smooth_desc">Анимации на частоте монитора</string>
     <string name="settings_wifi_only">Не загружать тексты</string>
@@ -50,7 +50,7 @@
     <string name="remote_devices_none">Пока ни одного</string>
     <string name="remote_forget">Отключить</string>
     <string name="discord_presence">Статус в Discord</string>
-    <string name="discord_presence_desc">Показывать в профиле Discord, что сейчас играет. Discord должен быть запущен, обложки находятся в Deezer и iTunes</string>
+    <string name="discord_presence_desc">Показывать в Discord, что сейчас играет</string>
     <string name="output_unavailable">Звук некуда выводить: проверьте наушники или колонки</string>
     <string name="choose_image">Выберите изображение</string>
     <string name="choose_folder">Выберите папку с музыкой</string>
@@ -81,5 +81,5 @@
     <string name="settings_system_summary">Трей, статус в Discord</string>
     <string name="youtube_cookies">Куки из браузера</string>
     <string name="youtube_cookies_off">Не брать</string>
-    <string name="youtube_cookies_desc">Браузер, в котором вы вошли в YouTube: тогда он не примет загрузки за бота. Chrome и Edge часто не дают прочитать свои куки, надёжнее всего Firefox</string>
+    <string name="youtube_cookies_desc">Браузер, где вы вошли в YouTube: так загрузки не примут за бота. Надёжнее всего Firefox</string>
 </resources>

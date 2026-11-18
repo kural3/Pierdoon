@@ -1,7 +1,11 @@
 package com.ku.pierdoon.playback
 
 import com.ku.pierdoon.data.Song
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** The computer's own [Player] as the shared model's [QueuePlayer]. */
@@ -63,6 +67,27 @@ class DesktopQueuePlayer(val player: Player) : QueuePlayer {
     override fun togglePlay() = PlaybackController.togglePlay()
     override fun prepare() = player.prepare()
 
+    private var fade: Job? = null
+
+    override fun fadeOutAndPause(durationMs: Long) {
+        if (fade?.isActive == true) return
+        fade = fadeScope.launch {
+            val start = player.volume
+            val steps = (durationMs / FADE_STEP_MS).toInt().coerceAtLeast(1)
+            try {
+                // The engine cubes the volume, so an even slide down sounds like an even fade.
+                for (i in steps downTo 1) {
+                    if (!player.playWhenReady) return@launch
+                    player.volume = start * i / steps
+                    delay(FADE_STEP_MS)
+                }
+                player.playWhenReady = false
+            } finally {
+                player.volume = start
+            }
+        }
+    }
+
     /** Windows won't replace or move a file the decoder still has open: wait for it to let go. */
     override suspend fun stopAndRelease() {
         val closed = player.stop()
@@ -71,5 +96,7 @@ class DesktopQueuePlayer(val player: Player) : QueuePlayer {
 
     private companion object {
         const val CLOSE_TIMEOUT_MS = 2_000L
+        const val FADE_STEP_MS = 50L
+        val fadeScope = MainScope()
     }
 }

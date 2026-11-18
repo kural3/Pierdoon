@@ -1,6 +1,9 @@
 package com.ku.pierdoon.playback
 
 import android.content.ContentUris
+import android.os.Bundle
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -94,8 +97,18 @@ class MediaQueuePlayer(private val p: Player) : QueuePlayer {
 
     override fun prepare() = p.prepare()
 
+    // The service owns the volume (even volume, crossfade), so it does the fade.
+    override fun fadeOutAndPause(durationMs: Long) {
+        val args = Bundle().apply { putLong(FADE_OUT_MS, durationMs) }
+        (p as? MediaController)?.sendCustomCommand(FADE_OUT, args)
+    }
+
     override suspend fun stopAndRelease() = p.stop()
 }
+
+/** Fade the music out and pause; the length in [FADE_OUT_MS]. */
+val FADE_OUT = SessionCommand("com.ku.pierdoon.FADE_OUT", Bundle.EMPTY)
+const val FADE_OUT_MS = "fade_ms"
 
 private fun queueKeyOf(item: MediaItem, index: Int): String =
     item.mediaMetadata.extras?.getLong(QUEUE_KEY, 0L)?.takeIf { it != 0L }?.let { "q:$it" } ?: "slot:$index"

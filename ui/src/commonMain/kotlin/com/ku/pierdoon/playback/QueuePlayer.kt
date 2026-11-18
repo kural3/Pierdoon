@@ -60,6 +60,9 @@ interface QueuePlayer {
     fun togglePlay()
     fun prepare()
 
+    /** Turns the music down over [durationMs], pauses, and puts the volume back for next time. */
+    fun fadeOutAndPause(durationMs: Long)
+
     /** Stops and waits (a little) until the current file is let go, so it can be rewritten or moved. */
     suspend fun stopAndRelease()
 }

@@ -32,6 +32,7 @@ import com.ku.pierdoon.data.InterfaceLanguage
 import com.ku.pierdoon.data.MusicFolder
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.download.DownloadFormat
+import com.ku.pierdoon.data.download.DownloadMode
 import com.ku.pierdoon.data.download.Downloader
 import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.remote.PcRemote
@@ -65,6 +66,7 @@ fun SettingsScreen(
     updateState: UpdateState,
     onCheckUpdates: () -> Unit,
     onShowUpdate: () -> Unit,
+    onThanks: () -> Unit,
     onFindDuplicates: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
@@ -128,9 +130,12 @@ fun SettingsScreen(
                 SettingsSection.Sync -> item(key = "sync") { PcSyncGroup(null, onOpenComputer) }
                 SettingsSection.Backup -> backupItems(onExportBackup, onImportBackup)
                 SettingsSection.Downloads -> downloads(settings, onUpdate)
-                SettingsSection.Updates -> updatesSection(settings, shared, updateState, updateStatus, onCheckUpdates, onShowUpdate)
                 SettingsSection.Beta -> betaSection(settings, shared, onForgetDislikes = { RadioMemory.get(context.filesDir).clear() })
-                SettingsSection.About -> item(key = "about") { AboutContent(version) }
+                // Updates live under About: one page for the version and what comes next.
+                SettingsSection.Updates, SettingsSection.About -> {
+                    item(key = "about") { AboutContent(version, onThanks = onThanks) }
+                    updatesSection(settings, shared, updateState, updateStatus, onCheckUpdates, onShowUpdate)
+                }
             }
         }
     }
@@ -179,7 +184,7 @@ private fun LazyListScope.sectionList(
             name = stringResource(Res.string.app_name),
             version = stringResource(Res.string.settings_version, version),
             status = updateStatus,
-            onStatusClick = { onOpen(SettingsSection.Updates) },
+            onStatusClick = { onOpen(SettingsSection.About) },
             onLogoClick = { onOpen(SettingsSection.About) },
         )
     }
@@ -236,7 +241,7 @@ private fun sectionSummary(s: SettingsSection, settings: AppSettings, trackCount
     SettingsSection.Downloads -> downloadsSummary(settings)
     SettingsSection.Updates -> updateStatus
     SettingsSection.Beta -> stringResource(Res.string.settings_beta_summary)
-    SettingsSection.About -> stringResource(Res.string.about_tagline)
+    SettingsSection.About -> updateStatus
 }
 
 /**
@@ -318,9 +323,7 @@ private fun LazyListScope.library(
 /** "Music/Pier.doon · M4A" on the section list. */
 @Composable
 private fun downloadsSummary(settings: AppSettings): String {
-    val format = stringResource(
-        if (settings.downloadFormat == DownloadFormat.M4a) Res.string.download_format_m4a else Res.string.download_format_opus
-    )
+    val format = stringResource(if (settings.downloadMode == DownloadMode.Ask) settings.downloadMode.label() else settings.downloadFormat.label())
     return "$DEFAULT_SAVE_FOLDER · $format"
 }
 

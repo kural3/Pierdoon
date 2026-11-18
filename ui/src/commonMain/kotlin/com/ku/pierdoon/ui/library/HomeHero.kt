@@ -265,6 +265,9 @@ fun homePills(
     statsDetail: String?,
     onStats: (() -> Unit)?,
     shuffleLabel: String,
+    /** Opens the lyrics quiz; null hides its pill. */
+    quizLabel: String = "",
+    onQuiz: (() -> Unit)? = null,
     /** The radio is on (playing or paused): its pill lights up, turns, and opens the player. */
     radioOn: Boolean = false,
     onOpenPlayer: () -> Unit = {},
@@ -286,6 +289,9 @@ fun homePills(
         }
         if (onStats != null) {
             add(QuickPill(statsLabel, PlayerIcons.BarChart, MaterialShapes.Cookie6Sided.toShape(), c.surfaceContainerHigh, c.onSurface, onStats, statsDetail))
+        }
+        if (onQuiz != null) {
+            add(QuickPill(quizLabel, PlayerIcons.Lyrics, MaterialShapes.Clover4Leaf.toShape(), c.surfaceContainerHigh, c.onSurface, onQuiz))
         }
     }
 }

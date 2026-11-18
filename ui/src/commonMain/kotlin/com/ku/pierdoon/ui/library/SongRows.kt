@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.components.FormatBadge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -176,17 +177,21 @@ fun SongRow(
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = if (isCurrent) MaterialTheme.typography.titleMediumEmphasized else MaterialTheme.typography.titleMedium,
-                color = when {
-                    selected == true -> colors.onPrimaryContainer
-                    isCurrent -> colors.onSecondaryContainer
-                    else -> colors.onSurface
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = song.title,
+                    style = if (isCurrent) MaterialTheme.typography.titleMediumEmphasized else MaterialTheme.typography.titleMedium,
+                    color = when {
+                        selected == true -> colors.onPrimaryContainer
+                        isCurrent -> colors.onSecondaryContainer
+                        else -> colors.onSurface
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                FormatBadge(song, Modifier.padding(start = 6.dp))
+            }
             Text(
                 text = "${song.artist.ifEmpty { stringResource(Res.string.unknown_artist) }} · ${formatDuration(song.durationMs)}",
                 style = MaterialTheme.typography.bodyMedium,

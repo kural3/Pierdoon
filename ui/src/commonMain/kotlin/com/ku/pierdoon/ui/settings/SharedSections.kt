@@ -3,7 +3,9 @@ package com.ku.pierdoon.ui.settings
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import com.ku.pierdoon.data.download.EngineUpdate
+import com.ku.pierdoon.data.download.DOWNLOAD_KBPS_CAPS
 import com.ku.pierdoon.data.download.DownloadFormat
+import com.ku.pierdoon.data.download.DownloadMode
 import com.ku.pierdoon.data.download.DownloadQueue
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
@@ -31,6 +33,7 @@ import com.ku.pierdoon.data.update.UpdateState
 import com.ku.pierdoon.playback.EqPreset
 import com.ku.pierdoon.ui.components.rememberToast
 import com.ku.pierdoon.ui.resources.*
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /** A change to the settings both apps have. */
@@ -188,7 +191,7 @@ fun LazyListScope.updatesSection(
     onShowUpdate: () -> Unit,
 ) {
     item(key = "updates") {
-        Group(null) {
+        Group(stringResource(Res.string.settings_updates)) {
             listOf<@Composable (Shape) -> Unit>(
                 { shape ->
                     SwitchItem(
@@ -328,6 +331,15 @@ fun LazyListScope.appearanceSection(
                         onSelect = { i -> onUpdate { copy(progressStyle = ProgressStyle.entries[i]) } },
                     )
                 })
+                add(GroupRow { shape ->
+                    SwitchItem(
+                        shape = shape,
+                        title = stringResource(Res.string.settings_format_badges),
+                        subtitle = stringResource(Res.string.settings_format_badges_desc),
+                        checked = settings.formatBadges,
+                        onChange = { v -> onUpdate { copy(formatBadges = v) } },
+                    )
+                })
                 addAll(styleRows)
             }
         }
@@ -385,24 +397,59 @@ internal expect fun rememberFontFilePicker(onPicked: (PickedFile) -> Unit): () -
 /** The format downloads are saved in, and yt-dlp: its version and an update. */
 fun LazyListScope.downloadFormatAndEngine(settings: SharedSettings, onUpdate: SharedUpdate, downloads: DownloadQueue) {
     item(key = "download_format") {
+        val mode = settings.downloadMode
+        val format = settings.downloadFormat
+        // MP3 and FLAC need FFmpeg, which every app that offers them has.
+        val formats = if (mode == DownloadMode.Simple) listOf(DownloadFormat.M4a, DownloadFormat.Opus)
+        else DownloadFormat.entries.filter { downloads.canConvert || !it.converts }
         Group(stringResource(Res.string.download_format)) {
-            listOf<@Composable (Shape) -> Unit>(
-                { shape ->
+            buildList<@Composable (Shape) -> Unit> {
+                add { shape ->
                     ChoiceRowItem(
                         shape = shape,
-                        options = listOf(
-                            stringResource(Res.string.download_format_m4a),
-                            stringResource(Res.string.download_format_opus),
-                        ),
-                        selected = settings.downloadFormat.ordinal,
-                        onSelect = { i -> onUpdate { copy(downloadFormat = DownloadFormat.entries[i]) } },
-                        description = stringResource(
-                            if (settings.downloadFormat == DownloadFormat.M4a) Res.string.download_format_m4a_desc
-                            else Res.string.download_format_opus_desc
-                        ),
+                        title = stringResource(Res.string.download_mode),
+                        options = DownloadMode.entries.map { stringResource(it.label()) },
+                        selected = mode.ordinal,
+                        onSelect = { i ->
+                            val next = DownloadMode.entries[i]
+                            onUpdate {
+                                // The simple choice has M4A and Opus only, and no cap.
+                                if (next == DownloadMode.Simple) copy(
+                                    downloadMode = next,
+                                    downloadMaxKbps = 0,
+                                    downloadFormat = if (downloadFormat == DownloadFormat.Opus) DownloadFormat.Opus else DownloadFormat.M4a,
+                                )
+                                // Downloads nobody is asked about (sent from the phone, the radio) take the best stream.
+                                else if (next == DownloadMode.Ask) copy(downloadMode = next, downloadMaxKbps = 0, downloadFormat = DownloadFormat.Best)
+                                else copy(downloadMode = next)
+                            }
+                        },
+                        description = stringResource(mode.description()),
                     )
-                },
-            )
+                }
+                // Asked each time: nothing more to set here.
+                if (mode != DownloadMode.Ask) add { shape ->
+                    ChoiceRowItem(
+                        shape = shape,
+                        title = stringResource(Res.string.download_codec),
+                        options = formats.map { stringResource(it.label()) },
+                        selected = formats.indexOf(format),
+                        onSelect = { i -> onUpdate { copy(downloadFormat = formats[i]) } },
+                    )
+                }
+                if (mode == DownloadMode.Custom) add { shape ->
+                    val cap = settings.downloadMaxKbps
+                    ChoiceRowItem(
+                        shape = shape,
+                        title = stringResource(Res.string.download_max_kbps),
+                        options = DOWNLOAD_KBPS_CAPS.map { if (it == 0) stringResource(Res.string.download_kbps_max) else it.toString() },
+                        selected = DOWNLOAD_KBPS_CAPS.indexOf(cap),
+                        onSelect = { i -> onUpdate { copy(downloadMaxKbps = DOWNLOAD_KBPS_CAPS[i]) } },
+                        description = if (cap == 0) stringResource(Res.string.download_kbps_max_desc)
+                        else stringResource(Res.string.download_kbps_cap_desc, cap),
+                    )
+                }
+            }
         }
     }
     item(key = "download_engine") {
@@ -434,3 +481,24 @@ fun LazyListScope.downloadFormatAndEngine(settings: SharedSettings, onUpdate: Sh
 /** A size on disk as the system writes it ("1.2 MB"). */
 @Composable
 internal expect fun fileSize(bytes: Long): String
+
+/** The format's name on its button: "M4A", "MP3", "Best". */
+fun DownloadFormat.label(): StringResource = when (this) {
+    DownloadFormat.M4a -> Res.string.download_format_m4a
+    DownloadFormat.Opus -> Res.string.download_format_opus
+    DownloadFormat.Best -> Res.string.download_format_best
+    DownloadFormat.Mp3 -> Res.string.download_format_mp3
+    DownloadFormat.Flac -> Res.string.download_format_flac
+}
+
+fun DownloadMode.label(): StringResource = when (this) {
+    DownloadMode.Simple -> Res.string.download_mode_simple
+    DownloadMode.Custom -> Res.string.download_mode_custom
+    DownloadMode.Ask -> Res.string.download_mode_ask
+}
+
+private fun DownloadMode.description(): StringResource = when (this) {
+    DownloadMode.Simple -> Res.string.download_mode_simple_desc
+    DownloadMode.Custom -> Res.string.download_mode_custom_desc
+    DownloadMode.Ask -> Res.string.download_mode_ask_desc
+}

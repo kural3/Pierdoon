@@ -60,6 +60,7 @@ import kotlin.system.exitProcess
  *     move 300 400       hover
  *     scroll 300 400 5   wheel (positive = down)
  *     drag 10 10 200 10  press, move, release
+ *     hold 10 10 200 10  press and move, keeping the button down (release 200 10 lets go)
  *     shot home          save home.png
  *     shotnow mid        save mid.png at once, mid-animation
  *     state              print whether it plays and how loud (the Delicious mode's levels)
@@ -162,7 +163,7 @@ fun main(args: Array<String>) {
                     "scroll" -> scene.sendPointerEvent(
                         PointerEventType.Scroll, at(p[1], p[2]), scrollDelta = Offset(0f, p[3].toFloat()),
                     )
-                    "drag" -> {
+                    "drag", "hold" -> {
                         val a = at(p[1], p[2])
                         val b = at(p[3], p[4])
                         scene.sendPointerEvent(PointerEventType.Move, a)
@@ -171,7 +172,8 @@ fun main(args: Array<String>) {
                             scene.sendPointerEvent(PointerEventType.Move, a + (b - a) * (i / 12f), buttons = pressed)
                             run(16)
                         }
-                        scene.sendPointerEvent(PointerEventType.Release, b, button = PointerButton.Primary)
+                        // "hold" keeps the button down there; "release x y" lets go.
+                        if (p[0] == "drag") scene.sendPointerEvent(PointerEventType.Release, b, button = PointerButton.Primary)
                     }
                     "shot", "shotnow" -> {
                         if (p[0] == "shot") run(400)

@@ -114,7 +114,9 @@ import com.ku.pierdoon.ui.components.rememberBackdrop
 import com.ku.pierdoon.ui.library.FillBox
 import com.ku.pierdoon.ui.library.LibraryScreen
 import com.ku.pierdoon.data.download.Downloader
+import com.ku.pierdoon.ui.download.offer
 import com.ku.pierdoon.ui.library.PlaylistsScreen
+import com.ku.pierdoon.ui.settings.SPECIAL_THANKS_FADE_MS
 import com.ku.pierdoon.ui.settings.SettingsScreen
 import com.ku.pierdoon.ui.remote.PcRemoteScreen
 import com.ku.pierdoon.ui.navigation.Navigator
@@ -164,6 +166,8 @@ fun PierdoonApp(vm: MainViewModel = viewModel<MainViewModelHolder>().model) {
 
     val library by vm.library.collectAsStateWithLifecycle()
     val player by vm.player.collectAsStateWithLifecycle()
+    // A quiz snippet plays: what it is stays hidden until it is answered.
+    val quizHides by vm.quizHidesPlayer.collectAsStateWithLifecycle()
     val position = vm.position.collectAsStateWithLifecycle()
     val lyrics by vm.lyrics.collectAsStateWithLifecycle()
     val lyricsOffset by vm.lyricsOffset.collectAsStateWithLifecycle()
@@ -262,7 +266,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel<MainViewModelHolder>().model) {
             pcName = pcPaired?.name.orEmpty(),
             onPhone = {
                 PcRemote.shareRequest.value = null
-                Downloader.enqueue(url, settings.downloadFormat)
+                Downloader.offer(url)
                 Downloader.openRequest.value = true
             },
             onPc = {
@@ -391,7 +395,7 @@ fun PierdoonApp(vm: MainViewModel = viewModel<MainViewModelHolder>().model) {
                     .onSizeChanged { chromeHeightPx = it.height },
             ) {
                 AnimatedVisibility(
-                    visible = player.nowPlaying != null || pc != null,
+                    visible = (player.nowPlaying != null && !quizHides) || pc != null,
                     enter = slideInVertically(spatialOffset) { it } + fadeIn(effects),
                     exit = slideOutVertically(spatialOffset) { it } + fadeOut(effects),
                 ) {
@@ -716,6 +720,7 @@ private fun Screens(
                 updateState = vm.update.collectAsStateWithLifecycle().value,
                 onCheckUpdates = vm::checkForUpdates,
                 onShowUpdate = vm::showUpdate,
+                onThanks = { vm.fadeOutAndPause(SPECIAL_THANKS_FADE_MS) },
                 onFindDuplicates = { nav.push(Route.Duplicates) },
                 onExportBackup = { saveBackup.launch(Backup.suggestedName(System.currentTimeMillis()) + "." + Backup.EXTENSION) },
                 onImportBackup = { openBackup.launch(arrayOf("*/*")) },

@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import com.ku.pierdoon.data.CoverStore
 import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.download.Downloader
+import com.ku.pierdoon.ui.download.offer
 import com.ku.pierdoon.data.download.findUrl
 import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.platform.InterfaceLanguage
@@ -231,7 +232,7 @@ private class LinkDropTarget : DragAndDropTarget {
             else -> null
         }
         val url = text?.let(::findUrl) ?: return false
-        Downloader.enqueue(url, SettingsStore.settings.value.downloadFormat)
+        Downloader.offer(url)
         Downloader.openRequest.value = true
         return true
     }
@@ -266,7 +267,7 @@ private fun unhandledShortcut(e: androidx.compose.ui.input.key.KeyEvent, vm: Mai
 /** Links passed on the command line ("Open with", a shortcut) are downloaded. */
 fun handleArgs(args: Array<String>) {
     args.firstNotNullOfOrNull { findUrl(it) }?.let { url ->
-        Downloader.enqueue(url, SettingsStore.settings.value.downloadFormat)
+        Downloader.offer(url)
         Downloader.openRequest.value = true
     }
 }

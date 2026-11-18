@@ -140,16 +140,18 @@ class LyricsModel(
      * background, so the lines keep coming from new songs. Null when no lyrics with words are found.
      */
     suspend fun randomQuote(library: Collection<Long>): LyricQuote? {
+        val pool = library as? Set<Long> ?: library.toSet()
         val stored = repository.storedIds()
-        val unfetched = library.filter { it !in stored }
+        val unfetched = pool.filter { it !in stored }
         if (networkAllowed() && prefetch?.isActive != true && unfetched.isNotEmpty()) {
             prefetch = scope.launch { unfetched.shuffled().take(QUOTE_PREFETCH).forEach { lyricsFor(it) } }
         }
-        val fresh = stored.filter { it !in recentQuotes && song(it) != null }.shuffled()
+        // Only [library]'s tracks: the quiz asks about one playlist or album.
+        val fresh = stored.filter { it in pool && it !in recentQuotes && song(it) != null }.shuffled()
         val quote = quoteFrom(fresh.take(QUOTE_TRIES), allowNetwork = false)
             ?: (if (networkAllowed()) quoteFrom(unfetched.shuffled().take(QUOTE_FETCHES), allowNetwork = true) else null)
             // Nothing new anywhere: an older one again rather than nothing.
-            ?: quoteFrom(recentQuotes.toList().shuffled(), allowNetwork = false)
+            ?: quoteFrom(recentQuotes.filter { it in pool }.shuffled(), allowNetwork = false)
             ?: return null
         recentQuotes.remove(quote.songId)
         recentQuotes.addLast(quote.songId)
@@ -172,7 +174,9 @@ class LyricsModel(
                 }
             } ?: continue
             val line = lyrics.quotableLines().randomOrNull() ?: continue
-            return LyricQuote(s.id, line, s.title, s.artist)
+            // Synced lyrics say where the line is sung; quotableLines trims, so compare trimmed.
+            val at = (lyrics as? Lyrics.Synced)?.lines?.firstOrNull { it.text.trim() == line }?.timeMs
+            return LyricQuote(s.id, line, s.title, s.artist, at)
         }
         return null
     }
@@ -230,6 +234,9 @@ private const val QUOTE_FETCH_TIMEOUT_MS = 4_000L
 private const val QUOTE_PREFETCH = 3
 private const val QUOTE_RECENT = 5
 
-/** A line of a song, for the home screen's greeting. */
+/**
+ * A line of a song, for the home screen's greeting and the lyrics quiz. [atMs] is where in the
+ * track it's sung (by the lyrics, before the user's offset); null for unsynced lyrics.
+ */
 @Immutable
-data class LyricQuote(val songId: Long, val line: String, val title: String, val artist: String)
+data class LyricQuote(val songId: Long, val line: String, val title: String, val artist: String, val atMs: Long? = null)

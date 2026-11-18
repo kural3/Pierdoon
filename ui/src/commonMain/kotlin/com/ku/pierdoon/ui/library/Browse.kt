@@ -231,6 +231,18 @@ fun PlaylistCover(
     }
 }
 
+/** The whole library, as a cover. */
+@Composable
+fun LibraryCover(modifier: Modifier = Modifier) {
+    IconCover(
+        icon = PlayerIcons.Library,
+        container = MaterialTheme.colorScheme.primaryContainer,
+        content = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = MaterialShapes.Cookie9Sided.toShape(),
+        modifier = modifier,
+    )
+}
+
 @Composable
 fun FavoritesCover(modifier: Modifier = Modifier) {
     IconCover(

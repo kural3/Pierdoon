@@ -57,7 +57,7 @@ fun BetaGroups(
         modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp),
     )
     var forgotten by remember { mutableStateOf(false) }
-    Group(stringResource(Res.string.settings_radio)) {
+    Group(null) {
         buildList<@Composable (Shape) -> Unit> {
             add { shape ->
                 SwitchItem(
@@ -87,7 +87,7 @@ fun BetaGroups(
             }
         }
     }
-    Group(stringResource(Res.string.settings_cassette_mode)) {
+    Group(null) {
         listOf<@Composable (Shape) -> Unit>({ shape ->
             SwitchItem(
                 shape = shape,

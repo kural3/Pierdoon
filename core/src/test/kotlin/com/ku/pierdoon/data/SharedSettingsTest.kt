@@ -39,6 +39,7 @@ class SharedSettingsTest {
             lyricsWifiOnly = true,
             lyricsSyncControls = true,
             lyricsKaraoke = false,
+            formatBadges = false,
             skipSilence = true,
             crossfadeSeconds = 5,
             playbackSpeed = 1.25f,
@@ -70,10 +71,11 @@ class SharedSettingsTest {
         assertEquals(
             setOf(
                 "theme", "color_source", "seed_color", "pure_black", "haptics", "smooth_animations", "glass",
-                "progress_style", "nothing_style", "font", "font_choice", "custom_font_file", "custom_font_name", "lyrics_wifi_only", "lyrics_sync_controls", "lyrics_karaoke", "lyrics_karaoke", "skip_silence",
+                "progress_style", "nothing_style", "font", "font_choice", "custom_font_file", "custom_font_name", "lyrics_wifi_only", "lyrics_sync_controls", "lyrics_karaoke", "lyrics_karaoke", "format_badges", "skip_silence",
                 "normalize_volume",
                 "crossfade_seconds", "playback_speed", "crossfade_albums", "cassette_mode", "radio", "radio_novelty", "radio_buffer", "equalizer",
                 "equalizer_gains", "equalizer_preset", "edit_target", "check_updates", "download_format",
+                "download_max_kbps", "download_mode",
                 "song_sort", "song_sort_desc",
             ),
             file.values.keys,

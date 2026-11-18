@@ -69,6 +69,10 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ku.pierdoon.ui.resources.Res
@@ -119,6 +123,10 @@ fun HomeScreen(
     greetingAction: (@Composable () -> Unit)? = null,
     /** A random line of a song, for a tap on the greeting; null leaves the greeting as it is. */
     onQuote: (suspend () -> LyricQuote?)? = null,
+    /** Plays the quoted line's track; null shows no play button by the quote. */
+    onPlayQuote: ((LyricQuote) -> Unit)? = null,
+    /** Opens the lyrics quiz; null hides its pill. */
+    onQuiz: (() -> Unit)? = null,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val wide = maxWidth >= TWO_PANE_WIDTH
@@ -133,6 +141,8 @@ fun HomeScreen(
         statsLabel = stringResource(Res.string.stats),
         statsDetail = weekListenedMs?.let { listenedTime(it) },
         onStats = weekListenedMs?.let { { onOpen(Route.Stats) } },
+        quizLabel = stringResource(Res.string.quiz_title),
+        onQuiz = onQuiz,
         radioOn = radioOn,
         onOpenPlayer = onOpenPlayer,
     )
@@ -168,6 +178,7 @@ fun HomeScreen(
                 Greeting(
                     greeting = stringResource(greetingRes()),
                     onQuote = onQuote,
+                    onPlayQuote = onPlayQuote,
                     modifier = Modifier.weight(1f),
                 )
                 greetingAction?.invoke()
@@ -272,10 +283,15 @@ private sealed interface GreetingText {
 
 /**
  * "Good morning" and the like, a colour sweeping across it now and then. A tap puts a random line
- * of a song in its place, with whose it is; each tap another.
+ * of a song in its place, with whose it is and a button that plays it from that line; each tap another.
  */
 @Composable
-private fun Greeting(greeting: String, onQuote: (suspend () -> LyricQuote?)?, modifier: Modifier = Modifier) {
+private fun Greeting(
+    greeting: String,
+    onQuote: (suspend () -> LyricQuote?)?,
+    onPlayQuote: ((LyricQuote) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
     val colors = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -331,12 +347,22 @@ private fun Greeting(greeting: String, onQuote: (suspend () -> LyricQuote?)?, mo
                     modifier = Modifier.colorSweep({ sweep.value }, sweepColors),
                 )
                 Spacer(Modifier.height(6.dp))
+                // Underlined, the song plays on a tap (its own click: the rest of the greeting brings the next line).
+                val playLabel = stringResource(Res.string.quote_play)
                 Text(
                     text = stringResource(Res.string.greeting_quote_source, text.quote.artist, text.quote.title),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge.let {
+                        if (onPlayQuote != null) it.copy(textDecoration = TextDecoration.Underline) else it
+                    },
                     color = colors.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = if (onPlayQuote == null) Modifier else Modifier
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .clickable(onClickLabel = playLabel, role = Role.Button) {
+                            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                            onPlayQuote(text.quote)
+                        },
                 )
             }
             GreetingText.NoLyrics -> Text(

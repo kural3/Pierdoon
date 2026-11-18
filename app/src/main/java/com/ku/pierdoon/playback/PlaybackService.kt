@@ -70,6 +70,8 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var carLibrary: CarLibrary
     private var crossfader: Crossfader? = null
     private var tapeDeck: TapeDeck? = null
+    private var playerVolume: PlayerVolume? = null
+    private var fadeOut: Job? = null
     /** The player itself; the session gets it wrapped in [TapeDeck.buttons]. */
     private var exoPlayer: ExoPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -101,7 +103,7 @@ class PlaybackService : MediaLibraryService() {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
 
-        val volume = PlayerVolume(player)
+        val volume = PlayerVolume(player).also { playerVolume = it }
         val loudness = EvenVolume.loudness(this)
 
         // History lives here, not in the UI: tracks that play with the app closed count too.
@@ -113,7 +115,7 @@ class PlaybackService : MediaLibraryService() {
                 volume.apply()
                 if (EvenVolume.enabled) measureAhead(player, loudness)
                 // Radio tracks not kept aren't in the library: nothing to remember them by.
-                mediaItem?.mediaId?.toLongOrNull()?.takeUnless { RadioTrack.isRadio(it) }?.let(library::recordPlayed)
+                mediaItem?.mediaId?.toLongOrNull()?.takeUnless { RadioTrack.isRadio(it) || QuizPlayback.active }?.let(library::recordPlayed)
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -127,7 +129,7 @@ class PlaybackService : MediaLibraryService() {
             override fun onEvents(player: Player, events: Player.Events) {
                 if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_IS_PLAYING_CHANGED)) {
                     history.tracker.update(
-                        player.currentMediaItem?.mediaId?.toLongOrNull()?.takeUnless { RadioTrack.isRadio(it) },
+                        player.currentMediaItem?.mediaId?.toLongOrNull()?.takeUnless { RadioTrack.isRadio(it) || QuizPlayback.active },
                         player.duration.takeIf { it != C.TIME_UNSET } ?: 0L,
                         player.isPlaying,
                         SystemClock.elapsedRealtime(),
@@ -346,6 +348,31 @@ class PlaybackService : MediaLibraryService() {
         }.take(order.length).toList()
     }
 
+    /**
+     * The music turned down over [durationMs] and paused (the special thanks in About). Squared,
+     * so it sounds like an even fade rather than holding on and dropping at the end.
+     */
+    private fun fadeOutAndPause(player: Player, durationMs: Long) {
+        val volume = playerVolume ?: return
+        if (fadeOut?.isActive == true || !player.isPlaying) return
+        fadeOut = scope.launch {
+            val steps = (durationMs / FADE_STEP_MS).toInt().coerceAtLeast(1)
+            try {
+                for (i in steps downTo 1) {
+                    // Paused or played on by hand: the fade gives way.
+                    if (!player.playWhenReady) return@launch
+                    val left = i / steps.toFloat()
+                    volume.fade = left * left
+                    delay(FADE_STEP_MS)
+                }
+                tapeDeck?.cancel()
+                player.pause()
+            } finally {
+                volume.fade = 1f
+            }
+        }
+    }
+
     /** Shuffle and repeat for the notification / lock screen, showing the current mode. */
     private fun modeButtons(player: Player) = if (Radio.state.value != null) emptyList() else listOf(
         CommandButton.Builder(if (player.shuffleModeEnabled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF)
@@ -376,6 +403,7 @@ class PlaybackService : MediaLibraryService() {
                 MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                     .add(TOGGLE_SHUFFLE)
                     .add(CYCLE_REPEAT)
+                    .add(FADE_OUT)
                     .build()
             )
             .build()
@@ -394,6 +422,7 @@ class PlaybackService : MediaLibraryService() {
             when (customCommand.customAction) {
                 TOGGLE_SHUFFLE.customAction -> player.shuffleModeEnabled = !player.shuffleModeEnabled
                 CYCLE_REPEAT.customAction -> player.repeatMode = nextRepeatMode(player.repeatMode)
+                FADE_OUT.customAction -> fadeOutAndPause(player, args.getLong(FADE_OUT_MS, SLEEP_FADE_MS))
                 else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -537,6 +566,7 @@ class PlaybackService : MediaLibraryService() {
         const val SAVE_DELAY_MS = 1_000L
         const val SEARCH_SUPPORTED = "android.media.browse.SEARCH_SUPPORTED"
         const val SLEEP_FADE_MS = 10_000L
+        const val FADE_STEP_MS = 50L
         val TOGGLE_SHUFFLE = SessionCommand("com.ku.pierdoon.TOGGLE_SHUFFLE", Bundle.EMPTY)
         val CYCLE_REPEAT = SessionCommand("com.ku.pierdoon.CYCLE_REPEAT", Bundle.EMPTY)
         val QUEUE_EVENTS = intArrayOf(

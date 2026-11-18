@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
@@ -29,12 +33,22 @@ import org.jetbrains.compose.resources.stringResource
 
 private const val REPO = "https://github.com/kural3/Pierdoon"
 
-/** "About": the logo to turn in your fingers, what the app is, and where it lives. */
+/**
+ * "About": the logo to turn in your fingers, what the app is, and where it lives. Pulling the
+ * logo far down opens the special thanks; [onThanks] then lets the song playing fade away.
+ */
 @Composable
-fun AboutContent(version: String, modifier: Modifier = Modifier) {
+fun AboutContent(version: String, modifier: Modifier = Modifier, onThanks: () -> Unit = {}) {
     val uri = LocalUriHandler.current
+    var thanks by remember { mutableStateOf(false) }
+    if (thanks) SpecialThanks(onDismiss = { thanks = false })
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        SpinningLogo(Modifier.padding(top = 8.dp).size(260.dp))
+        SpinningLogo(Modifier.padding(top = 8.dp).size(260.dp), onPulledDown = {
+            if (!thanks) {
+                thanks = true
+                onThanks()
+            }
+        })
         Spacer(Modifier.height(16.dp))
         Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.displaySmallEmphasized)
         Text(

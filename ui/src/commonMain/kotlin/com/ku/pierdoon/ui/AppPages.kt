@@ -48,10 +48,15 @@ import com.ku.pierdoon.ui.edit.EditSongScreen
 import com.ku.pierdoon.ui.library.CollectionScreen
 import com.ku.pierdoon.ui.library.DuplicatesScreen
 import com.ku.pierdoon.ui.library.FavoritesCover
+import com.ku.pierdoon.ui.library.LibraryCover
 import com.ku.pierdoon.ui.library.FoldersScreen
 import com.ku.pierdoon.ui.library.HeroTrack
 import com.ku.pierdoon.ui.library.HomeScreen
 import com.ku.pierdoon.ui.library.LibraryPlaylists
+import com.ku.pierdoon.ui.library.QuizActions
+import com.ku.pierdoon.ui.library.QuizScreen
+import com.ku.pierdoon.ui.library.QuizSource
+import com.ku.pierdoon.QUIZ_OPTIONS
 import com.ku.pierdoon.ui.library.MenuEntry
 import com.ku.pierdoon.ui.library.MixCollage
 import com.ku.pierdoon.ui.library.PlaylistCover
@@ -68,6 +73,8 @@ import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.daily_mix
 import com.ku.pierdoon.ui.resources.daily_mix_desc
 import com.ku.pierdoon.ui.resources.delete
+import com.ku.pierdoon.ui.resources.quiz_source_all
+import com.ku.pierdoon.ui.resources.quiz_title
 import com.ku.pierdoon.ui.resources.favorites
 import com.ku.pierdoon.ui.resources.smart_badge
 import com.ku.pierdoon.ui.resources.smart_edit_rules
@@ -163,6 +170,20 @@ fun AppPages(
     val smartTracks: (SmartPlaylist) -> List<Song> = { p ->
         p.evaluate(songs, plays.orEmpty(), userData.favorites, System.currentTimeMillis())
     }
+    // Where the quiz can take its tracks from: any with enough tracks to have four to pick from.
+    val quizSources: (String, String) -> List<QuizSource> = { allTitle, favTitle ->
+        buildList {
+            add(QuizSource("all", allTitle, songs) { m -> LibraryCover(m) })
+            add(QuizSource("fav", favTitle, vm.resolve(userData.favorites)) { m -> FavoritesCover(m) })
+            userData.playlists.forEach { p ->
+                val tracks = vm.resolve(p.songIds)
+                add(QuizSource("playlist:${p.id}", p.name, tracks) { m -> PlaylistCover(p, tracks.firstOrNull(), m, placeholderIconSize = 24.dp) })
+            }
+            collections.albums.forEach { a ->
+                add(QuizSource("album:${a.id}", a.title, a.songs) { m -> Artwork(a.coverSongId, a.coverAlbumId, m, placeholderIconSize = 24.dp) })
+            }
+        }.filter { it.songs.size >= QUIZ_OPTIONS }
+    }
     // The smart playlist being made (id not in the list yet) or changed; null with the editor closed.
     var smartEditor by remember { mutableStateOf<SmartEditorTarget?>(null) }
 
@@ -228,6 +249,8 @@ fun AppPages(
                     HomeScreen(
                         greetingAction = options.homeAction,
                         onQuote = vm::randomLyricQuote,
+                        onPlayQuote = vm::playQuote,
+                        onQuiz = if (songs.size >= QUIZ_OPTIONS) { { nav.push(Route.Quiz()) } } else null,
                         recent = recent,
                         collections = collections,
                         playlists = userData.playlists,
@@ -287,6 +310,11 @@ fun AppPages(
                                 Artwork(album.coverSongId, album.coverAlbumId, m.clip(RoundedCornerShape(40.dp)), large = true, placeholderIconSize = 64.dp)
                             }
                         },
+                        menu = if (album != null && album.songs.size >= QUIZ_OPTIONS) {
+                            listOf(MenuEntry(stringResource(Res.string.quiz_title), PlayerIcons.Lyrics) { nav.push(Route.Quiz("album:${album.id}")) })
+                        } else {
+                            emptyList()
+                        },
                     )
                 }
                 is Route.ArtistDetail -> {
@@ -313,7 +341,9 @@ fun AppPages(
                         playlistId = playlist?.id,
                         emptyText = stringResource(PlatformStrings.emptyPlaylist),
                         menu = if (playlist != null) {
-                            listOf(
+                            listOfNotNull(
+                                MenuEntry(stringResource(Res.string.quiz_title), PlayerIcons.Lyrics) { nav.push(Route.Quiz("playlist:${playlist.id}")) }
+                                    .takeIf { tracks.size >= QUIZ_OPTIONS },
                                 MenuEntry(stringResource(Res.string.coverLabel), PlayerIcons.Image) { onPlaylistCover(playlist) },
                                 MenuEntry(stringResource(Res.string.renameLabel), PlayerIcons.Edit) { onRenamePlaylist(playlist) },
                                 MenuEntry(stringResource(Res.string.delete), PlayerIcons.Delete) { onDeletePlaylist(playlist) },
@@ -346,6 +376,30 @@ fun AppPages(
                     tracks = dailyMix,
                     cover = { m -> MixCollage(dailyMix, m) },
                 )
+                is Route.Quiz -> {
+                    val allTitle = stringResource(Res.string.quiz_source_all)
+                    val favTitle = stringResource(Res.string.favorites)
+                    val sources = remember(songs, userData.playlists, userData.favorites, collections, allTitle, favTitle) {
+                        quizSources(allTitle, favTitle)
+                    }
+                    QuizScreen(
+                        sources = sources,
+                        initialSource = route.source,
+                        actions = remember {
+                            QuizActions(
+                                nextRound = vm::quizRound,
+                                onSnippet = vm::quizSnippet,
+                                onPause = vm::quizPause,
+                                onReveal = vm::quizReveal,
+                                onPlayQuote = vm::playQuote,
+                                onPlay = vm::quizPlay,
+                                onEnd = vm::quizEnd,
+                            )
+                        },
+                        onBack = { nav.pop() },
+                        bottomInset = bottomInset,
+                    )
+                }
                 Route.Stats -> StatsScreen(
                     plays = plays,
                     songs = songs,

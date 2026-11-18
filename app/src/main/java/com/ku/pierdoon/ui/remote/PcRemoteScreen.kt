@@ -7,7 +7,6 @@ import com.ku.pierdoon.ui.settings.SwitchItem
 import com.ku.pierdoon.ui.settings.ActionItem
 import com.ku.pierdoon.remote.SyncStatus
 import com.ku.pierdoon.remote.PcSync
-import com.ku.pierdoon.ui.settings.PcSyncGroup
 import org.jetbrains.compose.resources.StringResource
 import com.ku.pierdoon.ui.resources.Res
 import com.ku.pierdoon.ui.resources.*
@@ -465,6 +464,7 @@ private fun RemoteScreen(
             else -> null
         }
     }
+    var page by rememberSaveable { mutableStateOf(PcPage.Sync) }
     var libraryTab by rememberSaveable { mutableStateOf(LibraryTab.Songs) }
     var query by rememberSaveable { mutableStateOf("") }
     var open by remember { mutableStateOf<OpenCollection?>(null) }
@@ -518,18 +518,12 @@ private fun RemoteScreen(
     LaunchedEffect(pending) {
         val url = pending ?: return@LaunchedEffect
         PcRemote.pendingDownload.value = null
+        page = PcPage.Download
         deliver(url)
     }
 
     AppScaffold(
         title = name,
-        subtitle = stringResource(
-            when (connection) {
-                PcRemote.Connection.Connected -> Res.string.pc_status_connected
-                PcRemote.Connection.Offline -> Res.string.pc_status_offline
-                else -> Res.string.pc_status_connecting
-            }
-        ),
         onBack = onBack,
         actions = {
             Box {
@@ -573,82 +567,100 @@ private fun RemoteScreen(
                     }
                 }
             }
-            item(key = "volume") {
-                Box(Modifier.animateItem().padding(horizontal = 16.dp)) {
-                    Group(null) {
-                        listOf<@Composable (Shape) -> Unit>({ shape ->
-                            ItemContainer(shape) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                                ) {
-                                    Icon(
-                                        if (state.muted || state.volume == 0f) PlayerIcons.VolumeOff else PlayerIcons.VolumeUp,
-                                        contentDescription = stringResource(Res.string.pc_volume),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    Spacer(Modifier.width(12.dp))
-                                    ValueSlider(
-                                        value = if (state.muted) 0f else state.volume,
-                                        onValueChange = PcRemote::setVolume,
-                                        modifier = Modifier.weight(1f),
-                                    )
+            item(key = "pages") {
+                ConnectedChoice(
+                    options = PcPage.entries.map { stringResource(it.title) },
+                    selected = page.ordinal,
+                    onSelect = { page = PcPage.entries[it] },
+                    modifier = Modifier.animateItem().fillMaxWidth().padding(horizontal = 16.dp).padding(top = 4.dp, bottom = 12.dp),
+                )
+            }
+            if (page == PcPage.Sync) {
+                item(key = "hero") {
+                    PcHero(connection, library.songs.size.takeIf { library.version >= 0 }, Modifier.animateItem().padding(horizontal = 16.dp))
+                }
+                item(key = "volume") {
+                    Box(Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 12.dp)) {
+                        Group(stringResource(Res.string.pc_volume)) {
+                            listOf<@Composable (Shape) -> Unit>({ shape ->
+                                ItemContainer(shape) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                                    ) {
+                                        Icon(
+                                            if (state.muted || state.volume == 0f) PlayerIcons.VolumeOff else PlayerIcons.VolumeUp,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Spacer(Modifier.width(12.dp))
+                                        ValueSlider(
+                                            value = if (state.muted) 0f else state.volume,
+                                            onValueChange = PcRemote::setVolume,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
                                 }
-                            }
-                        })
+                            })
+                        }
                     }
                 }
             }
-            item(key = "sync") {
-                Box(Modifier.animateItem().padding(horizontal = 16.dp).padding(top = 12.dp)) {
-                    PcSyncGroup(stringResource(Res.string.sync_title))
-                }
-            }
-            item(key = "send") {
-                Box(Modifier.animateItem().padding(horizontal = 16.dp)) {
-                    SendBox(
-                        link = link,
-                        onLink = {
-                            link = it
-                            if (send is SendState.Note) send = SendState.Idle
-                        },
-                        source = source,
-                        onSource = {
-                            source = it
-                            if (send !is SendState.Idle && send !is SendState.Note) submit()
-                        },
-                        send = send,
-                        sentUrls = sentUrls,
-                        onSubmit = ::submit,
-                        onPick = { hit -> deliver(hit.url, hit.title, hit.artist.ifBlank { null }) },
-                    )
-                }
-            }
-            if (downloads.isNotEmpty()) {
-                item(key = "downloads") {
+            if (page == PcPage.Download) {
+                item(key = "send") {
                     Box(Modifier.animateItem().padding(horizontal = 16.dp)) {
-                        Group(stringResource(Res.string.pc_downloads)) {
-                            downloads.take(MAX_DOWNLOADS_SHOWN).map<PcDownload, @Composable (Shape) -> Unit> { d ->
-                                { shape -> DownloadRow(d, shape) }
+                        SendBox(
+                            link = link,
+                            onLink = {
+                                link = it
+                                if (send is SendState.Note) send = SendState.Idle
+                            },
+                            source = source,
+                            onSource = {
+                                source = it
+                                if (send !is SendState.Idle && send !is SendState.Note) submit()
+                            },
+                            send = send,
+                            sentUrls = sentUrls,
+                            onSubmit = ::submit,
+                            onPick = { hit -> deliver(hit.url, hit.title, hit.artist.ifBlank { null }) },
+                        )
+                    }
+                }
+                if (downloads.isNotEmpty()) {
+                    item(key = "downloads") {
+                        Box(Modifier.animateItem().padding(horizontal = 16.dp)) {
+                            Group(stringResource(Res.string.pc_downloads)) {
+                                downloads.take(MAX_DOWNLOADS_SHOWN).map<PcDownload, @Composable (Shape) -> Unit> { d ->
+                                    { shape -> DownloadRow(d, shape) }
+                                }
                             }
                         }
                     }
                 }
             }
-            item(key = "library_gap") { Spacer(Modifier.height(20.dp)) }
-            libraryItems(
-                library = library,
-                currentId = state.song?.id,
-                tab = libraryTab,
-                onTab = { libraryTab = it; open = null },
-                query = query,
-                onQuery = { query = it },
-                open = open,
-                onOpen = { open = it },
-                onSave = onSaveToPhone,
-            )
+            if (page == PcPage.Library) {
+                libraryItems(
+                    library = library,
+                    currentId = state.song?.id,
+                    tab = libraryTab,
+                    onTab = { libraryTab = it; open = null },
+                    query = query,
+                    onQuery = { query = it },
+                    open = open,
+                    onOpen = { open = it },
+                    onSave = onSaveToPhone,
+                )
+            }
         }
     }
+}
+
+/** The computer page's tabs. */
+private enum class PcPage(val title: StringResource) {
+    Sync(Res.string.pc_tab_sync),
+    Download(Res.string.pc_tab_download),
+    Library(Res.string.pc_tab_library),
 }
 
 /** "Download on the computer": a link (or a name to look up) goes to the computer's downloads. */

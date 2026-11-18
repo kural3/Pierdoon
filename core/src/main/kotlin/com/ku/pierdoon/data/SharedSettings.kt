@@ -1,7 +1,9 @@
 package com.ku.pierdoon.data
 
 import androidx.compose.runtime.Immutable
+import com.ku.pierdoon.data.download.DOWNLOAD_KBPS_CAPS
 import com.ku.pierdoon.data.download.DownloadFormat
+import com.ku.pierdoon.data.download.DownloadMode
 import com.ku.pierdoon.data.metadata.SaveTarget
 import com.ku.pierdoon.playback.EQ_FLAT
 import com.ku.pierdoon.playback.EqPreset
@@ -52,6 +54,8 @@ interface SharedSettings {
     val lyricsSyncControls: Boolean
     /** The line being sung fills with light as it goes, word by word as far as the timing allows. */
     val lyricsKaraoke: Boolean
+    /** A small shimmering badge ("FLAC") by the titles of lossless tracks. */
+    val formatBadges: Boolean
     val skipSilence: Boolean
     /** Loud tracks turned down and quiet ones up, toward one loudness (EBU R128). */
     val normalizeVolume: Boolean
@@ -79,6 +83,10 @@ interface SharedSettings {
     /** Look for a new release on GitHub now and then (at most twice a day). */
     val checkUpdates: Boolean
     val downloadFormat: DownloadFormat
+    /** The highest bitrate a download may have, in kbit/s; 0 is no cap. */
+    val downloadMaxKbps: Int
+    /** How a download's format is chosen: M4A or Opus, set codec and bitrate, or each time. */
+    val downloadMode: DownloadMode
     val songSort: SongSort
     val songSortDescending: Boolean
 }
@@ -103,6 +111,7 @@ data class CommonSettings(
     override val lyricsWifiOnly: Boolean = false,
     override val lyricsSyncControls: Boolean = false,
     override val lyricsKaraoke: Boolean = true,
+    override val formatBadges: Boolean = true,
     override val skipSilence: Boolean = false,
     override val normalizeVolume: Boolean = false,
     override val crossfadeSeconds: Int = 0,
@@ -118,6 +127,8 @@ data class CommonSettings(
     override val editTarget: SaveTarget = SaveTarget.App,
     override val checkUpdates: Boolean = true,
     override val downloadFormat: DownloadFormat = DownloadFormat.M4a,
+    override val downloadMaxKbps: Int = 0,
+    override val downloadMode: DownloadMode = DownloadMode.Simple,
     override val songSort: SongSort = SongSort.Title,
     override val songSortDescending: Boolean = false,
 ) : SharedSettings {
@@ -141,6 +152,7 @@ data class CommonSettings(
         putBoolean(K_WIFI, lyricsWifiOnly)
         putBoolean(K_SYNC_CONTROLS, lyricsSyncControls)
         putBoolean(K_KARAOKE, lyricsKaraoke)
+        putBoolean(K_FORMAT_BADGES, formatBadges)
         putBoolean(K_SILENCE, skipSilence)
         putBoolean(K_NORMALIZE, normalizeVolume)
         putInt(K_CROSSFADE, crossfadeSeconds)
@@ -156,6 +168,8 @@ data class CommonSettings(
         putString(K_EDIT_TARGET, editTarget.name)
         putBoolean(K_UPDATES, checkUpdates)
         putString(K_DOWNLOAD_FORMAT, downloadFormat.name)
+        putInt(K_DOWNLOAD_MAX_KBPS, downloadMaxKbps)
+        putString(K_DOWNLOAD_MODE, downloadMode.name)
         putString(K_SONG_SORT, songSort.name)
         putBoolean(K_SONG_SORT_DESC, songSortDescending)
     }
@@ -185,6 +199,7 @@ data class CommonSettings(
                 lyricsWifiOnly = getBoolean(K_WIFI, d.lyricsWifiOnly),
                 lyricsSyncControls = getBoolean(K_SYNC_CONTROLS, d.lyricsSyncControls),
                 lyricsKaraoke = getBoolean(K_KARAOKE, d.lyricsKaraoke),
+                formatBadges = getBoolean(K_FORMAT_BADGES, d.formatBadges),
                 skipSilence = getBoolean(K_SILENCE, d.skipSilence),
                 normalizeVolume = getBoolean(K_NORMALIZE, d.normalizeVolume),
                 crossfadeSeconds = getInt(K_CROSSFADE, d.crossfadeSeconds).coerceIn(0, MAX_CROSSFADE_SECONDS),
@@ -200,6 +215,10 @@ data class CommonSettings(
                 editTarget = enumOr(getString(K_EDIT_TARGET, null), d.editTarget),
                 checkUpdates = getBoolean(K_UPDATES, d.checkUpdates),
                 downloadFormat = enumOr(getString(K_DOWNLOAD_FORMAT, null), d.downloadFormat),
+                downloadMaxKbps = getInt(K_DOWNLOAD_MAX_KBPS, d.downloadMaxKbps).takeIf { it in DOWNLOAD_KBPS_CAPS } ?: 0,
+                // For a few builds there was only an "advanced" switch: on is the custom mode.
+                downloadMode = getString(K_DOWNLOAD_MODE, null)?.let { enumOr(it, d.downloadMode) }
+                    ?: if (getBoolean(K_DOWNLOAD_ADVANCED, false)) DownloadMode.Custom else d.downloadMode,
                 songSort = enumOr(getString(K_SONG_SORT, null), d.songSort),
                 songSortDescending = getBoolean(K_SONG_SORT_DESC, d.songSortDescending),
             )
@@ -228,6 +247,7 @@ data class CommonSettings(
         private const val K_WIFI = "lyrics_wifi_only"
         private const val K_SYNC_CONTROLS = "lyrics_sync_controls"
         private const val K_KARAOKE = "lyrics_karaoke"
+        private const val K_FORMAT_BADGES = "format_badges"
         private const val K_SILENCE = "skip_silence"
         private const val K_NORMALIZE = "normalize_volume"
         private const val K_CROSSFADE = "crossfade_seconds"
@@ -243,6 +263,9 @@ data class CommonSettings(
         private const val K_EDIT_TARGET = "edit_target"
         private const val K_UPDATES = "check_updates"
         private const val K_DOWNLOAD_FORMAT = "download_format"
+        private const val K_DOWNLOAD_MAX_KBPS = "download_max_kbps"
+        private const val K_DOWNLOAD_ADVANCED = "download_advanced"
+        private const val K_DOWNLOAD_MODE = "download_mode"
         private const val K_SONG_SORT = "song_sort"
         private const val K_SONG_SORT_DESC = "song_sort_desc"
     }

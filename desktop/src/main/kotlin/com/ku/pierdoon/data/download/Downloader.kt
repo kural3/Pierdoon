@@ -54,6 +54,7 @@ import java.security.MessageDigest
  */
 object Downloader : DownloadQueue {
     override val supported: Boolean = true
+    override val canConvert: Boolean = true
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val engineLock = Mutex()
@@ -113,8 +114,8 @@ object Downloader : DownloadQueue {
         scope.launch { runCatching { ensureEngine(update = false) } }
     }
 
-    override fun enqueue(url: String, format: DownloadFormat, title: String?, artist: String?) {
-        val task = synchronized(this) { DownloadTask(nextId++, url.trim(), format, title, artist) }
+    override fun enqueue(url: String, format: DownloadFormat, title: String?, artist: String?, streamId: String?) {
+        val task = synchronized(this) { DownloadTask(nextId++, url.trim(), format, title, artist, streamId = streamId) }
         _tasks.update { it + task }
         wake.trySend(Unit)
     }
@@ -143,6 +144,13 @@ object Downloader : DownloadQueue {
             val name = trackName(e.str("title"), null, null, e.str("uploader") ?: e.str("channel"))
             SearchHit(url, name.title, name.artist, duration?.toInt(), e.thumbnail())
         }
+    }
+
+    override suspend fun streams(url: String): List<AudioStream>? = withContext(Dispatchers.IO) {
+        runCatching {
+            ensureEngine(update = true)
+            JSONObject(execute(listOf("--no-playlist", "-J", "--", url.trim()))).audioStreams()
+        }.getOrNull()
     }
 
     override fun retry(id: Long) {
@@ -360,9 +368,9 @@ object Downloader : DownloadQueue {
             "--no-mtime",
             "--newline",
             "--write-info-json",
-            "-f", formatSelector(task.format),
-            // Audio as served: "best" keeps the codec, FFmpeg only changes the container.
-            "-x", "--audio-format", "best",
+            "-f", selectorFor(task, SettingsStore.settings.value.downloadMaxKbps),
+            // Audio as served ("best" keeps the codec, FFmpeg only changes the container), or converted.
+            *conversionArgs(task.format).toTypedArray(),
             "--ffmpeg-location", ffmpegPath(),
             "-o", File(work, "%(id)s.%(ext)s").path,
             // Links come from sites too (search results, playlist entries): after "--" one that
@@ -543,7 +551,7 @@ object Downloader : DownloadQueue {
 
     private fun showName(id: Long, info: JSONObject) {
         val name = info.trackName()
-        set(id) { it.copy(title = name.title.ifBlank { null }, artist = name.artist.ifBlank { null }) }
+        set(id) { it.copy(title = name.title.ifBlank { null }, artist = name.artist.ifBlank { null }, quality = info.audioQuality()) }
     }
 
     /** Tags the file, gives it a cover and moves it into Music/Pier.doon. Returns its song id. */

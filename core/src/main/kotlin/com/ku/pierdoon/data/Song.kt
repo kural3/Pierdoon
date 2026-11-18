@@ -25,8 +25,24 @@ data class Song(
     val albumFromFolder: Boolean = false,
     /** The folder the file lies in: "Music/Rock" on Android, the absolute path on Windows. */
     val folder: String = "",
+    /** Android: the file name's extension ("flac"), as MediaStore gives no path; on Windows it's read off [path]. */
+    val fileType: String = "",
+    /** Average kbit/s over the whole file (its size by its length); 0 where unknown. */
+    val kbps: Int = 0,
 ) {
     val file: File get() = File(path)
+
+    private val extension: String get() = fileType.ifEmpty { path.substringAfterLast('.', "") }.lowercase()
+
+    /** "FLAC", "MP3", "AAC"… as people know the file's kind; null where it can't be told. */
+    val formatName: String? get() = formatNameOf(extension)
+
+    /** How good the file can sound, by its kind and bitrate: what its badge makes of it. */
+    val audioTier: AudioTier get() = when {
+        extension in LOSSLESS_EXTENSIONS -> AudioTier.Lossless
+        kbps >= HIGH_KBPS -> AudioTier.High
+        else -> AudioTier.Standard
+    }
 
     companion object {
         /** Identity of a queue entry while it moves around; a song can be queued twice. */
@@ -52,3 +68,31 @@ data class Song(
         }
     }
 }
+
+/** A file's sound, from best: lossless, lossy at a high bitrate (320 MP3), and the rest. */
+enum class AudioTier { Lossless, High, Standard }
+
+/** Lossy files from this average up count as [AudioTier.High]; a 320 MP3 with its cover clears it, a V0 one (~245) doesn't. */
+private const val HIGH_KBPS = 280
+
+private val LOSSLESS_EXTENSIONS = setOf("flac", "wav", "aif", "aiff", "alac", "ape", "wv", "dsf", "dff")
+
+/** The kind of audio file by its extension; ALAC hides in .m4a, so that one reads as AAC. */
+fun formatNameOf(extension: String): String? = when (val e = extension.lowercase()) {
+    "" -> null
+    "flac" -> "FLAC"
+    "wav" -> "WAV"
+    "aif", "aiff" -> "AIFF"
+    "alac" -> "ALAC"
+    "ape" -> "APE"
+    "wv" -> "WV"
+    "dsf", "dff" -> "DSD"
+    "m4a", "aac", "mp4" -> "AAC"
+    "opus", "webm" -> "OPUS"
+    "ogg", "oga" -> "OGG"
+    else -> e.uppercase()
+}
+
+/** kbit/s of a file of [bytes] that plays [durationMs]; 0 when either is unknown. */
+fun averageKbps(bytes: Long, durationMs: Long): Int =
+    if (bytes <= 0 || durationMs <= 0) 0 else (bytes * 8 / durationMs).toInt()

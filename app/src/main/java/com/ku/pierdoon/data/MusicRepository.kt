@@ -77,6 +77,8 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATE_ADDED,
             MediaStore.Audio.Media.TRACK,
+            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.SIZE,
             FOLDER_COLUMN,
         )
         // MediaProvider rejects "COLLATE LOCALIZED", so loadSongs() sorts by locale itself.
@@ -95,6 +97,8 @@ class MusicRepository(private val context: Context) {
             val addedCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
             val trackCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
             val folderCol = c.getColumnIndexOrThrow(FOLDER_COLUMN)
+            val nameCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+            val sizeCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
             songs.ensureCapacity(c.count)
             while (c.moveToNext()) {
                 val folder = folderOf(c.getString(folderCol))
@@ -111,6 +115,8 @@ class MusicRepository(private val context: Context) {
                     // A real album in a folder of its name has track numbers; untagged files don't.
                     albumFromFolder = c.getInt(trackCol) == 0 && album == folder.substringAfterLast('/'),
                     folder = folder,
+                    fileType = c.getString(nameCol)?.substringAfterLast('.', "").orEmpty(),
+                    kbps = averageKbps(c.getLong(sizeCol), c.getLong(durationCol)),
                 )
                 songs += if (withOverrides) overrides.apply(song) else song
             }

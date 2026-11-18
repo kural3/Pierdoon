@@ -29,8 +29,8 @@ android {
         applicationId = "com.ku.pierdoon"
         minSdk = 24
         targetSdk = 37
-        versionCode = 19
-        versionName = "3.0"
+        versionCode = 20
+        versionName = "4.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -148,8 +148,9 @@ dependencies {
     implementation(libs.androidx.media3.session)
     // Writing tags into audio files ("save to file" when editing a track).
     implementation(libs.jaudiotagger)
-    // Track downloads: yt-dlp with its Python runtime. No ffmpeg (35 MB): audio is saved as the site serves it.
+    // Track downloads: yt-dlp with its Python runtime, and FFmpeg to convert them (MP3, FLAC).
     implementation(libs.youtubedl)
+    implementation(libs.youtubedl.ffmpeg)
     // Compiles the baseline profile on install, also for APKs from GitHub rather than Play.
     implementation(libs.androidx.profileinstaller)
     baselineProfile(project(":baselineprofile"))

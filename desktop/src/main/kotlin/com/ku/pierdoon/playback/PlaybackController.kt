@@ -53,7 +53,7 @@ object PlaybackController {
         PlayHistory.load()
         player.addListener { p, events ->
             // Radio tracks not kept aren't in the library: no history, no stats.
-            val song = p.currentMediaItem?.song?.takeUnless { RadioTrack.isRadio(it.id) }
+            val song = p.currentMediaItem?.song?.takeUnless { RadioTrack.isRadio(it.id) || QuizPlayback.active }
             PlayHistory.tracker.update(
                 song?.id, song?.durationMs ?: 0, p.isPlaying, System.nanoTime() / 1_000_000, System.currentTimeMillis(),
                 newItem = Player.Event.Transition in events,

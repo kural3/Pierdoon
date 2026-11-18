@@ -8,13 +8,20 @@ interface DownloadQueue {
     /** False where yt-dlp can't run (Android before 10). */
     val supported: Boolean
 
+    /** FFmpeg is at hand to convert downloads (MP3, FLAC); without it they're saved as served. */
+    val canConvert: Boolean get() = false
+
     /** Everything queued, running and finished this session. */
     val tasks: StateFlow<List<DownloadTask>>
 
     /** Gets yt-dlp ready before the first link, so the first download starts sooner. */
     fun warmUp()
 
-    fun enqueue(url: String, format: DownloadFormat, title: String? = null, artist: String? = null)
+    /** [streamId] is one of the link's [streams], picked by hand; [format] then only says whether to convert. */
+    fun enqueue(url: String, format: DownloadFormat, title: String? = null, artist: String? = null, streamId: String? = null)
+
+    /** The audio streams [url] offers, to pick one from; null when yt-dlp couldn't read the link. */
+    suspend fun streams(url: String): List<AudioStream>?
     fun remove(id: Long)
     fun retry(id: Long)
 
@@ -60,12 +67,20 @@ data class DownloadTask(
     val status: DownloadStatus = DownloadStatus.Queued,
     /** Set on the tracks of a playlist or album link; they end up in a Pier.doon playlist together. */
     val group: DownloadGroup? = null,
+    /** The stream picked by hand, or null for [format]'s own choice. */
+    val streamId: String? = null,
+    /** The stream that came down, once yt-dlp has said which. */
+    val quality: AudioQuality? = null,
 ) {
     val active: Boolean get() = status !is DownloadStatus.Done && status !is DownloadStatus.Failed
 }
 
 @Immutable
 data class DownloadGroup(val id: Long, val name: String)
+
+/** A downloaded stream's codec ("Opus", "AAC") and average bitrate in kbit/s, either unknown. */
+@Immutable
+data class AudioQuality(val codec: String?, val kbps: Int?)
 
 enum class SearchSource(val prefix: String) { YouTube("ytsearch"), SoundCloud("scsearch") }
 

@@ -1,5 +1,6 @@
 package com.ku.pierdoon
 
+import androidx.compose.runtime.Immutable
 import com.ku.pierdoon.data.Backup
 import com.ku.pierdoon.data.CommonSettings
 import com.ku.pierdoon.data.CoverStore
@@ -38,6 +39,7 @@ import com.ku.pierdoon.playback.NowPlaying
 import com.ku.pierdoon.playback.PlayerState
 import com.ku.pierdoon.playback.QueueEntry
 import com.ku.pierdoon.playback.QueuePlayer
+import com.ku.pierdoon.playback.QuizPlayback
 import com.ku.pierdoon.playback.QueueState
 import com.ku.pierdoon.playback.RadioControl
 import com.ku.pierdoon.playback.RepeatMode
@@ -227,6 +229,118 @@ abstract class AppModel(
     /** A random line from the lyrics already on this device, for the home screen's greeting. */
     suspend fun randomLyricQuote(): LyricQuote? = lyricsModel.randomQuote(songsById.keys)
 
+    /**
+     * Plays [quote]'s track on its own, from just before the line when the lyrics say where it's
+     * sung (with the track's offset), else from the start.
+     */
+    fun playQuote(quote: LyricQuote) {
+        val p = queuePlayer ?: return
+        val song = songsById[quote.songId] ?: return
+        quitQuizAudio()
+        p.play(listOf(song), 0, p.shuffle)
+        val at = quote.atMs?.let { it + lyricsModel.offsetFor(song.id) - QUOTE_LEAD_MS }
+        if (at != null && at > 0) p.seekTo(0, at)
+    }
+
+    // The quiz ----------------------------------------------------------------------------------------
+
+    /**
+     * A round of the quiz over [pool]: the track to guess (one not in [used], while there are
+     * any) and [QUIZ_OPTIONS] tracks to pick from. By lyrics it comes with a line of it; by ear,
+     * with where its snippet starts. The other options have titles unlike it and each other, from
+     * [pool] while it has enough, else from the whole library. Null when no line is found, or
+     * there aren't enough titles.
+     */
+    suspend fun quizRound(mode: QuizMode, pool: List<Song>, used: Set<Long>): QuizRound? {
+        val fresh = pool.filter { it.id !in used }.ifEmpty { pool }
+        val quote: LyricQuote?
+        val answer: Song
+        when (mode) {
+            QuizMode.Lyrics -> {
+                quote = lyricsModel.randomQuote(fresh.mapTo(HashSet()) { it.id })
+                    ?: (if (fresh.size < pool.size) lyricsModel.randomQuote(pool.mapTo(HashSet()) { it.id }) else null)
+                    ?: return null
+                answer = songsById[quote.songId] ?: return null
+            }
+            QuizMode.Listen -> {
+                quote = null
+                answer = fresh.random()
+            }
+        }
+        val others = (pool.shuffled().asSequence() + librarySongs().shuffled().asSequence())
+            .filter { quizKey(it) != quizKey(answer) }
+            .distinctBy(::quizKey)
+            .take(QUIZ_OPTIONS - 1)
+            .toList()
+        if (others.size < QUIZ_OPTIONS - 1) return null
+        // By ear, from somewhere in the middle: the start is often silence or a long intro.
+        val fromMs = if (answer.durationMs > QUIZ_SNIPPET_MS * 3) {
+            (answer.durationMs * (0.25 + Math.random() * 0.4)).toLong()
+        } else {
+            0L
+        }
+        return QuizRound(answer, (others + answer).shuffled(), quote, fromMs)
+    }
+
+    private fun quizKey(song: Song) = song.title.trim().lowercase()
+
+    private val _quizHidesPlayer = MutableStateFlow(false)
+
+    /** True while a snippet plays unanswered: the players don't show what it is, not to give it away. */
+    val quizHidesPlayer: StateFlow<Boolean> = _quizHidesPlayer.asStateFlow()
+
+    /** What played before the quiz took the player, to come back to after it. */
+    private class SavedQueue(val songs: List<Song>, val index: Int, val positionMs: Long, val playing: Boolean, val shuffle: Boolean)
+    private var beforeQuiz: SavedQueue? = null
+
+    /** Plays [round]'s snippet from its start, hiding the track in the players until [quizReveal]. */
+    fun quizSnippet(round: QuizRound) {
+        val p = queuePlayer ?: return
+        if (beforeQuiz == null) {
+            beforeQuiz = SavedQueue((0 until p.itemCount).map(p::songAt), p.currentIndex, p.positionMs, p.isPlaying, p.shuffle)
+        }
+        QuizPlayback.active = true
+        _quizHidesPlayer.value = true
+        p.play(listOf(round.answer), 0, false)
+        if (round.fromMs > 0) p.seekTo(0, round.fromMs)
+    }
+
+    fun quizPause() {
+        queuePlayer?.playWhenReady = false
+    }
+
+    fun quizReveal() {
+        _quizHidesPlayer.value = false
+    }
+
+    /** Plays [song] for real, from its start: what played before the quiz no longer comes back. */
+    fun quizPlay(song: Song) {
+        quitQuizAudio()
+        playSongs(listOf(song), 0)
+    }
+
+    /** The quiz is left: what played before it comes back where it was, paused if it was. */
+    fun quizEnd() {
+        _quizHidesPlayer.value = false
+        QuizPlayback.active = false
+        val saved = beforeQuiz ?: return
+        beforeQuiz = null
+        val p = queuePlayer ?: return
+        if (saved.songs.isEmpty() || saved.index !in saved.songs.indices) {
+            p.playWhenReady = false
+            return
+        }
+        p.play(saved.songs, saved.index, saved.shuffle)
+        p.seekTo(saved.index, saved.positionMs)
+        if (!saved.playing) p.playWhenReady = false
+    }
+
+    private fun quitQuizAudio() {
+        beforeQuiz = null
+        QuizPlayback.active = false
+        _quizHidesPlayer.value = false
+    }
+
     suspend fun lyricsCacheSize(): Long = lyricsModel.cacheSize()
     fun clearLyricsCache() = lyricsModel.clearCache()
 
@@ -324,6 +438,11 @@ abstract class AppModel(
 
     fun togglePlay() {
         queuePlayer?.togglePlay()
+    }
+
+    /** The song playing slowly fades away and stops, like at the end of a film. */
+    fun fadeOutAndPause(durationMs: Long) {
+        queuePlayer?.takeIf { it.isPlaying }?.fadeOutAndPause(durationMs)
     }
 
     fun playNext(song: Song) = playNext(listOf(song))
@@ -705,3 +824,22 @@ abstract class AppModel(
         const val COVER_PICKS = "cover-picks"
     }
 }
+
+/** How a quiz guesses: by a line of the lyrics, or by ear. */
+enum class QuizMode { Lyrics, Listen }
+
+/**
+ * A round of the quiz: the track to guess, the tracks to pick from, and, by lyrics, a line of it;
+ * by ear, where in it the snippet starts.
+ */
+@Immutable
+data class QuizRound(val answer: Song, val options: List<Song>, val quote: LyricQuote?, val fromMs: Long)
+
+/** How long a quiz snippet plays. */
+const val QUIZ_SNIPPET_MS = 10_000L
+
+/** How many tracks a quiz round offers. */
+const val QUIZ_OPTIONS = 4
+
+/** A quoted line plays from this long before it's sung, to come in on it. */
+private const val QUOTE_LEAD_MS = 1_500L

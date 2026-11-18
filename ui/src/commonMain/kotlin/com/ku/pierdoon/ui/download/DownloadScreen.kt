@@ -86,6 +86,8 @@ import com.ku.pierdoon.ui.components.RemoteImage
 import com.ku.pierdoon.ui.formatDuration
 import com.ku.pierdoon.ui.library.AppScaffold
 import com.ku.pierdoon.ui.library.listBottomPadding
+import com.ku.pierdoon.data.download.AudioQuality
+import com.ku.pierdoon.data.download.DownloadMode
 import com.ku.pierdoon.ui.settings.Group
 import com.ku.pierdoon.ui.settings.ItemContainer
 import com.ku.pierdoon.ui.settings.groupShape
@@ -111,6 +113,9 @@ fun DownloadScreen(downloads: DownloadQueue, onBack: (() -> Unit)?, onPlay: (Lon
     var searchJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(Unit) { downloads.warmUp() }
+    // Under "choose each time": the picker for the link waiting for it.
+    val asking by DownloadAsk.pending.collectAsState()
+    asking?.let { StreamPickerDialog(it, downloads, onDismiss = { DownloadAsk.pending.value = null }) }
 
     val url = findUrl(link)
     fun runSearch() {
@@ -133,7 +138,7 @@ fun DownloadScreen(downloads: DownloadQueue, onBack: (() -> Unit)?, onPlay: (Lon
         focus.clearFocus()
         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
         if (url != null) {
-            downloads.enqueue(url, settings.downloadFormat)
+            downloads.offer(url)
             link = ""
             search = SearchState.Idle
         } else {
@@ -219,7 +224,7 @@ fun DownloadScreen(downloads: DownloadQueue, onBack: (() -> Unit)?, onPlay: (Lon
                                             queued = tasks.any { it.url == hit.url },
                                             onDownload = {
                                                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                                                downloads.enqueue(hit.url, settings.downloadFormat, hit.title, hit.artist.ifBlank { null })
+                                                downloads.offer(hit.url, hit.title, hit.artist.ifBlank { null })
                                             },
                                         )
                                     }
@@ -580,6 +585,13 @@ private fun TaskBadge(status: DownloadStatus) {
     }
 }
 
+/** "Opus 135 kbit/s", or as much of it as is known. */
+@Composable
+fun qualityText(q: AudioQuality): String? {
+    val kbps = q.kbps?.let { stringResource(Res.string.download_kbps, it) }
+    return listOfNotNull(q.codec, kbps).joinToString(" ").ifBlank { null }
+}
+
 @Composable
 private fun statusText(task: DownloadTask): String {
     val artist = task.artist
@@ -590,7 +602,13 @@ private fun statusText(task: DownloadTask): String {
             s.progress?.let { stringResource(Res.string.download_progress, (it * 100).toInt()) }
                 ?: stringResource(Res.string.download_running)
         DownloadStatus.Saving -> stringResource(Res.string.download_saving)
-        is DownloadStatus.Done -> stringResource(Res.string.download_done)
+        is DownloadStatus.Done -> {
+            val done = stringResource(Res.string.download_done)
+            // Beyond the simple choice, what came down: "Opus 135 kbit/s".
+            val advanced = SharedSettingsStore.settings.collectAsState().value.downloadMode != DownloadMode.Simple
+            val q = task.quality?.takeIf { advanced }?.let { qualityText(it) }
+            if (q != null) "$done · $q" else done
+        }
         is DownloadStatus.Failed -> {
             val reason = stringResource(
                 when (s.reason) {

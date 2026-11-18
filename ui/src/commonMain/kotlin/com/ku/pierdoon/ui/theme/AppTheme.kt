@@ -86,6 +86,7 @@ fun AppTheme(
                 progressStyle = settings.progressStyle,
                 lyricsSyncControls = settings.lyricsSyncControls,
                 lyricsKaraoke = settings.lyricsKaraoke,
+                formatBadges = settings.formatBadges,
                 nothing = settings.nothingStyle,
             ),
             LocalHapticFeedback provides (haptics ?: NoHaptics),

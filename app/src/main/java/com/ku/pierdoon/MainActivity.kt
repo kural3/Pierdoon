@@ -37,6 +37,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.ku.pierdoon.playback.PlaybackService
 import com.ku.pierdoon.data.download.Downloader
+import com.ku.pierdoon.ui.download.offer
 import com.ku.pierdoon.data.download.findUrl
 import com.ku.pierdoon.data.update.Updater
 import com.ku.pierdoon.data.SettingsStore
@@ -130,7 +131,7 @@ class MainActivity : ComponentActivity() {
                     PcRemote.shareRequest.value = url
                     return
                 }
-                Downloader.enqueue(url, SettingsStore.settings.value.downloadFormat)
+                Downloader.offer(url)
                 Downloader.openRequest.value = true
             }
             DownloadService.ACTION_OPEN_DOWNLOADS -> Downloader.openRequest.value = true

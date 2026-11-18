@@ -68,6 +68,9 @@
     <string name="pc_library_loading">Загрузка библиотеки…</string>
     <string name="pc_search">Поиск по библиотеке компьютера</string>
     <string name="pc_nothing_found">Ничего не найдено</string>
+    <string name="pc_tab_sync">Связь</string>
+    <string name="pc_tab_download">Скачать</string>
+    <string name="pc_tab_library">Медиатека</string>
     <string name="pc_volume">Громкость на компьютере</string>
     <string name="player_device_phone">Телефон</string>
     <string name="player_device_switch">Выбрать, где играет</string>

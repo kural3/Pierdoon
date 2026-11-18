@@ -28,6 +28,8 @@ sealed interface Route {
     data object Favorites : Route { override val key = "favorites" }
     data object DailyMix : Route { override val key = "dailymix" }
     data object Stats : Route { override val key = "stats" }
+    /** Guess the song; [source] picks where from at the start ("playlist:5", "album:7", "fav"), null the whole library. */
+    data class Quiz(val source: String? = null) : Route { override val key = if (source == null) "quiz" else "quiz:$source" }
     data class YearReview(val year: Int) : Route { override val key = "year:$year" }
     data object Duplicates : Route { override val key = "duplicates" }
     data object Folders : Route { override val key = "folders" }
@@ -52,6 +54,8 @@ sealed interface Route {
             key == Favorites.key -> Favorites
             key == DailyMix.key -> DailyMix
             key == Stats.key -> Stats
+            key == "quiz" -> Quiz()
+            key.startsWith("quiz:") -> Quiz(key.removePrefix("quiz:"))
             key.startsWith("year:") -> YearReview(key.removePrefix("year:").toInt())
             key.startsWith("smart:") -> SmartPlaylistDetail(key.removePrefix("smart:").toLong())
             key == Duplicates.key -> Duplicates

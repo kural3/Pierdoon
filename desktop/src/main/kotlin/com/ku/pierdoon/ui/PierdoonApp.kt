@@ -101,6 +101,7 @@ import com.ku.pierdoon.ui.player.LyricsSearch
 import com.ku.pierdoon.ui.player.NowPlayingScreen
 import com.ku.pierdoon.ui.player.PlayerBar
 import com.ku.pierdoon.ui.player.QueuePanel
+import com.ku.pierdoon.ui.settings.SPECIAL_THANKS_FADE_MS
 import com.ku.pierdoon.ui.settings.SettingsScreen
 import com.ku.pierdoon.ui.phone.PhoneScreen
 import com.ku.pierdoon.ui.theme.AlbumThemeSeed
@@ -129,6 +130,8 @@ enum class SidePanel { Lyrics, Queue }
 fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
     val library by vm.library.collectAsState()
     val player by vm.player.collectAsState()
+    // A quiz snippet plays: what it is stays hidden until it is answered.
+    val quizHides by vm.quizHidesPlayer.collectAsState()
     val position = vm.position.collectAsState()
     val lyrics by vm.lyrics.collectAsState()
     val lyricsOffset by vm.lyricsOffset.collectAsState()
@@ -282,7 +285,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
             )
             // Over the screen rather than beside it, on frosted glass: opening it moves nothing.
             AnimatedVisibility(
-                visible = sidePanel != null && nowPlaying != null && ready,
+                visible = sidePanel != null && nowPlaying != null && ready && !quizHides,
                 enter = slideInHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) { it / 3 } + fadeIn(effects),
                 exit = slideOutHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) { it / 3 } + fadeOut(effects),
                 modifier = Modifier.align(Alignment.TopEnd).graphicsLayer { alpha = if (covered) 0f else 1f },
@@ -328,7 +331,7 @@ fun PierdoonApp(vm: MainViewModel, nav: Navigator) {
 
             if (ready) {
                 AnimatedVisibility(
-                    visible = player.nowPlaying != null,
+                    visible = player.nowPlaying != null && !quizHides,
                     enter = slideInVertically(spatialOffset) { it } + fadeIn(effects),
                     exit = slideOutVertically(spatialOffset) { it } + fadeOut(effects),
                     modifier = Modifier
@@ -635,6 +638,7 @@ private fun Screens(
                     updateState = updateState,
                     onCheckUpdates = vm::checkForUpdates,
                     onShowUpdate = vm::showUpdate,
+                    onThanks = { vm.fadeOutAndPause(SPECIAL_THANKS_FADE_MS) },
                     onFindDuplicates = { nav.push(Route.Duplicates) },
                     onExportBackup = {
                         Files.saveBackup(backupTitle, Backup.suggestedName(System.currentTimeMillis()))?.let { target ->

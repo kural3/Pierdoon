@@ -94,6 +94,7 @@ class MusicRepository {
             dateAdded = minOf(entry.created, entry.modified) / 1000,
             path = file.absolutePath,
             folder = folder,
+            kbps = averageKbps(entry.size, t.durationMs),
         )
         return if (withOverrides) overrides.apply(song) else song
     }

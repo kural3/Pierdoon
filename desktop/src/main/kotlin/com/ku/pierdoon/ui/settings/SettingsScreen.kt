@@ -80,6 +80,7 @@ fun SettingsScreen(
     updateState: UpdateState,
     onCheckUpdates: () -> Unit,
     onShowUpdate: () -> Unit,
+    onThanks: () -> Unit,
     onFindDuplicates: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
@@ -122,9 +123,12 @@ fun SettingsScreen(
             }
             SettingsSection.Backup -> backupItems(onExportBackup, onImportBackup)
             SettingsSection.Downloads -> downloads(settings, onUpdate, onDownloadFolder)
-            SettingsSection.Updates -> updatesSection(settings, shared, updateState, updateStatus, onCheckUpdates, onShowUpdate)
             SettingsSection.Beta -> betaSection(settings, shared, onForgetDislikes = { RadioMemory.get(AppDirs.files).clear() })
-            SettingsSection.About -> item(key = "about") { AboutContent(version) }
+            // Updates live under About: one page for the version and what comes next.
+            SettingsSection.Updates, SettingsSection.About -> {
+                item(key = "about") { AboutContent(version, onThanks = onThanks) }
+                updatesSection(settings, shared, updateState, updateStatus, onCheckUpdates, onShowUpdate)
+            }
         }
     }
 
@@ -220,7 +224,7 @@ private fun LazyListScope.sectionList(
             name = stringResource(Res.string.app_name),
             version = stringResource(Res.string.settings_version, version),
             status = updateStatus,
-            onStatusClick = { onOpen(SettingsSection.Updates) },
+            onStatusClick = { onOpen(SettingsSection.About) },
             onLogoClick = { onOpen(SettingsSection.About) },
         )
     }
@@ -247,7 +251,7 @@ private fun LazyListScope.sectionList(
                             SettingsSection.Downloads -> stringResource(Res.string.settings_downloads_summary)
                             SettingsSection.Updates -> updateStatus
                             SettingsSection.Beta -> stringResource(Res.string.settings_beta_summary)
-                            SettingsSection.About -> stringResource(Res.string.about_tagline)
+                            SettingsSection.About -> updateStatus
                         },
                         onClick = { onOpen(s) },
                         selected = s == selected,

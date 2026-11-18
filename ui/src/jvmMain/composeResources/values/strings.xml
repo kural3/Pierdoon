@@ -8,7 +8,7 @@
     <string name="settings_black_desc">In the dark theme: deep black instead of grey</string>
     <string name="settings_glass_desc">Blur under the player and panels</string>
     <string name="settings_floating_nav">Compact sidebar</string>
-    <string name="settings_floating_nav_desc">Icons only, no labels. Drag the sidebar edge to change its width</string>
+    <string name="settings_floating_nav_desc">Icons only, no labels</string>
     <string name="settings_haptics">Click sounds</string>
     <string name="settings_smooth_desc">Animations at the monitor's refresh rate</string>
     <string name="settings_wifi_only">Don't download lyrics</string>
@@ -50,7 +50,7 @@
     <string name="remote_devices_none">None yet</string>
     <string name="remote_forget">Disconnect</string>
     <string name="discord_presence">Discord status</string>
-    <string name="discord_presence_desc">Show what's playing on your Discord profile. Discord must be running; covers come from Deezer and iTunes</string>
+    <string name="discord_presence_desc">Show what's playing in Discord</string>
     <string name="output_unavailable">Nowhere to play the sound: check your headphones or speakers</string>
     <string name="choose_image">Choose an image</string>
     <string name="choose_folder">Choose your music folder</string>
@@ -81,5 +81,5 @@
     <string name="settings_system_summary">Tray, Discord status</string>
     <string name="youtube_cookies">Cookies from a browser</string>
     <string name="youtube_cookies_off">Don't use</string>
-    <string name="youtube_cookies_desc">The browser you are signed in to YouTube with: then it won't take downloads for a bot. Chrome and Edge often won't let their cookies be read; Firefox is the sure one</string>
+    <string name="youtube_cookies_desc">The browser you're signed in to YouTube with, so downloads aren't taken for a bot. Firefox works best</string>
 </resources>

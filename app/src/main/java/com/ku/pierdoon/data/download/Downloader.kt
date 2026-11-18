@@ -1,5 +1,6 @@
 package com.ku.pierdoon.data.download
 
+import com.ku.pierdoon.data.SettingsStore
 import com.ku.pierdoon.data.init
 import com.ku.pierdoon.data.DEFAULT_SAVE_FOLDER
 import android.content.ContentUris
@@ -30,6 +31,7 @@ import com.ku.pierdoon.radio.RadioTrack
 import com.ku.pierdoon.radio.YouTubeMix
 import com.ku.pierdoon.data.metadata.MetadataSearch
 import com.ku.pierdoon.data.metadata.FileTags
+import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.YoutubeDLResponse
@@ -135,9 +137,11 @@ object Downloader : DownloadQueue {
         if (supported) scope.launch { runCatching { ensureEngine(update = false) } }
     }
 
-    override fun enqueue(url: String, format: DownloadFormat, title: String?, artist: String?) {
+    override val canConvert: Boolean = true
+
+    override fun enqueue(url: String, format: DownloadFormat, title: String?, artist: String?, streamId: String?) {
         if (!supported) return
-        val task = synchronized(this) { DownloadTask(nextId++, url.trim(), format, title, artist) }
+        val task = synchronized(this) { DownloadTask(nextId++, url.trim(), format, title, artist, streamId = streamId) }
         _tasks.update { it + task }
         ContextCompat.startForegroundService(app, Intent(app, DownloadService::class.java))
         wake.trySend(Unit)
@@ -150,6 +154,18 @@ object Downloader : DownloadQueue {
         synchronized(this) { running?.takeIf { it.first == id }?.second?.cancel() }
         // The cancelled track may have been the last one the group was waiting for.
         group?.let { scope.launch { finishGroup(it) } }
+    }
+
+    override suspend fun streams(url: String): List<AudioStream>? = withContext(Dispatchers.IO) {
+        runCatching {
+            ensureEngine(update = true)
+            val request = YoutubeDLRequest(url.trim()).apply {
+                addOption("--no-playlist")
+                addOption("-J")
+                addCommands(listOf("--"))
+            }
+            JSONObject(execute(request, "pierdoon-streams").out).audioStreams()
+        }.getOrNull()
     }
 
     /**
@@ -304,7 +320,11 @@ object Downloader : DownloadQueue {
     private suspend fun ensureEngine(update: Boolean) = engineLock.withLock {
         if (!engineReady) {
             // Unpacking Python half-way would leave a broken copy: not interrupted by a cancel.
-            withContext(NonCancellable) { YoutubeDL.init(app) }
+            withContext(NonCancellable) {
+                YoutubeDL.init(app)
+                // For MP3 and FLAC; yt-dlp finds it once it's unpacked.
+                FFmpeg.init(app)
+            }
             engineReady = true
             refreshVersion()
         }
@@ -331,7 +351,7 @@ object Downloader : DownloadQueue {
 
     /** Runs yt-dlp: the audio file and its .info.json land in [work]. */
     private suspend fun fetch(task: DownloadTask, work: File): JSONObject {
-        download(task.url, task.format, work, "pierdoon-${task.id}") { progress, line ->
+        download(task.url, task.format, work, "pierdoon-${task.id}", selectorFor(task, SettingsStore.settings.value.downloadMaxKbps)) { progress, line ->
             if (!line.startsWith("[download]")) return@download
             set(task.id) {
                 it.copy(status = DownloadStatus.Downloading(if (progress > 0f) (progress / 100f).coerceIn(0f, 1f) else null))
@@ -349,6 +369,7 @@ object Downloader : DownloadQueue {
         format: DownloadFormat,
         work: File,
         processId: String,
+        selector: String = formatSelector(format, SettingsStore.settings.value.downloadMaxKbps),
         onLine: ((Float, String) -> Unit)? = null,
     ): YoutubeDLResponse {
         val request = YoutubeDLRequest(url).apply {
@@ -356,7 +377,9 @@ object Downloader : DownloadQueue {
             addOption("--no-mtime")
             addOption("--newline")
             addOption("--write-info-json")
-            addOption("-f", formatSelector(format))
+            addOption("-f", selector)
+            // MP3 and FLAC are made by FFmpeg from what came down; the rest is kept as served.
+            if (format.converts) addCommands(conversionArgs(format))
             addOption("-o", File(work, "%(id)s.%(ext)s").path)
             // Links come from sites too (search results, playlist entries): after "--" one that
             // starts with "-" is still a link, never an option such as --exec. The library puts
@@ -416,7 +439,8 @@ object Downloader : DownloadQueue {
         ensureEngine(update = false)
         val work = File(radioDir, track.videoId).apply { deleteRecursively(); mkdirs() }
         try {
-            download(track.url, format, work, "pierdoon-radio-${track.videoId}")
+            // The radio plays and forgets: no time spent converting.
+            download(track.url, if (format.converts) DownloadFormat.Best else format, work, "pierdoon-radio-${track.videoId}")
             val info = readInfo(work) ?: return@withContext null
             val audio = audioIn(work) ?: return@withContext null
             info.str("thumbnail")?.let { MetadataSearch.download(it) }?.let(::squareJpeg)
@@ -505,7 +529,7 @@ object Downloader : DownloadQueue {
 
     private fun showName(id: Long, info: JSONObject) {
         val name = info.trackName()
-        set(id) { it.copy(title = name.title.ifBlank { null }, artist = name.artist.ifBlank { null }) }
+        set(id) { it.copy(title = name.title.ifBlank { null }, artist = name.artist.ifBlank { null }, quality = info.audioQuality()) }
     }
 
     /** Tags the file, gives it a cover and moves it into Music/Pier.doon. Returns its MediaStore id. */

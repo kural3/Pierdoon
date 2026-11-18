@@ -12,6 +12,8 @@ data class UiPrefs(
     val lyricsSyncControls: Boolean = false,
     /** The sung line fills with light as it goes. */
     val lyricsKaraoke: Boolean = true,
+    /** "FLAC" shimmering by lossless tracks' titles ([com.ku.pierdoon.ui.components.FormatBadge]). */
+    val formatBadges: Boolean = true,
     /** Nothing style: dot-matrix headings, dotted progress, flat player. */
     val nothing: Boolean = false,
     /** Covers lean towards a press and spring back, shapes turn while held ([com.ku.pierdoon.ui.components.lively]); off only where nothing should move. */

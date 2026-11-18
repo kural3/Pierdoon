@@ -23,7 +23,10 @@ enum class SettingsSection(val group: SectionGroup, val onPhone: Boolean = true,
     Appearance(SectionGroup.App),
     Sync(SectionGroup.App, onComputer = false),
     System(SectionGroup.App, onPhone = false),
-    Backup(SectionGroup.App), Updates(SectionGroup.App), Beta(SectionGroup.App), About(SectionGroup.App);
+    Backup(SectionGroup.App),
+    /** Folded into [About]: kept so a link to it still opens there. */
+    Updates(SectionGroup.App, onPhone = false, onComputer = false),
+    Beta(SectionGroup.App), About(SectionGroup.App);
 
     /** Its place on its own app's list, which picks its icon's shape: Sync and System share one. */
     val iconIndex: Int

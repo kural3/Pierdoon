@@ -1,5 +1,6 @@
 package com.ku.pierdoon.ui.library
 
+import com.ku.pierdoon.ui.components.FormatBadge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -156,13 +157,17 @@ private fun Modifier.trackClicks(source: MutableInteractionSource, onClick: () -
 private fun TitleAndArtist(song: Song, isCurrent: Boolean, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     Column(modifier) {
-        Text(
-            song.title,
-            style = MaterialTheme.typography.titleSmall,
-            color = if (isCurrent) colors.primary else colors.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                song.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (isCurrent) colors.primary else colors.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            FormatBadge(song, Modifier.padding(start = 6.dp))
+        }
         Text(
             song.artist.ifEmpty { stringResource(Res.string.unknown_artist) },
             style = MaterialTheme.typography.bodySmall,
