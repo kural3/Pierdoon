@@ -70,6 +70,26 @@ public class DemoData {
                 lengths.add(seconds);
             }
         }
+        // Made-up lyrics for "Satellite Heart", as if written in the app, so the lyrics panel has something to light up.
+        Files.createDirectories(files.resolve("lyrics"));
+        String[] words = {
+            "Static on the radio, a signal in the night",
+            "I followed every echo just to find your light",
+            "Circling the city at a thousand miles an hour",
+            "Counting all the windows in the old glass tower",
+            "Oh, satellite heart",
+            "You keep me in orbit, never too far",
+            "Oh, satellite heart",
+            "I see you shining wherever you are",
+            "Paper planes and postcards drifting out of view",
+            "Every little frequency still leads me back to you",
+        };
+        StringBuilder lrc = new StringBuilder();
+        for (int i = 0; i < words.length; i++) {
+            int at = 6 + i * 5;
+            lrc.append(String.format("[%02d:%02d.00]%s%n", at / 60, at % 60, words[i]));
+        }
+        Files.writeString(files.resolve("lyrics").resolve(ids.get(11) + ".lrc"), lrc.toString());
         // A week of listening, most of it to a few favourites.
         long now = System.currentTimeMillis();
         StringBuilder plays = new StringBuilder();

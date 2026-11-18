@@ -8,29 +8,24 @@ import java.util.List;
 import javax.imageio.ImageIO;
 
 /**
- * README banners: the hero and one frame per feature, screenshots in a window on graphite.
- * Run from the repo root on Windows (it uses Segoe UI): `java docs/Banners.java <folder with post_home.png, post_queue.png,
- * post_log.png> docs desktop/icons/pierdoon.png`. The screenshots come from `./gradlew shots` at 1440x900.
+ * README pictures: the hero and one frame per feature, each screenshot as a window on graphite, lit by its own colours.
+ * Run from the repo root: `java docs/Banners.java <folder with home.png, lyrics.png, delicious.png> docs desktop/icons/pierdoon.png`.
+ * The screenshots come from `./gradlew :desktop:shots` at 1440x900 on the made-up library of DemoData.java.
+ * home: play "Continue listening", `muted off`, 3 s. lyrics: then the player bar's expand button, about 14 s more
+ * (a line half lit). delicious: on a fresh copy, play, then the sparkle button in the player bar, about 10 s.
  */
 public class Banners {
-    static Font bold, regular;
-    static final Color INK = new Color(0xF2, 0xEF, 0xEA), MUTED = new Color(0xA9, 0xA6, 0xA0);
+    static Font font;
+    static final Color INK = new Color(0xF4, 0xF1, 0xEC), MUTED = new Color(0xA3, 0xA0, 0x9A);
 
     public static void main(String[] a) throws Exception {
         Path shots = Paths.get(a[0]), out = Paths.get(a[1]), icon = Paths.get(a[2]);
-        bold = Font.createFont(Font.TRUETYPE_FONT, new File("C:/Windows/Fonts/segoeuib.ttf"));
-        regular = Font.createFont(Font.TRUETYPE_FONT, new File("C:/Windows/Fonts/segoeui.ttf"));
-        BufferedImage home = ImageIO.read(shots.resolve("post_home.png").toFile());
-        hero(ImageIO.read(icon.toFile()), home, out.resolve("readme-hero.png"));
-        feature(home, "A fresh, expressive look",
-            "Material 3 Expressive on the phone and the PC. On a wide window the screens spread into two columns.",
-            false, out.resolve("readme-design.png"));
-        feature(ImageIO.read(shots.resolve("post_queue.png").toFile()), "Lyrics and queue on frosted glass",
-            "Synced lyrics and the queue open over the screen, so nothing moves aside. Menus and sheets are frosted too.",
-            true, out.resolve("readme-glass.png"));
-        feature(ImageIO.read(shots.resolve("post_log.png").toFile()), "Downloads that explain themselves",
-            "Every download is logged with the full error. When YouTube asks if you\u2019re a bot, sign in once and it stops asking.",
-            false, out.resolve("readme-downloads.png"));
+        font = Font.createFont(Font.TRUETYPE_FONT, new File("ui/src/commonMain/composeResources/font/google_sans.ttf"));
+        hero(ImageIO.read(icon.toFile()), ImageIO.read(shots.resolve("home.png").toFile()), out.resolve("readme-cover.png"));
+        feature(ImageIO.read(shots.resolve("lyrics.png").toFile()), "Lyrics that light up as they’re sung",
+            "Synced lyrics found for you, or written and timed by hand.", out.resolve("readme-lyrics.png"));
+        feature(ImageIO.read(shots.resolve("delicious.png").toFile()), "Delicious mode",
+            "On the computer: just the words, over the cover, moving with the music.", out.resolve("readme-delicious.png"));
     }
 
     static Graphics2D canvas(BufferedImage img) {
@@ -43,41 +38,28 @@ public class Banners {
         return g;
     }
 
-    /** Graphite, a soft glow in the screenshot's own colour, and a faint cookie in a corner, like the app's cards. */
-    static void background(Graphics2D g, int w, int h, Color glow, double gx, double gy, boolean cookieLeft) {
-        Shape card = new RoundRectangle2D.Double(0, 0, w, h, 56, 56);
+    /** A rounded graphite card with two soft glows in the screenshot's colours. */
+    static void background(Graphics2D g, int w, int h, Color[] glow) {
+        Shape card = new RoundRectangle2D.Double(0, 0, w, h, 48, 48);
         g.setClip(card);
-        g.setPaint(new GradientPaint(0, 0, new Color(0x2B, 0x2C, 0x30), 0, h, new Color(0x16, 0x17, 0x1A)));
+        g.setPaint(new GradientPaint(0, 0, new Color(0x1E, 0x1F, 0x23), 0, h, new Color(0x111214)));
         g.fill(card);
-        float r = (float) (w * 0.55);
-        g.setPaint(new RadialGradientPaint(new Point2D.Double(gx, gy), r, new float[]{0f, 1f},
-            new Color[]{new Color(glow.getRed(), glow.getGreen(), glow.getBlue(), 70), new Color(glow.getRed(), glow.getGreen(), glow.getBlue(), 0)}));
-        g.fill(card);
-        g.setColor(new Color(255, 255, 255, 9));
-        double cs = h * 0.9;
-        AffineTransform t = AffineTransform.getTranslateInstance(cookieLeft ? -cs * 0.35 : w - cs * 0.65, h - cs * 0.6);
-        t.rotate(Math.toRadians(18), cs / 2, cs / 2);
-        g.fill(t.createTransformedShape(cookie(cs, 9, 0.06)));
+        glow(g, card, glow[0], w * 0.22, h * 0.95, w * 0.55, 90);
+        glow(g, card, glow[1], w * 0.82, h * 0.7, w * 0.5, 70);
     }
 
-    static Shape cookie(double size, int lobes, double depth) {
-        Path2D p = new Path2D.Double();
-        double c = size / 2, r = size * 0.46;
-        for (int i = 0; i <= 1440; i++) {
-            double t = i * Math.PI * 2 / 1440, rr = r * (1 + depth * Math.cos(lobes * t));
-            double x = c + rr * Math.sin(t), y = c - rr * Math.cos(t);
-            if (i == 0) p.moveTo(x, y); else p.lineTo(x, y);
-        }
-        p.closePath();
-        return p;
+    static void glow(Graphics2D g, Shape area, Color c, double x, double y, double r, int alpha) {
+        g.setPaint(new RadialGradientPaint(new Point2D.Double(x, y), (float) r, new float[]{0f, 1f},
+            new Color[]{new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha), new Color(c.getRed(), c.getGreen(), c.getBlue(), 0)}));
+        g.fill(area);
     }
 
     /** The screenshot as a window: rounded, a hairline edge, a soft shadow under it. */
     static void window(Graphics2D g, BufferedImage shot, double x, double y, double w) {
-        double h = w * shot.getHeight() / shot.getWidth(), arc = w * 0.03;
-        for (int i = 28; i > 0; i--) {
-            g.setColor(new Color(0, 0, 0, (int) (5 + (28 - i) * 0.35)));
-            g.fill(new RoundRectangle2D.Double(x - i * 0.6, y - i * 0.2 + 16, w + i * 1.2, h + i * 1.2, arc + i, arc + i));
+        double h = w * shot.getHeight() / shot.getWidth(), arc = 36;
+        for (int i = 36; i > 0; i--) {
+            g.setColor(new Color(0, 0, 0, (int) (3 + (36 - i) * 0.3)));
+            g.fill(new RoundRectangle2D.Double(x - i * 0.5, y - i * 0.1 + 20, w + i, h + i, arc + i, arc + i));
         }
         Shape rr = new RoundRectangle2D.Double(x, y, w, h, arc, arc);
         Shape old = g.getClip();
@@ -87,84 +69,63 @@ public class Banners {
         g.drawImage(shot, (int) x, (int) y, (int) w, (int) h, null);
         g.setClip(old);
         g.setStroke(new BasicStroke(1.5f));
-        g.setColor(new Color(255, 255, 255, 34));
+        g.setColor(new Color(255, 255, 255, 30));
         g.draw(rr);
     }
 
-    static Color average(BufferedImage img) {
-        long r = 0, gr = 0, b = 0, n = 0;
-        for (int y = 0; y < img.getHeight(); y += 8) for (int x = 0; x < img.getWidth(); x += 8) {
-            int c = img.getRGB(x, y);
-            int cr = c >> 16 & 255, cg = c >> 8 & 255, cb = c & 255;
-            int max = Math.max(cr, Math.max(cg, cb)), min = Math.min(cr, Math.min(cg, cb));
-            if (max - min < 40) continue; // only the colourful parts: covers, accents
-            r += cr; gr += cg; b += cb; n++;
+    /** The two most common vivid colours of the picture, for the glows. */
+    static Color[] palette(BufferedImage img) {
+        Map<Integer, int[]> bins = new HashMap<>();
+        for (int y = 0; y < img.getHeight(); y += 4) for (int x = 0; x < img.getWidth(); x += 4) {
+            int c = img.getRGB(x, y), r = c >> 16 & 255, gr = c >> 8 & 255, b = c & 255;
+            float[] hsb = Color.RGBtoHSB(r, gr, b, null);
+            if (hsb[1] < 0.35f || hsb[2] < 0.3f) continue;
+            int[] s = bins.computeIfAbsent((int) (hsb[0] * 12) % 12, k -> new int[4]);
+            s[0] += r; s[1] += gr; s[2] += b; s[3]++;
         }
-        return n == 0 ? new Color(0x9A, 0x96, 0x8E) : new Color((int) (r / n), (int) (gr / n), (int) (b / n));
+        List<int[]> sorted = new ArrayList<>(bins.values());
+        sorted.sort((p, q) -> q[3] - p[3]);
+        Color fallback = new Color(0xC8553D);
+        Color first = sorted.isEmpty() ? fallback : avg(sorted.get(0));
+        Color second = sorted.size() < 2 || sorted.get(1)[3] < sorted.get(0)[3] / 8 ? first : avg(sorted.get(1));
+        return new Color[]{first, second};
     }
 
-    static int text(Graphics2D g, String s, Font f, Color c, int x, int y, int width, float lineGap) {
-        g.setFont(f);
+    static Color avg(int[] s) { return new Color(s[0] / s[3], s[1] / s[3], s[2] / s[3]); }
+
+    static void centered(Graphics2D g, String s, float size, Color c, int cx, int baseline) {
+        g.setFont(font.deriveFont(size));
         g.setColor(c);
-        FontMetrics m = g.getFontMetrics();
-        List<String> lines = new ArrayList<>();
-        StringBuilder line = new StringBuilder();
-        for (String word : s.split(" ")) {
-            String tryLine = line.length() == 0 ? word : line + " " + word;
-            if (m.stringWidth(tryLine) > width && line.length() > 0) {
-                lines.add(line.toString());
-                line = new StringBuilder(word);
-            } else line = new StringBuilder(tryLine);
-        }
-        lines.add(line.toString());
-        int lh = (int) (m.getHeight() * lineGap);
-        for (String l : lines) {
-            y += lh;
-            g.drawString(l, x, y - m.getDescent());
-        }
-        return y;
+        g.drawString(s, cx - g.getFontMetrics().stringWidth(s) / 2f, baseline);
     }
 
     static void hero(BufferedImage icon, BufferedImage shot, Path file) throws IOException {
-        int w = 1600, h = 680;
+        int w = 1600, h = 900;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = canvas(img);
-        background(g, w, h, average(shot), w * 0.8, h * 0.4, true);
-        // The app, big and running off the right and bottom edges.
-        window(g, shot, 760, 120, 1000);
-        g.drawImage(icon, 92, 72, 140, 140, null);
-        int y = text(g, "Pier.doon", bold.deriveFont(104f), INK, 88, 222, 700, 0.95f);
-        y = text(g, "An offline music player", regular.deriveFont(32f), MUTED, 94, y + 4, 700, 1.15f);
-        y = text(g, "for Android and Windows", regular.deriveFont(32f), MUTED, 94, y, 700, 1.15f);
-        String[] chips = {"Material 3 Expressive", "Synced lyrics", "Radio", "Downloads", "Cassette mode"};
-        g.setFont(regular.deriveFont(22f));
-        FontMetrics m = g.getFontMetrics();
-        int cx = 96, cy = y + 34;
-        for (String c : chips) {
-            int cw = m.stringWidth(c) + 36;
-            if (cx + cw > 700) { cx = 96; cy += 54; }
-            g.setColor(new Color(255, 255, 255, 18));
-            g.fill(new RoundRectangle2D.Double(cx, cy, cw, 42, 42, 42));
-            g.setColor(new Color(255, 255, 255, 40));
-            g.draw(new RoundRectangle2D.Double(cx, cy, cw, 42, 42, 42));
-            g.setColor(INK);
-            g.drawString(c, cx + 18, cy + 29);
-            cx += cw + 12;
-        }
+        background(g, w, h, palette(shot));
+        // The name, small and centred, the app rising from the bottom edge under it.
+        g.setFont(font.deriveFont(68f));
+        String name = "Pier.doon";
+        int nameW = g.getFontMetrics().stringWidth(name), iconS = 76, gap = 20;
+        int left = (w - (iconS + gap + nameW)) / 2;
+        g.drawImage(icon, left, 64, iconS, iconS, null);
+        g.setColor(INK);
+        g.drawString(name, left + iconS + gap, 126);
+        centered(g, "An offline music player for Android and Windows", 28f, MUTED, w / 2, 190);
+        window(g, shot, 160, 250, w - 320);
         g.dispose();
         ImageIO.write(img, "png", file.toFile());
     }
 
-    static void feature(BufferedImage shot, String title, String body, boolean textRight, Path file) throws IOException {
-        int w = 1600, h = 760;
+    static void feature(BufferedImage shot, String title, String body, Path file) throws IOException {
+        int w = 1600, h = 980;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = canvas(img);
-        double sw = 1000, sx = textRight ? 80 : w - sw - 80;
-        background(g, w, h, average(shot), sx + sw / 2, h / 2.0, !textRight);
-        window(g, shot, sx, (h - sw * shot.getHeight() / shot.getWidth()) / 2, sw);
-        int tx = textRight ? (int) (sx + sw + 64) : 80, tw = w - (int) sw - 80 - 64 - 80;
-        int y = text(g, title, bold.deriveFont(54f), INK, tx, 230, tw, 0.88f);
-        text(g, body, regular.deriveFont(27f), MUTED, tx, y + 20, tw, 1.12f);
+        background(g, w, h, palette(shot));
+        centered(g, title, 48f, INK, w / 2, 104);
+        centered(g, body, 26f, MUTED, w / 2, 150);
+        window(g, shot, 240, 206, w - 480);
         g.dispose();
         ImageIO.write(img, "png", file.toFile());
     }

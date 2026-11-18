@@ -49,6 +49,7 @@ import kotlin.system.exitProcess
  *     wait 1500          let it run
  *     tab Settings       select a tab
  *     page Appearance    open a settings page
+ *     muted on|off       sound off or on (on at the start, so nothing plays through the speakers)
  *     nothing on|off     the Nothing style
  *     progress Thick     the seek bar style: Wavy, Line, Dots or Thick
  *     chrome on          draw the window's own title bar buttons
@@ -182,7 +183,9 @@ fun main(args: Array<String>) {
                         println("shot ${p[1]}")
                     }
                     "cassette" -> SettingsStore.update { it.shared { copy(cassetteMode = p[1] == "on") } }
-                    "nothing" -> SettingsStore.update { it.shared { copy(nothingStyle = p[1] == "on") } }
+                    // The demo library is silent, so its pictures can show the volume as it really looks.
+                    "muted" -> SettingsStore.update { it.copy(muted = p[1] == "on") }
+                    "nothing" ->SettingsStore.update { it.shared { copy(nothingStyle = p[1] == "on") } }
                     "chrome" -> com.ku.pierdoon.ui.desktop.WindowChrome.controls.value =
                         if (p[1] == "on") com.ku.pierdoon.ui.desktop.WindowControls(androidx.compose.ui.window.WindowState(), onClose = {}) else null
                     "tracks" -> SettingsStore.update { it.copy(trackView = com.ku.pierdoon.data.TrackView.valueOf(p[1])) }
